@@ -28,7 +28,8 @@ class MaskedAutoencoderViT(nn.Module):
     def __init__(self, modalities, input_channels=1, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-                 mlp_ratio=4., norm_layer=nn.LayerNorm, norm_pix_loss=False, 
+                 mlp_ratio=4., norm_layer=nn.LayerNorm, 
+                 norm_pix_loss=False, masked_patch_loss=False,
                  ncc_weight:float=0.0):
         super().__init__()
 
@@ -114,6 +115,7 @@ class MaskedAutoencoderViT(nn.Module):
         # --------------------------------------------------------------------------
 
         self.norm_pix_loss = norm_pix_loss
+        self.masked_patch_loss = masked_patch_loss
         
         self.ncc_weight = ncc_weight
 
@@ -538,14 +540,16 @@ class MaskedAutoencoderViT(nn.Module):
         attn_mask_input_space = torch.nn.functional.interpolate(attn_mask.unsqueeze(1), scale_factor=self.patch_size, mode="nearest")
         # [N, C, H, W]
         imgs_hat = imgs_hat * attn_mask_input_space
-
         # mean over last dim (for normalization) does not require consideration of the attention mask
         ncc = statistics.ncc(imgs, imgs_hat)
 
-        # loss_patches = (loss * mask).sum() / mask.sum()  # TODO: mean loss on removed patches
-        loss = loss.sum() / (torch.sum(attn_mask) + 1e-9)  # neglects the paddings
+        if self.masked_patch_loss:
+            # compute loss only on masked patches
+            loss = (loss * mask).sum() / (torch.sum(attn_mask.flatten(1) * mask) + 1e-9)
+        else:
+            loss = loss.sum() / (torch.sum(attn_mask) + 1e-9)
 
-        return (1-self.ncc_weight)*loss + self.ncc_weight*(1-ncc)
+        return (1 - self.ncc_weight) * loss + self.ncc_weight * (1 - ncc)
 
     def forward(self, imgs, attn_mask, pos_embed_y, mask_ratio=0.75):
         """

@@ -73,6 +73,8 @@ def get_args_parser():
 
     parser.add_argument('--norm_pix_loss', action='store_true', default=False,
                         help='Use (per-patch) normalized pixels as targets for computing loss')
+    parser.add_argument('--masked_patch_loss', action='store_true', default=False,
+                        help='Compute loss only on masked patches')
 
     parser.add_argument('--ncc_weight', type=float, default=0.1,
                         help='Add normalized cross-correlation (ncc) as additional loss term')
@@ -294,6 +296,7 @@ def main(args):
         input_channels=args.input_channels,
         patch_size=args.patch_size,
         norm_pix_loss=args.norm_pix_loss,
+        masked_patch_loss=args.masked_patch_loss,
         ncc_weight=args.ncc_weight
     )
 

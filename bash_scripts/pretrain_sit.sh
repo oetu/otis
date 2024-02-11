@@ -27,6 +27,7 @@ patch_height="1"
 patch_width=(100)
 
 norm_pix_loss="False"
+masked_patch_loss="False"
 
 ncc_weight=0.1
 cos_weight=0.0
@@ -152,6 +153,10 @@ do
 
             if [ "$norm_pix_loss" = "True" ]; then
                 cmd=$cmd" --norm_pix_loss"
+            fi
+
+            if [ "$masked_patch_loss" = "True" ]; then
+                cmd=$cmd" --masked_patch_loss"
             fi
 
             if [ "$wandb" = "True" ]; then
