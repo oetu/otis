@@ -27,7 +27,7 @@ patch_height="1"
 patch_width=(100)
 
 norm_pix_loss="False"
-masked_patch_loss="False"
+masked_patch_loss="True"
 
 ncc_weight=0.1
 cos_weight=0.0
@@ -122,7 +122,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="SiT"
+            folder="SiT/masked_patch_loss"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data
