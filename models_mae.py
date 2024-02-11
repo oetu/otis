@@ -531,8 +531,6 @@ class MaskedAutoencoderViT(nn.Module):
         # mean over last dim does not require consideration of the attention mask
         loss = loss.sum(dim=-1) / (loss.shape[-1] + 1e-9)
 
-        # loss_patches = (loss_patches * mask).sum() / mask.sum()  # mean loss on removed patches
-
         # REGULARIZATION (using normalized correlation coefficient of the actual signals)
         # [N, C, H, W]
         imgs_hat = self.unpatchify(pred, attn_mask)
@@ -544,8 +542,8 @@ class MaskedAutoencoderViT(nn.Module):
         # mean over last dim (for normalization) does not require consideration of the attention mask
         ncc = statistics.ncc(imgs, imgs_hat)
 
-        # loss = loss.sum() / (torch.numel(loss) + 1e-5)
-        loss = loss.sum() / (torch.sum(attn_mask) + 1e-9) # neglects the paddings
+        # loss_patches = (loss * mask).sum() / mask.sum()  # TODO: mean loss on removed patches
+        loss = loss.sum() / (torch.sum(attn_mask) + 1e-9)  # neglects the paddings
 
         return (1-self.ncc_weight)*loss + self.ncc_weight*(1-ncc)
 

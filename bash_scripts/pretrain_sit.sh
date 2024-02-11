@@ -39,40 +39,45 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(1e-5)
+blr_array=(1e-4)
 weight_decay=(0.15)
 
 # Data path
-path="tower"
-dataset="ukbb"
+path="server"
+dataset="signalnet"
+
 if [ "$path" = "tower" ]; then
     if [ "$dataset" = "ukbb" ]; then
         data_base="/home/oturgut/data/processed/ukbb"
-    else
+    elif  [ "$dataset" = "mimic" ]; then
         data_base="/home/oturgut/data/processed/mimic-ecg-text"
+    else 
+        data_base="/home/oturgut/data/processed/signalnet"
     fi
-    checkpoint_base="/home/oturgut/mae"
+    checkpoint_base="/home/oturgut/SiT"
 else
     if [ "$dataset" = "ukbb" ]; then
         data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
-    else
+    elif [ "$dataset" = "mimic" ]; then
         data_base="/vol/aimspace/projects/physionet/mimic/processed/mimic-ecg-text"
+    else
+        data_base="/vol/aimspace/users/tuo/data/signalnet"
     fi
-    checkpoint_base="/vol/aimspace/users/tuo/mae"
+    checkpoint_base="/vol/aimspace/users/tuo/SiT"
 fi
 
 # Dataset parameters
 if [ "$dataset" = "ukbb" ]; then
-    # data_path=$data_base"/processed/ecgs_train_ecg_imaging_float32.pt"
-    # val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
+    data_path=$data_base"/processed/ecgs_train_ecg_imaging_float32.pt"
+    val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
     # data_path=$data_base"/ecgs_train_ecg_imaging_noBase_gn.pt"
     # val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
-
-    data_path="/home/oturgut/data/processed/signalnet/data_train_new.pt"
-    val_data_path="/home/oturgut/data/processed/signalnet/data_val_new.pt"
-else
+elif [ "$dataset" = "mimic" ]; then
     data_path=$data_base"/ecgs_train_590k_p1_clean.pt"
     val_data_path=$data_base"/ecgs_val_10k_clean.pt"
+else
+    data_path=$data_base"/data_train_new.pt"
+    val_data_path=$data_base"/data_val_new.pt"
 fi
 
 num_workers="24"
@@ -92,13 +97,13 @@ fi
 
 target="CAD"
 data_path_online=$online_data_base"/processed/ecgs_train_"$target"_all_balanced_float32.pt"
-# data_path_online=$online_data_base"/ecgs_train_"$target"_all_balanced_noBase_gn.pt"
 labels_path_online=$online_data_base"/labelsOneHot/labels_train_"$target"_all_balanced.pt"
+# data_path_online=$online_data_base"/ecgs_train_"$target"_all_balanced_noBase_gn.pt"
 # labels_mask_path_online=""
 
 val_data_path_online=$online_data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
-# val_data_path_online=$online_data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
 val_labels_path_online=$online_data_base"/labelsOneHot/labels_val_"$target"_all.pt"
+# val_data_path_online=$online_data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
 # val_labels_mask_path_online=""
 
 # Log specifications
@@ -116,7 +121,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="SiT/dec_pos_y_linear_prj"
+            folder="SiT"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data
