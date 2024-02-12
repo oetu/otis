@@ -58,7 +58,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     # required for metrics calculation
     logits, labels = [], []
 
-    for data_iter_step, (samples, targets, targets_mask) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for data_iter_step, (samples, targets, targets_mask, pos_embed_y) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
@@ -67,6 +67,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         targets = targets.to(device, non_blocking=True)
         targets_mask = targets_mask.to(device, non_blocking=True)
         targets = targets * targets_mask
+        pos_embed_y = pos_embed_y.to(device, non_blocking=True)
 
         if args.downstream_task == 'classification':
             targets_mask = targets_mask.unsqueeze(dim=-1).repeat(1, args.nb_classes)
@@ -75,7 +76,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             samples, targets = mixup_fn(samples, targets)
 
         with torch.cuda.amp.autocast():
-            outputs = model(samples)*targets_mask
+            outputs = model(samples, pos_embed_y) * targets_mask
             loss = criterion(outputs, targets)
 
         loss_value = loss.item()
@@ -208,21 +209,26 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
 
     for batch in metric_logger.log_every(data_loader, 10, header):
         images = batch[0]
-        target = batch[-2]
-        target_mask = batch[-1]
         images = images.to(device, non_blocking=True)
+
+        target = batch[1]
         target = target.to(device, non_blocking=True)
+
+        target_mask = batch[2]
         target_mask = target_mask.to(device, non_blocking=True)
         target = target * target_mask
+
+        pos_embed_y = batch[3]
+        pos_embed_y = pos_embed_y.to(device, non_blocking=True)
 
         if args.downstream_task == 'classification':
             target_mask = target_mask.unsqueeze(dim=-1).repeat(1, args.nb_classes)
 
         # compute output
         with torch.cuda.amp.autocast():
-            embedding = model.forward_features(images)
+            embedding = model.forward_features(images, pos_embed_y)
             output = model.forward_head(embedding)
-            output = output*target_mask
+            output = output * target_mask
             loss = criterion(output, target)
 
         if args.save_embeddings:

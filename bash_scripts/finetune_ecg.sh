@@ -2,7 +2,7 @@
 # Fine tuning 
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
-seed=(101 202 303 404)
+seed=(0)
 batch_size=(32)
 accum_iter=(1)
 
@@ -16,8 +16,8 @@ max_delta="0.25" # for AUROC
 # Model parameters
 input_channels="1"
 input_electrodes="12"
-time_steps="2500"
-model_size="tiny"
+time_steps="5000"
+model_size="tinyDeep"
 model="vit_"$model_size"_patchX"
 
 patch_height="1"
@@ -36,10 +36,8 @@ ft_surr_phase_noise="0.075"
 drop_path=(0.1)
 layer_decay=(0.5)
 
-from_scratch="False"
-
 # Optimizer parameters
-blr=(1e-5) # 3e-5 if from scratch
+blr=(3e-5) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -62,14 +60,14 @@ fi
 # labels_path=$data_base"/labelsOneHot/labels_train_flutter_all_balanced.pt"
 # downstream_task="classification"
 # nb_classes="2"
-data_path=$data_base"/processed/ecgs_train_diabetes_all_balanced_float32.pt"
-labels_path=$data_base"/labelsOneHot/labels_train_diabetes_all_balanced.pt"
-downstream_task="classification"
-nb_classes="2"
-# data_path=$data_base"/ecgs_train_CAD_all_balanced_noBase_gn.pt"
-# labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
+# data_path=$data_base"/processed/ecgs_train_diabetes_all_balanced_float32.pt"
+# labels_path=$data_base"/labelsOneHot/labels_train_diabetes_all_balanced.pt"
 # downstream_task="classification"
 # nb_classes="2"
+data_path=$data_base"/ecgs_train_CAD_all_balanced_noBase_gn.pt"
+labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
+downstream_task="classification"
+nb_classes="2"
 # data_path=$data_base"/ecgs_train_CAD_hundredth_balanced_noBase_gn.pt"
 # labels_path=$data_base"/labelsOneHot/labels_train_CAD_hundredth_balanced.pt"
 # downstream_task="classification"
@@ -103,24 +101,24 @@ nb_classes="2"
 # val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
 # val_labels_path=$data_base"/labelsOneHot/labels_val_flutter_all.pt"
 # pos_label="1"
-val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
-val_labels_path=$data_base"/labelsOneHot/labels_val_diabetes_all.pt"
-pos_label="1"
-# val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
-# val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
+# val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
+# val_labels_path=$data_base"/labelsOneHot/labels_val_diabetes_all.pt"
 # pos_label="1"
+val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
+val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
+pos_label="1"
 # val_data_path=$data_base"/ecgs_val_Regression_noBase_gn.pt"
 # val_labels_path=$data_base"/labelsOneHot/labels_val_Regression_stdNormed.pt"
 # val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
 
 global_pool=(True)
 attention_pool=(False)
-num_workers="32"
+num_workers="24"
 
 # Log specifications
-save_output="True"
+save_output="False"
 wandb="True"
-wandb_project="MAE_ECG_Fin_Tiny_Diabetes_v2"
+wandb_project="MAE_ECG_Fin_Tiny_CAD"
 wandb_id=""
 
 plot_attention_map="False"
@@ -130,7 +128,9 @@ save_logits="False"
 
 # Pretraining specifications
 pre_batch_size=(128)
-pre_blr=(1e-5)
+pre_blr=(3e-5)
+
+from_scratch="False"
 
 # EVALUATE
 eval="False"
@@ -155,12 +155,15 @@ do
                         for smth in "${smoothing[@]}"
                         do
 
-                            folder="ukbb/ecg/Diabetes/MAE/cos"
+                            folder="ukbb/ecg/CAD"
                             subfolder=("seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$weight_decay"/m0.8")
 
                             pre_data="b"$pre_batch_size"_blr"$pre_blr
                             # finetune=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_"$pre_data"/checkpoint-399.pth"
-                            
+
+                            # SiT
+                            finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
+
                             # # MAE + MMCL
                             # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"
                             
@@ -170,10 +173,10 @@ do
                             # # MAE only
                             # finetune=$checkpoint_base"/checkpoints/tiny/v1/checkpoint-399.pth"
                             # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/cl/ncc_weight0.1/seed0/tiny/t2500/p1x100/wd0.15/m0.8/pre_b1536_blr3e-6/checkpoint-398-ncc-0.9573.pth"
-                            finetune="/home/oturgut/mae/output/pre/ukbb/ecg/cos/ncc_weight0.1/seed0/tiny/t2500/p1x100/wd0.15/m0.8/pre_b1024_blr3e-6/checkpoint-396-ncc-0.9567.pth"
+                            # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/cos/ncc_weight0.1/seed0/tiny/t2500/p1x100/wd0.15/m0.8/pre_b1024_blr3e-6/checkpoint-396-ncc-0.9567.pth"
                             # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/ncc_weight0.1/seed0/tiny/t2500/p1x100/wd0.15/m0.8/pre_b1536_blr3e-6/checkpoint-399-ncc-0.96.pth"
                             # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/ncc_weight0.1/seed0/tinyDeep/t2500/p1x100/wd0.15/m0.8/pre_b1536_blr3e-6/checkpoint-394-ncc-0.9590.pth"
-                            
+
                             # # BYOL 
                             # finetune=$checkpoint_base"/checkpoints/ecg/ecg_v204_um_checkpoint.pth"
 

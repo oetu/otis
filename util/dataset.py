@@ -63,6 +63,10 @@ class SignalDataset(Dataset):
         self.train = train 
         self.args = args
 
+    def set_modality_offsets(self, modality_offsets:Dict=None):
+        """set predefined modality offsets"""
+        self.offsets = modality_offsets
+
     def __len__(self) -> int:
         """return the number of samples in the dataset"""
         return len(self.data)

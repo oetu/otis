@@ -15,14 +15,36 @@ import torch
 import torch.nn as nn
 
 import timm.models.vision_transformer
+from timm.models.layers import trunc_normal_
+
+from util.patch_embed import PatchEmbed
+from util.pos_embed import get_1d_sincos_pos_embed
 
 
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """ Vision Transformer with support for global average pooling
     """
-    def __init__(self, global_pool=False, attention_pool=False, 
+    def __init__(self, img_size, modalities, patch_size=(1, 100), global_pool=False, attention_pool=False, 
                  masking_blockwise=False, mask_ratio=0.0, mask_c_ratio=0.0, mask_t_ratio=0.0, **kwargs):
         super(VisionTransformer, self).__init__(**kwargs)
+
+        embed_dim = kwargs['embed_dim']
+        self.patch_embed = PatchEmbed(img_size[0], patch_size, embed_dim, flatten=False) # set flatten to False
+
+        self.grid_size = {}
+        for modality, shape in modalities:
+            grid_size = (shape[1] // patch_size[0], shape[2] // patch_size[1])
+            self.grid_size.update( {modality: grid_size} )
+
+        assert embed_dim % 2 == 0
+        self.max_num_patches_x = max([v[1] for k, v in self.grid_size.items()])
+        self.pos_embed_x = nn.Parameter(torch.zeros(1, self.max_num_patches_x + 1, embed_dim // 2), requires_grad=False) # +1 cls embed
+
+        total_num_embeddings_y = sum([v[0] for k, v in self.grid_size.items()])
+        self.pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, embed_dim // 2, padding_idx=0) # +1 padding embed
+
+        # split into pos_embed_x and pos_embed_y
+        del self.pos_embed
 
         self.masking_blockwise = masking_blockwise
         self.mask_ratio = mask_ratio
@@ -47,6 +69,26 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         
         for block in self.blocks:
             block.attn.forward = self._attention_forward_wrapper(block.attn)
+
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        # initialize learnable pos_embed for the vertical axis
+        _pos_embed_y = torch.nn.Parameter(torch.randn(self.pos_embed_y.num_embeddings-1, 
+                                                      self.pos_embed_y.embedding_dim) * .02)
+        trunc_normal_(_pos_embed_y, std=.02)
+        with torch.no_grad():
+            self.pos_embed_y.weight[1:] = _pos_embed_y
+                
+        # initialize (and freeze) pos_embed for the horizontal axis by sin-cos embedding
+        _pos_embed_x = get_1d_sincos_pos_embed(self.pos_embed_x.shape[-1], 
+                                               self.pos_embed_x.shape[-2]-1, 
+                                               cls_token=True)
+        self.pos_embed_x.data.copy_(torch.from_numpy(_pos_embed_x).float().unsqueeze(0))
+
+        # # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
+        # w = self.patch_embed.proj.weight.data
+        # torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
         
     def _attention_forward_wrapper(self, attn_obj):
         """
@@ -135,25 +177,62 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
             
         return x_masked, None, None
 
-    def forward_features(self, x):
+    def forward_features(self, x, pos_embed_y):
         """
         x: [B=N, L, D], sequence
+        pos_embed_y: [B=N, C', T'], with C'*T'=L and C'=H/p, T'=W/q
+
+        Note: patch_size: (p, q) 
         """
-        B = x.shape[0]
+        # embed patches
+        # (B, D, C', T')
         x = self.patch_embed(x)
 
-        x = x + self.pos_embed[:, 1:, :]
+        # add pos embed X w/o cls token
+        # (1, 1+T'_max, D/2)
+        pos_embed_x = self.pos_embed_x
+        # (1, 1+T'_max, D), padding left
+        pos_embed_x = torch.nn.functional.pad(pos_embed_x, (x.shape[1]//2, 0), "constant", 0)
+        # (1, D, 1, 1+T'_max)
+        pos_embed_x_batch = torch.permute(pos_embed_x, (0, 2, 1)).unsqueeze(-2)
+        # (1, D, 1, T')
+        pos_embed_x_batch = pos_embed_x_batch[..., 1:x.shape[-1]+1]
+        # (1, D, C', T')
+        pos_embed_x_batch = pos_embed_x_batch.expand(-1, -1, x.shape[2], -1)
+
+        # (B, D, C', T')
+        x = x + pos_embed_x_batch
+
+        # add pos embed Y
+        # (B, C', T', D/2)
+        pos_embed_y_batch = self.pos_embed_y(pos_embed_y)
+        # (B, C', T', D), padding right
+        pos_embed_y_batch = torch.nn.functional.pad(pos_embed_y_batch, (0, x.shape[1]//2), "constant", 0)
+        # (B, D, C', T')
+        pos_embed_y_batch = torch.permute(pos_embed_y_batch, (0, 3, 1, 2))
+        
+        # (B, D, C', T')
+        x = x + pos_embed_y_batch
+
+        # flatten
+        # (B, N, D), with N=C'*T'
+        x = x.flatten(2).transpose(1, 2)
+
         if self.masking_blockwise:
             x, _, _ = self.random_masking_blockwise(x, self.mask_c_ratio, self.mask_t_ratio)
         else:
             x, _, _ = self.random_masking(x, self.mask_ratio)
 
-        cls_token = self.cls_token + self.pos_embed[:, 0, :]
-        cls_tokens = cls_token.expand(B, -1, -1)  # stole cls_tokens impl from Phil Wang, thanks
+        # append cls token
+        # (1, 1, D)
+        cls_token = self.cls_token + pos_embed_x[:, :1, :]
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        # (B, 1+N, D)
         x = torch.cat((cls_tokens, x), dim=1)
         
         x = self.pos_drop(x)
 
+        # apply Transformer blocks
         for blk in self.blocks:
             x = blk(x)
 
@@ -178,6 +257,11 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         x = self.fc_norm(x)
         
         return x if pre_logits else self.head(x)
+    
+    def forward(self, x, pos_embed_y):
+        x = self.forward_features(x, pos_embed_y)
+        x = self.forward_head(x)
+        return x
 
 
 def vit_pluto_patchX(**kwargs):
