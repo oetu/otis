@@ -413,12 +413,12 @@ def main(args):
 
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=0.01)#2e-5)
-    
-    model.to(device, non_blocking=True)
 
     # # TODO: make pos embeddings y trainable if flag set to True
     # if args.trainable_pos_embed_y:
     #     model.pos_embed_y.weight.requires_grad = True
+    
+    model.to(device, non_blocking=True)
 
     model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)

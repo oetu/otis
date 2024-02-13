@@ -3,21 +3,21 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-batch_size=(32)
+batch_size=(128)
 accum_iter=(1)
 
 epochs="400"
 warmup_epochs="5"
 
 # Callback parameters
-patience="25"
-max_delta="0.0"
+patience="15"
+max_delta="0.25"
 
 # Model parameters
 input_channels="1"
 input_electrodes="12"
 time_steps="2500"
-model_size="tiny"
+model_size="tinyDeep"
 model="vit_"$model_size"_patchX"
 
 patch_height="1"
@@ -36,17 +36,17 @@ ft_surr_phase_noise="0.075"
 layer_decay=(0.75)
 
 # Optimizer parameters
-blr=(3e-6)
+blr=(1e-2)
 min_lr="0.0"
-weight_decay=(0.2)
+weight_decay=(0.1)
 
 # Criterion parameters
-smoothing=(0.0)
+smoothing=(0.1)
 
 from_scratch="False"
 
 # Data path
-path="server"
+path="tower"
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/ukbb"
     checkpoint_base="/home/oturgut/mae"
@@ -65,14 +65,18 @@ fi
 # labels_path=$data_base"/labelsOneHot/labels_train_diabetes_all_balanced.pt"
 # downstream_task="classification"
 # nb_classes="2"
+data_path=$data_base"/processed/ecgs_train_CAD_all_balanced_float32.pt"
+labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
+downstream_task="classification"
+nb_classes="2"
 # data_path=$data_base"/ecgs_train_CAD_all_balanced_noBase_gn.pt"
 # labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
 # downstream_task="classification"
 # nb_classes="2"
-data_path=$data_base"/ecgs_train_Regression_noBase_gn.pt"
-labels_path=$data_base"/labelsOneHot/labels_train_Regression_stdNormed.pt"
-labels_mask_path=$data_base"/labels_train_Regression_mask.pt"
-downstream_task="regression"
+# data_path=$data_base"/ecgs_train_Regression_noBase_gn.pt"
+# labels_path=$data_base"/labelsOneHot/labels_train_Regression_stdNormed.pt"
+# labels_mask_path=$data_base"/labels_train_Regression_mask.pt"
+# downstream_task="regression"
 # # LV
 # lower_bnd="0"
 # upper_bnd="6"
@@ -85,10 +89,10 @@ downstream_task="regression"
 # lower_bnd="24"
 # upper_bnd="41"
 # nb_classes="17"
-# Ecc
-lower_bnd="41"
-upper_bnd="58"
-nb_classes="17"
+# # Ecc
+# lower_bnd="41"
+# upper_bnd="58"
+# nb_classes="17"
 # # Err
 # lower_bnd="58"
 # upper_bnd="75"
@@ -101,21 +105,21 @@ nb_classes="17"
 # val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
 # val_labels_path=$data_base"/labelsOneHot/labels_val_diabetes_all.pt"
 # pos_label="1"
-# val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
-# val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
-# pos_label="1"
-val_data_path=$data_base"/ecgs_val_Regression_noBase_gn.pt"
-val_labels_path=$data_base"/labelsOneHot/labels_val_Regression_stdNormed.pt"
-val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
+val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
+val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
+pos_label="1"
+# val_data_path=$data_base"/ecgs_val_Regression_noBase_gn.pt"
+# val_labels_path=$data_base"/labelsOneHot/labels_val_Regression_stdNormed.pt"
+# val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
 
 global_pool=(True)
 attention_pool=(False)
 num_workers="24"
 
 # Log specifications
-save_output="False"
+save_output="True"
 wandb="True"
-wandb_project="MAE_ECG_Fin_Tiny_Ecc"
+wandb_project="MAE_ECG_CAD"
 wandb_id=""
 
 plot_attention_map="False"
@@ -125,7 +129,7 @@ save_logits="False"
 
 # Pretraining specifications
 pre_batch_size=(128)
-pre_blr=(1e-5)
+pre_blr=(1e-4)
 
 # EVALUATE
 eval="False"
@@ -138,8 +142,6 @@ do
 
     for bs in "${batch_size[@]}"
     do
-        for ld in "${layer_decay[@]}"
-        do
             for lr in "${blr[@]}"
             do
 
@@ -148,13 +150,15 @@ do
                     for smth in "${smoothing[@]}"
                     do
 
-                        folder="ukbb/ecg/Ecc/MMonly"
-                        subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/ld"$ld"/smth"$smth"/wd"$wd"/m0.8/atp")
+                        folder="ukbb/ecg/CAD"
+                        subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$wd"/m0.8/atp")
 
                         pre_data="b"$pre_batch_size"_blr"$pre_blr
+                        finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
+                        # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
                         # finetune=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_"$pre_data"/checkpoint-399.pth"
                         # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"
-                        finetune=$checkpoint_base"/checkpoints/mm_v283_mae_checkpoint.pth"
+                        # finetune=$checkpoint_base"/checkpoints/mm_v283_mae_checkpoint.pth"
                         # finetune=$checkpoint_base"/checkpoints/tiny/v1/checkpoint-399.pth"
 
                         output_dir=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$(($bs*$accum_iter))"_blr"$lr"_"$pre_data
@@ -162,12 +166,12 @@ do
                         # resume=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$bs"_blr"$lr"_"$pre_data"/checkpoint-6-pcc-0.27.pth"
 
                         if [ "$downstream_task" = "regression" ]; then
-                            cmd="python3 main_linprobe.py --lower_bnd $lower_bnd --upper_bnd $upper_bnd --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                            cmd="python3 main_linprobe.py --lower_bnd $lower_bnd --upper_bnd $upper_bnd --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                         else
-                            cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                            cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                         fi
 
-                        # cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                        # cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
 
                         if [ "$masking_blockwise" = "True" ]; then
                             cmd=$cmd" --masking_blockwise --mask_c_ratio $mask_c_ratio --mask_t_ratio $mask_t_ratio"
@@ -238,7 +242,7 @@ do
                 done
 
             done
-        done
+        
     done
 
 done

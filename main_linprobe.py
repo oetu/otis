@@ -27,7 +27,7 @@ from timm.models.layers import trunc_normal_
 
 import util.lr_decay as lrd
 import util.misc as misc
-from util.pos_embed import interpolate_pos_embed
+from util.pos_embed import interpolate_pos_embed_x
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.lars import LARS
 from util.callbacks import EarlyStop
@@ -120,6 +120,11 @@ def get_args_parser():
     parser.add_argument('--attention_pool', action='store_true', default=False)
     parser.add_argument('--cls_token', action='store_false', dest='global_pool',
                         help='Use class token instead of global pool for classification')
+    
+    parser.add_argument('--load_pos_embed_y', action='store_false', default=True,
+                        help='Load pre-trained position embeddings Y (spatial axis) from checkpoint')
+    # parser.add_argument('--trainable_pos_embed_y', action='store_true', default=False,
+    #                     help='Make position embeddings Y (spatial axis) trainable')
 
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
@@ -211,14 +216,19 @@ def main(args):
 
     cudnn.benchmark = True
     
-    dataset_train = SignalDataset(data_path=args.data_path, labels_path=args.labels_path, 
+    dataset_train = SignalDataset(data_path=args.data_path, 
+                                  labels_path=args.labels_path, 
                                   labels_mask_path=args.labels_mask_path,
                                   downstream_task=args.downstream_task, 
-                                  finetune=True, train=True, args=args)
-    dataset_val = SignalDataset(data_path=args.val_data_path, labels_path=args.val_labels_path, 
+                                  finetune=True, train=True, 
+                                  args=args)
+    dataset_val = SignalDataset(data_path=args.val_data_path, 
+                                labels_path=args.val_labels_path, 
                                 labels_mask_path=args.val_labels_mask_path, 
                                 downstream_task=args.downstream_task, 
-                                finetune=True, train=False, args=args)
+                                finetune=True, train=False, 
+                                modality_offsets=dataset_train.offsets, 
+                                args=args)
 
     # train balanced
     class_weights = 2.0 / (2.0 * torch.Tensor([1.0, 1.0])) # total_nb_samples / (nb_classes * samples_per_class)
@@ -286,6 +296,7 @@ def main(args):
     )
 
     model = models_vit.__dict__[args.model](
+        modalities=dataset_train.modalities,
         img_size=args.input_size,
         patch_size=args.patch_size,
         num_classes=args.nb_classes,
@@ -308,20 +319,50 @@ def main(args):
                 print(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
 
-        # interpolate position embedding
-        checkpoint_input_size = checkpoint['args'].input_size
-        interpolate_pos_embed(model, checkpoint_model, checkpoint_input_size)
+        # load position embedding X
+        interpolate_pos_embed_x(model, checkpoint_model)
+
+        key = "pos_embed_x"
+        if key in checkpoint_model:
+            print(f"Removing key {key} from pretrained checkpoint")
+            del checkpoint_model[key]
+        
+        # load position embedding Y
+        target_modality, target_shape = dataset_train.modalities[0]
+        pos_embed_y_available = False
+
+        checkpoint_modalities = checkpoint["modalities"]
+        for modality, shape in checkpoint_modalities:
+            if modality == target_modality and shape[1] == target_shape[1]:
+                pos_embed_y_available = True
+                break
+
+        if args.load_pos_embed_y and pos_embed_y_available:
+            print("Loading position embedding Y from checkpoint")
+            model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
+
+            dataset_train.set_modality_offsets(checkpoint["modality_offsets"])
+            dataset_val.set_modality_offsets(checkpoint["modality_offsets"])
+        else:
+            print("Initializing new position embedding Y")
+
+        key = "pos_embed_y.weight"
+        if key in checkpoint_model:
+            print(f"Removing key {key} from pretrained checkpoint")
+            del checkpoint_model[key]
 
         # load pre-trained model
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
         if args.global_pool:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias'}
+            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias', 
+                                             'pos_embed_x', 'pos_embed_y.weight'}
         elif args.attention_pool:
             pass
         else:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias'}
+            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 
+                                             'pos_embed_x', 'pos_embed_y.weight'}
 
         # manually initialize fc layer: following MoCo v3
         trunc_normal_(model.head.weight, std=0.01)
@@ -335,6 +376,10 @@ def main(args):
     for _, p in model.head.named_parameters():
         p.requires_grad = True
 
+    # # TODO: make pos embeddings y trainable if flag set to True
+    # if args.trainable_pos_embed_y:
+    #     model.pos_embed_y.weight.requires_grad = True
+    
     model.to(device, non_blocking=True)
 
     model_without_ddp = model
@@ -358,12 +403,6 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
 
-    # build optimizer with layer-wise lr decay (lrd)
-    # param_groups = lrd.param_groups_lrd(model_without_ddp, args.weight_decay,
-    #     no_weight_decay_list=model_without_ddp.no_weight_decay(),
-    #     layer_decay=args.layer_decay
-    # )
-    # optimizer = torch.optim.AdamW(param_groups, lr=args.lr)
     optimizer = LARS(model_without_ddp.head.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     print(optimizer)
     loss_scaler = NativeScaler()
