@@ -3,7 +3,7 @@
 
 # Basic parameters
 seed="0"
-batch_size="128"
+batch_size="256"
 accum_iter=(1)
 
 epochs="300"
@@ -27,7 +27,7 @@ patch_height="1"
 patch_width=(100)
 
 norm_pix_loss="False"
-masked_patch_loss="True"
+masked_patch_loss="False"
 
 ncc_weight=0.1
 cos_weight=0.0
@@ -40,12 +40,12 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(1e-4)
+blr_array=(3e-5)
 weight_decay=(0.15)
 
 # Data path
 path="server"
-dataset="signalnet"
+dataset="sit"
 
 if [ "$path" = "tower" ]; then
     if [ "$dataset" = "ukbb" ]; then
@@ -122,7 +122,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="SiT/masked_patch_loss"
+            folder="SiT/cropped"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data

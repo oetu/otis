@@ -16,7 +16,7 @@ max_delta="0.25" # for AUROC
 # Model parameters
 input_channels="1"
 input_electrodes="12"
-time_steps="5000"
+time_steps="2500"
 model_size="tinyDeep"
 model="vit_"$model_size"_patchX"
 
@@ -33,19 +33,21 @@ jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
-drop_path=(0.1)
-layer_decay=(0.5)
+drop_path=(0.2)
+layer_decay=(0.75)
 
 # Optimizer parameters
-blr=(3e-5) # 3e-5 if from scratch
+blr=(1e-5) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
 # Criterion parameters
 smoothing=(0.1)
 
+from_scratch="False"
+
 # Data path
-path="tower"
+path="server"
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/ukbb"
     checkpoint_base="/home/oturgut/mae"
@@ -64,7 +66,7 @@ fi
 # labels_path=$data_base"/labelsOneHot/labels_train_diabetes_all_balanced.pt"
 # downstream_task="classification"
 # nb_classes="2"
-data_path=$data_base"/ecgs_train_CAD_all_balanced_noBase_gn.pt"
+data_path=$data_base"/processed/ecgs_train_CAD_all_balanced_float32.pt"
 labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
 downstream_task="classification"
 nb_classes="2"
@@ -104,7 +106,7 @@ nb_classes="2"
 # val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
 # val_labels_path=$data_base"/labelsOneHot/labels_val_diabetes_all.pt"
 # pos_label="1"
-val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
+val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
 val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
 pos_label="1"
 # val_data_path=$data_base"/ecgs_val_Regression_noBase_gn.pt"
@@ -128,9 +130,7 @@ save_logits="False"
 
 # Pretraining specifications
 pre_batch_size=(128)
-pre_blr=(3e-5)
-
-from_scratch="False"
+pre_blr=(1e-4)
 
 # EVALUATE
 eval="False"
@@ -162,7 +162,13 @@ do
                             # finetune=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_"$pre_data"/checkpoint-399.pth"
 
                             # SiT
-                            finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
+                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
+                            
+                            # SiT-like UKBB
+                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
+                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-299-ncc-0.9626.pth"
+                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-5/checkpoint-298-ncc-0.9575.pth"
+
 
                             # # MAE + MMCL
                             # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"
