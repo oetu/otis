@@ -573,14 +573,15 @@ class MaskedAutoencoderViT(nn.Module):
         z1 = statistics.masked_mean(latent[:, 1:, ...], attn_mask_visible_patches, dim=1)     # global average pooling
         z2 = statistics.masked_mean(latent2[:, 1:, ...], attn_mask_visible_patches, dim=1)    # global average pooling
         
-        p1 = self.projector(z1)
-        p2 = self.projector(z2)
+        # p1 = self.projector(z1)
+        # p2 = self.projector(z2)
 
-        h1 = self.predictor(p1)
-        h2 = self.predictor(p2)
+        # h1 = self.predictor(p1)
+        # h2 = self.predictor(p2)
 
         # loss_cos = - (self.criterion(h1, p2).mean() + self.criterion(h2, p1).mean()) * 0.5
-        loss_cos = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
+        # loss_cos = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
+        loss_cos = torch.tensor([0.0], device=imgs.device)
         # loss_cos = - (self.criterion(h1, z2).mean() + self.criterion(h2, z1).mean()) * 0.5
         # loss_cos = - (self.criterion(h1, z2.detach()).mean() + self.criterion(h2, z1.detach()).mean()) * 0.5
 
