@@ -8,7 +8,7 @@
 #SBATCH --gres=gpu:1  # Number of GPUs if needed
 #SBATCH --cpus-per-task=24  # Number of CPUs (Don't use more than 24 per GPU)
 #SBATCH --mem=126G  # Memory in GB (Don't use more than 126G per GPU)
-#SBATCH --nodelist=leto
+#SBATCH --nodelist=helios
 
 # load python module
 module load python/anaconda3
