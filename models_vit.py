@@ -9,6 +9,8 @@
 # DeiT: https://github.com/facebookresearch/deit
 # --------------------------------------------------------
 
+from typing import Dict
+
 from functools import partial
 
 import torch
@@ -21,10 +23,44 @@ from util.patch_embed import PatchEmbed
 from util.pos_embed import get_1d_sincos_pos_embed
 
 
+class Attention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        assert dim % num_heads == 0, 'dim should be divisible by num_heads'
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+
+        self.mha = nn.MultiheadAttention(embed_dim=dim, num_heads=num_heads, dropout=attn_drop, batch_first=True)
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+        self.attn_map = None
+
+    def forward(self, x, attn_mask=None):
+        B, N, C = x.shape # C = embed_dim
+        qkv = self.qkv(x).reshape(B, N, 3, C).permute(2, 0, 1, 3) # (QKV, B, Heads, N, head_dim)
+        q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple) (B, Heads, N, head_dim)
+
+        attn, _ = self.mha(q, k, v, key_padding_mask=attn_mask)
+
+        # if attn_mask is not None:
+        #     attn = attn * attn_mask[..., None]
+
+        self.attn_map = attn
+
+        x = self.proj(attn)
+        x = self.proj_drop(x)
+        return x
+    
+
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """ Vision Transformer with support for global average pooling
     """
-    def __init__(self, img_size, modalities, patch_size=(1, 100), global_pool=False, attention_pool=False, 
+    def __init__(self, img_size, modalities:Dict, patch_size=(1, 100), global_pool=False, attention_pool=False, 
                  masking_blockwise=False, mask_ratio=0.0, mask_c_ratio=0.0, mask_t_ratio=0.0, **kwargs):
         super(VisionTransformer, self).__init__(**kwargs)
 
@@ -32,7 +68,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         self.patch_embed = PatchEmbed(img_size[0], patch_size, embed_dim, flatten=False) # set flatten to False
 
         self.grid_size = {}
-        for modality, shape in modalities:
+        for modality, shape in modalities.items():
             grid_size = (shape[1] // patch_size[0], shape[2] // patch_size[1])
             self.grid_size.update( {modality: grid_size} )
 
@@ -68,7 +104,9 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
             del self.norm  # remove the original norm
         
         for block in self.blocks:
-            block.attn.forward = self._attention_forward_wrapper(block.attn)
+            # block.attn.forward = self._attention_forward_wrapper(block.attn)
+            block.attn = Attention(kwargs['embed_dim'], kwargs['num_heads'], qkv_bias=kwargs['qkv_bias'], 
+                                   attn_drop=kwargs['attn_drop_rate'], proj_drop=kwargs['drop_rate'])
 
         self.initialize_weights()
 
@@ -90,29 +128,32 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         # w = self.patch_embed.proj.weight.data
         # torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
         
-    def _attention_forward_wrapper(self, attn_obj):
-        """
-        Modified version of def forward() of class Attention() in timm.models.vision_transformer
-        """
-        def my_forward(x):
-            B, N, C = x.shape # C = embed_dim
-            # (3, B, Heads, N, head_dim)
-            qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
-            q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
+    # def _attention_forward_wrapper(self, attn_obj):
+    #     """
+    #     Modified version of def forward() of class Attention() in timm.models.vision_transformer
+    #     """
+    #     def my_forward(x):
+    #         B, N, C = x.shape # C = embed_dim
+    #         # (3, B, Heads, N, head_dim)
+    #         qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
+    #         q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
 
-            # (B, Heads, N, N)
-            attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
-            attn = attn.softmax(dim=-1)
-            attn = attn_obj.attn_drop(attn)
-            # (B, Heads, N, N)
-            attn_obj.attn_map = attn # this was added 
+    #         # (B, Heads, N, N)
+    #         attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
+    #         attn = attn.softmax(dim=-1)
+            
+    #         # (B, Heads, N, N)
+    #         attn_obj.attn_map = attn # this was added 
 
-            # (B, N, Heads*head_dim)
-            x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-            x = attn_obj.proj(x)
-            x = attn_obj.proj_drop(x)
-            return x
-        return my_forward
+    #         # (B, Heads, N, N)
+    #         attn = attn_obj.attn_drop(attn)
+
+    #         # (B, N, Heads*head_dim)
+    #         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+    #         x = attn_obj.proj(x)
+    #         x = attn_obj.proj_drop(x)
+    #         return x
+    #     return my_forward
 
     def random_masking(self, x, mask_ratio):
         """

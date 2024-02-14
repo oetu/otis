@@ -375,11 +375,13 @@ def main(args):
             del checkpoint_model[key]
 
         # load position embedding Y
-        target_modality, target_shape = dataset_train.modalities[0]
+        target_modality, target_shape = dataset_train.modalities.keys(), dataset_train.modalities.values() 
+        assert len(target_modality) == 1, "There is more than one modality in the target dataset"
+
         pos_embed_y_available = False
 
         checkpoint_modalities = checkpoint["modalities"]
-        for modality, shape in checkpoint_modalities:
+        for modality, shape in checkpoint_modalities.items():
             if modality == target_modality and shape[1] == target_shape[1]:
                 pos_embed_y_available = True
                 break

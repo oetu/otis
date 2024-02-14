@@ -9,6 +9,8 @@
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------
 
+from typing import Dict
+
 import builtins
 import datetime
 import os
@@ -315,7 +317,7 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
         model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-%s" % epoch_name, client_state=client_state)
 
 def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, test_stats, evaluation_criterion, 
-                    mode="increasing", modalities=None, modality_offsets=None):
+                    mode="increasing", modalities:Dict=None, modality_offsets:Dict=None):
     output_dir = Path(args.output_dir)
     epoch_name = str(epoch)
 

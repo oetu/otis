@@ -3,7 +3,7 @@
 
 # Basic parameters
 seed="0"
-batch_size="256"
+batch_size="128"
 accum_iter=(1)
 
 epochs="300"
@@ -44,7 +44,7 @@ blr_array=(3e-5)
 weight_decay=(0.15)
 
 # Data path
-path="server"
+path="tower"
 dataset="sit"
 
 if [ "$path" = "tower" ]; then
@@ -122,7 +122,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="SiT/cropped"
+            folder="test2"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data

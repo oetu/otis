@@ -36,12 +36,12 @@ class SignalDataset(Dataset):
             data = [sample[1] for sample in data]
 
         self.modality = modality
-        self.modalities = sorted(list(set(self.modality))) # unique modalities
+        self.modalities = {modality: shape for modality, shape in sorted(list(set(self.modality))) } # unique modalities
 
         self.offsets = {}
         if modality_offsets is None:
             offset = 0
-            for modality, shape in self.modalities:
+            for modality, shape in self.modalities.items():
                 self.offsets.update( {modality: offset} )
                 offset += shape[-2]
         else:
@@ -63,9 +63,9 @@ class SignalDataset(Dataset):
         self.train = train 
         self.args = args
 
-    def set_modality_offsets(self, modality_offsets:Dict=None):
-        """set predefined modality offsets"""
-        self.offsets = modality_offsets
+    # def set_modality_offsets(self, modality_offsets:Dict=None):
+    #     """set predefined modality offsets"""
+    #     self.offsets = modality_offsets
 
     def __len__(self) -> int:
         """return the number of samples in the dataset"""
@@ -75,27 +75,27 @@ class SignalDataset(Dataset):
         """return a sample from the dataset at index idx"""
         data = self.data[idx]        
         if self.train == False:
-            if self.finetune:
-                transform = transforms.Compose([
-                    augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], start_idx=0, resize=False),
-                ])
-            else:
-                transform = torch.nn.Identity()
+            # if self.finetune:
+            #     transform = transforms.Compose([
+            #         augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], start_idx=0, resize=False),
+            #     ])
+            # else:
+            transform = torch.nn.Identity()
         else:
-            if self.finetune:
-                transform = transforms.Compose([
-                    augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], resize=False),
-                    augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
-                    augmentations.Jitter(sigma=self.args.jitter_sigma),
-                    augmentations.Rescaling(sigma=self.args.rescaling_sigma),
-                ])
-            else:
-                transform = transforms.Compose([
-                    augmentations.CropResizing(),
-                    augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
-                    augmentations.Jitter(sigma=self.args.jitter_sigma),
-                    augmentations.Rescaling(sigma=self.args.rescaling_sigma),
-                ])
+            # if self.finetune:
+            #     transform = transforms.Compose([
+            #         augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], resize=False),
+            #         augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
+            #         augmentations.Jitter(sigma=self.args.jitter_sigma),
+            #         augmentations.Rescaling(sigma=self.args.rescaling_sigma),
+            #     ])
+            # else:
+            transform = transforms.Compose([
+                augmentations.CropResizing(),
+                augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
+                augmentations.Jitter(sigma=self.args.jitter_sigma),
+                augmentations.Rescaling(sigma=self.args.rescaling_sigma),
+            ])
 
         data = transform(data)
 

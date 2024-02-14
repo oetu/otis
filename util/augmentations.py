@@ -154,7 +154,7 @@ class CropResizing(object):
     """
         Randomly crop the sample and resize to the original length.
     """
-    def __init__(self, lower_bnd=0.25, upper_bnd=1.0, fixed_crop_len=None, start_idx=None, resize=True, fixed_resize_len=None) -> None:
+    def __init__(self, lower_bnd=0.5, upper_bnd=1.0, fixed_crop_len=None, start_idx=None, resize=True, fixed_resize_len=None) -> None:
         self.lower_bnd = lower_bnd
         self.upper_bnd = upper_bnd
         self.fixed_crop_len = fixed_crop_len

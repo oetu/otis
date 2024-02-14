@@ -9,6 +9,8 @@
 # DeiT: https://github.com/facebookresearch/deit
 # --------------------------------------------------------
 
+from typing import Dict
+
 from functools import partial
 
 import torch
@@ -18,14 +20,48 @@ from timm.models.vision_transformer import Block
 from timm.models.layers import trunc_normal_
 
 from util.patch_embed import PatchEmbed
-from util.pos_embed import get_1d_sincos_pos_embed, get_2d_sincos_pos_embed
+from util.pos_embed import get_1d_sincos_pos_embed
 import util.statistics as statistics
+
+
+class Attention(nn.Module):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        assert dim % num_heads == 0, 'dim should be divisible by num_heads'
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+
+        self.mha = nn.MultiheadAttention(embed_dim=dim, num_heads=num_heads, dropout=attn_drop, batch_first=True)
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+
+        self.attn_map = None
+
+    def forward(self, x, attn_mask=None):
+        B, N, C = x.shape # C = embed_dim
+        qkv = self.qkv(x).reshape(B, N, 3, C).permute(2, 0, 1, 3) # (QKV, B, Heads, N, head_dim)
+        q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple) (B, Heads, N, head_dim)
+
+        attn, _ = self.mha(q, k, v, key_padding_mask=attn_mask)
+
+        # if attn_mask is not None:
+        #     attn = attn * attn_mask[..., None]
+
+        self.attn_map = attn
+
+        x = self.proj(attn)
+        x = self.proj_drop(x)
+        return x
 
 
 class MaskedAutoencoderViT(nn.Module):
     """ Masked Autoencoder with VisionTransformer backbone
     """
-    def __init__(self, modalities, input_channels=1, patch_size=(1, 100),
+    def __init__(self, modalities:Dict, input_channels=1, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
@@ -40,7 +76,7 @@ class MaskedAutoencoderViT(nn.Module):
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         self.grid_size = {}
-        for modality, input_size in modalities:
+        for modality, input_size in modalities.items():
             grid_size = (input_size[1] // patch_size[0], input_size[2] // patch_size[1])
             self.grid_size.update( {modality: grid_size} )
 
@@ -60,7 +96,8 @@ class MaskedAutoencoderViT(nn.Module):
         # modify the attention operation to consider attention masks
         for block in self.blocks:
             block.forward = self._block_forward_wrapper(block)
-            block.attn.forward = self._attention_forward_wrapper(block.attn)
+            # block.attn.forward = self._attention_forward_wrapper(block.attn)
+            block.attn = Attention(embed_dim, num_heads, qkv_bias=True)
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
@@ -84,7 +121,8 @@ class MaskedAutoencoderViT(nn.Module):
         # modify the attention operation to consider attention masks
         for block in self.decoder_blocks:
             block.forward = self._block_forward_wrapper(block)
-            block.attn.forward = self._attention_forward_wrapper(block.attn)
+            # block.attn.forward = self._attention_forward_wrapper(block.attn)
+            block.attn = Attention(decoder_embed_dim, decoder_num_heads, qkv_bias=True)
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
@@ -126,58 +164,56 @@ class MaskedAutoencoderViT(nn.Module):
         Modified version of def forward() of class Block() in timm.models.vision_transformer
         """
         def my_forward(x, attn_mask=None):
-            if attn_mask is None:
-                x = x + block_obj.drop_path1(block_obj.ls1(block_obj.attn(block_obj.norm1(x))))
-            else:
-                x = x + block_obj.drop_path1(block_obj.ls1(block_obj.attn(block_obj.norm1(x), attn_mask)))
+            x = x + block_obj.drop_path1(block_obj.ls1(block_obj.attn(block_obj.norm1(x), attn_mask)))
             x = x + block_obj.drop_path2(block_obj.ls2(block_obj.mlp(block_obj.norm2(x))))
             return x
 
         return my_forward
 
-    def _attention_forward_wrapper(self, attn_obj):
-        """
-        Modified version of def forward() of class Attention() in timm.models.vision_transformer
-        """
-        def my_forward(x, attn_mask=None):
-            B, N, C = x.shape # C = embed_dim
-            # (3, B, Heads, N, head_dim)
-            qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
-            q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
+    # def _attention_forward_wrapper(self, attn_obj):
+    #     """
+    #     Modified version of def forward() of class Attention() in timm.models.vision_transformer
+    #     """
+    #     def my_forward(x, attn_mask=None):
+    #         B, N, C = x.shape # C = embed_dim
+    #         # (3, B, Heads, N, head_dim)
+    #         qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
+    #         q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
 
-            # TODO: implement the pytorch multiheadattention, it is more efficient
+    #         # TODO: implement the pytorch multiheadattention, it is more efficient
 
-            # (B, Heads, N, N)
-            attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
+    #         # (B, Heads, N, N)
+    #         attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
 
-            if attn_mask is not None:
-                # (B, 1, N)
-                attn_mask_batch = attn_mask.unsqueeze(1).clone()
-                # (B, 1, N, N)
-                attn_mask_batch = torch.einsum("bhn,bhl->bhnl", attn_mask_batch, attn_mask_batch)
-                # (B, Heads, N, N)
-                attn_mask_batch = attn_mask_batch.expand(-1, attn_obj.num_heads, -1, -1)
+    #         if attn_mask is not None:
+    #             # (B, 1, N)
+    #             attn_mask_batch = attn_mask.unsqueeze(1).clone()
+    #             # (B, 1, N, N)
+    #             attn_mask_batch = torch.einsum("bhn,bhl->bhnl", attn_mask_batch, attn_mask_batch)
+    #             # (B, Heads, N, N)
+    #             attn_mask_batch = attn_mask_batch.expand(-1, attn_obj.num_heads, -1, -1)
 
-                # (B, Heads, N, N)
-                attn[attn_mask_batch==0] = -torch.inf # will be zero after softmax, exp(-inf)=0
+    #             # (B, Heads, N, N)
+    #             attn[attn_mask_batch==0] = -torch.inf # will be zero after softmax, exp(-inf)=0
 
-            # attn = attn.softmax(dim=-1) # returns nan if there is rows with -inf only :S
-            # implement a modified softmax version that includes a small positive term in the denominator
-            attn = torch.exp(attn - attn.max()) # avoid numerical instability by subtracting the maximum value
-            attn = attn / (attn.sum(dim=-1, keepdim=True) + 1e-9)
+    #         # attn = attn.softmax(dim=-1) # returns nan if there is rows with -inf only :S
+    #         # implement a modified softmax version that includes a small positive term in the denominator
+    #         attn = torch.exp(attn - attn.max()) # avoid numerical instability by subtracting the maximum value
+    #         attn = attn / (attn.sum(dim=-1, keepdim=True) + 1e-9)
 
-            attn = attn_obj.attn_drop(attn)
+    #         # (B, Heads, N, N)
+    #         attn_obj.attn_map = attn # this was added 
 
-            # (B, Heads, N, N)
-            attn_obj.attn_map = attn # this was added 
+    #         # (B, Heads, N, N)
+    #         attn = attn_obj.attn_drop(attn)
 
-            # (B, N, Heads*head_dim)
-            x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-            x = attn_obj.proj(x)
-            x = attn_obj.proj_drop(x)
-            return x
+    #         # (B, N, Heads*head_dim)
+    #         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+    #         x = attn_obj.proj(x)
+    #         x = attn_obj.proj_drop(x)
+    #         return x
         
-        return my_forward
+    #     return my_forward
 
     def initialize_weights(self):
         # initialize learnable pos_embed for the vertical axis
@@ -573,15 +609,14 @@ class MaskedAutoencoderViT(nn.Module):
         z1 = statistics.masked_mean(latent[:, 1:, ...], attn_mask_visible_patches, dim=1)     # global average pooling
         z2 = statistics.masked_mean(latent2[:, 1:, ...], attn_mask_visible_patches, dim=1)    # global average pooling
         
-        # p1 = self.projector(z1)
-        # p2 = self.projector(z2)
+        p1 = self.projector(z1)
+        p2 = self.projector(z2)
 
-        # h1 = self.predictor(p1)
-        # h2 = self.predictor(p2)
+        h1 = self.predictor(p1)
+        h2 = self.predictor(p2)
 
         # loss_cos = - (self.criterion(h1, p2).mean() + self.criterion(h2, p1).mean()) * 0.5
-        # loss_cos = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
-        loss_cos = torch.tensor([0.0], device=imgs.device)
+        loss_cos = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
         # loss_cos = - (self.criterion(h1, z2).mean() + self.criterion(h2, z1).mean()) * 0.5
         # loss_cos = - (self.criterion(h1, z2.detach()).mean() + self.criterion(h2, z1.detach()).mean()) * 0.5
 
