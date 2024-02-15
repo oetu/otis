@@ -3,7 +3,7 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-batch_size=(32)
+batch_size=(64)
 accum_iter=(1)
 
 epochs="400"
@@ -120,7 +120,7 @@ num_workers="24"
 # Log specifications
 save_output="False"
 wandb="True"
-wandb_project="MAE_ECG_Fin_Tiny_CAD"
+wandb_project="MAE_ECG_CAD"
 wandb_id=""
 
 plot_attention_map="False"
@@ -131,6 +131,7 @@ save_logits="False"
 # Pretraining specifications
 pre_batch_size=(128)
 pre_blr=(1e-4)
+trainable_pos_embed_y="True"
 
 # EVALUATE
 eval="False"
@@ -165,10 +166,10 @@ do
                             # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
                             
                             # SiT-like UKBB
-                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
+                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/test2/checkpoint-34-ncc-0.5850.pth"
+                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
                             # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-299-ncc-0.9626.pth"
                             # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-5/checkpoint-298-ncc-0.9575.pth"
-
 
                             # # MAE + MMCL
                             # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"
@@ -201,6 +202,10 @@ do
 
                             cmd="python3 main_finetune.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $dp --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                             
+                            if [ "$trainable_pos_embed_y" = "True" ]; then
+                                cmd=$cmd" --trainable_pos_embed_y"
+                            fi
+
                             if [ "$downstream_task" = "regression" ]; then    
                                 cmd=$cmd" --lower_bnd $lower_bnd --upper_bnd $upper_bnd"
                             fi

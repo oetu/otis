@@ -156,10 +156,10 @@ def get_args_parser():
     parser.add_argument('--cls_token', action='store_false', dest='global_pool',
                         help='Use class token instead of global pool for classification')
     
-    parser.add_argument('--load_pos_embed_y', action='store_false', default=True,
-                        help='Load pre-trained position embeddings Y (spatial axis) from checkpoint')
-    # parser.add_argument('--trainable_pos_embed_y', action='store_true', default=False,
-    #                     help='Make position embeddings Y (spatial axis) trainable')
+    parser.add_argument('--ignore_pos_embed_y', action='store_true', default=False,
+                        help='Ignore pre-trained position embeddings Y (spatial axis) from checkpoint')
+    parser.add_argument('--trainable_pos_embed_y', action='store_true', default=False,
+                        help='Make position embeddings Y (spatial axis) trainable')
 
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
@@ -353,8 +353,6 @@ def main(args):
         mask_t_ratio=args.mask_t_ratio
     )
 
-    # TODO: load model weights as well as pos embeddings X, interpolate if required
-    # TODO: load positional embeddings Y together with modality offsets if load_pos_embed_y set to True 
     if args.finetune and not args.eval:
         checkpoint = torch.load(args.finetune, map_location='cpu')
 
@@ -374,9 +372,10 @@ def main(args):
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
 
-        # load position embedding Y
-        target_modality, target_shape = dataset_train.modalities.keys(), dataset_train.modalities.values() 
-        assert len(target_modality) == 1, "There is more than one modality in the target dataset"
+        # load position embedding Y together with modality offsets
+        assert len(dataset_train.modalities) == 1, "There is more than one modality in the target dataset"
+        target_modality = list(dataset_train.modalities.keys())[0]
+        target_shape = list(dataset_train.modalities.values())[0]
 
         pos_embed_y_available = False
 
@@ -386,10 +385,11 @@ def main(args):
                 pos_embed_y_available = True
                 break
 
-        if args.load_pos_embed_y and pos_embed_y_available:
+        if not args.ignore_pos_embed_y and pos_embed_y_available:
             print("Loading position embedding Y from checkpoint")
             model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
 
+            # load modality offsets
             dataset_train.set_modality_offsets(checkpoint["modality_offsets"])
             dataset_val.set_modality_offsets(checkpoint["modality_offsets"])
         else:
@@ -416,9 +416,8 @@ def main(args):
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=0.01)#2e-5)
 
-    # # TODO: make pos embeddings y trainable if flag set to True
-    # if args.trainable_pos_embed_y:
-    #     model.pos_embed_y.weight.requires_grad = True
+    if args.trainable_pos_embed_y:
+        model.pos_embed_y.weight.requires_grad = True
     
     model.to(device, non_blocking=True)
 

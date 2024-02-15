@@ -105,8 +105,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         
         for block in self.blocks:
             # block.attn.forward = self._attention_forward_wrapper(block.attn)
-            block.attn = Attention(kwargs['embed_dim'], kwargs['num_heads'], qkv_bias=kwargs['qkv_bias'], 
-                                   attn_drop=kwargs['attn_drop_rate'], proj_drop=kwargs['drop_rate'])
+            block.attn = Attention(kwargs['embed_dim'], kwargs['num_heads'], qkv_bias=kwargs['qkv_bias'])
 
         self.initialize_weights()
 
@@ -127,33 +126,6 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         # # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
         # w = self.patch_embed.proj.weight.data
         # torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
-        
-    # def _attention_forward_wrapper(self, attn_obj):
-    #     """
-    #     Modified version of def forward() of class Attention() in timm.models.vision_transformer
-    #     """
-    #     def my_forward(x):
-    #         B, N, C = x.shape # C = embed_dim
-    #         # (3, B, Heads, N, head_dim)
-    #         qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
-    #         q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
-
-    #         # (B, Heads, N, N)
-    #         attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
-    #         attn = attn.softmax(dim=-1)
-            
-    #         # (B, Heads, N, N)
-    #         attn_obj.attn_map = attn # this was added 
-
-    #         # (B, Heads, N, N)
-    #         attn = attn_obj.attn_drop(attn)
-
-    #         # (B, N, Heads*head_dim)
-    #         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-    #         x = attn_obj.proj(x)
-    #         x = attn_obj.proj_drop(x)
-    #         return x
-    #     return my_forward
 
     def random_masking(self, x, mask_ratio):
         """
@@ -371,3 +343,31 @@ def vit_huge(**kwargs):
         embed_dim=1280, depth=32, num_heads=16, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
+
+        
+# def _attention_forward_wrapper(self, attn_obj):
+#     """
+#     Modified version of def forward() of class Attention() in timm.models.vision_transformer
+#     """
+#     def my_forward(x):
+#         B, N, C = x.shape # C = embed_dim
+#         # (3, B, Heads, N, head_dim)
+#         qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
+#         q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
+
+#         # (B, Heads, N, N)
+#         attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
+#         attn = attn.softmax(dim=-1)
+        
+#         # (B, Heads, N, N)
+#         attn_obj.attn_map = attn # this was added 
+
+#         # (B, Heads, N, N)
+#         attn = attn_obj.attn_drop(attn)
+
+#         # (B, N, Heads*head_dim)
+#         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+#         x = attn_obj.proj(x)
+#         x = attn_obj.proj_drop(x)
+#         return x
+#     return my_forward

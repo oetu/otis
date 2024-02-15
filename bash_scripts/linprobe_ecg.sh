@@ -36,7 +36,7 @@ ft_surr_phase_noise="0.075"
 layer_decay=(0.75)
 
 # Optimizer parameters
-blr=(1e-2)
+blr=(1e-1)
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -46,7 +46,7 @@ smoothing=(0.1)
 from_scratch="False"
 
 # Data path
-path="tower"
+path="server"
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/ukbb"
     checkpoint_base="/home/oturgut/mae"
@@ -117,7 +117,7 @@ attention_pool=(False)
 num_workers="24"
 
 # Log specifications
-save_output="True"
+save_output="False"
 wandb="True"
 wandb_project="MAE_ECG_CAD"
 wandb_id=""
@@ -130,6 +130,7 @@ save_logits="False"
 # Pretraining specifications
 pre_batch_size=(128)
 pre_blr=(1e-4)
+trainable_pos_embed_y="False"
 
 # EVALUATE
 eval="False"
@@ -154,7 +155,8 @@ do
                         subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$wd"/m0.8/atp")
 
                         pre_data="b"$pre_batch_size"_blr"$pre_blr
-                        finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
+                        finetune="/vol/aimspace/users/tuo/SiT/output/pre/test2/checkpoint-34-ncc-0.5850.pth"
+                        # finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
                         # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
                         # finetune=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_"$pre_data"/checkpoint-399.pth"
                         # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"
@@ -165,13 +167,15 @@ do
 
                         # resume=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$bs"_blr"$lr"_"$pre_data"/checkpoint-6-pcc-0.27.pth"
 
-                        if [ "$downstream_task" = "regression" ]; then
-                            cmd="python3 main_linprobe.py --lower_bnd $lower_bnd --upper_bnd $upper_bnd --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
-                        else
-                            cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                        cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+
+                        if [ "$trainable_pos_embed_y" = "True" ]; then
+                            cmd=$cmd" --trainable_pos_embed_y"
                         fi
 
-                        # cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                        if [ "$downstream_task" = "regression" ]; then
+                            cmd=$cmd" --lower_bnd $lower_bnd --upper_bnd $upper_bnd"
+                        fi
 
                         if [ "$masking_blockwise" = "True" ]; then
                             cmd=$cmd" --masking_blockwise --mask_c_ratio $mask_c_ratio --mask_t_ratio $mask_t_ratio"
