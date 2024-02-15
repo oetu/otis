@@ -38,6 +38,15 @@ class SignalDataset(Dataset):
         self.modality = modality
         self.modalities = {modality: shape for modality, shape in sorted(list(set(self.modality))) } # unique modalities
 
+        modality_list = [mod[0] for mod in modality]
+        unique_modalities = list(set(modality_list))
+        
+        self.modality_weights = {}
+        for mod_current in unique_modalities:
+            mod_indices = torch.tensor([mod == mod_current for mod in modality_list])
+            mod_weight = len(modality) / (len(unique_modalities) * mod_indices.sum())
+            self.modality_weights.update( {mod_current: mod_weight} )
+
         self.offsets = {}
         if modality_offsets is None:
             offset = 0
@@ -108,7 +117,7 @@ class SignalDataset(Dataset):
 
         modality, _ = self.modality[idx]
             
-        return data, label, label_mask, self.args.patch_size, self.offsets[modality]
+        return data, label, label_mask, self.args.patch_size, self.offsets[modality], modality
 
     @staticmethod
     def collate_fn(batch):
@@ -144,8 +153,10 @@ class SignalDataset(Dataset):
                                                pad=(0, int(grid_width.max() - grid_width[idx]), 0, int(grid_height.max() - grid_height[idx])), 
                                                mode="constant", value=0) for idx, sample in enumerate(batch)]
         pos_embed_y = torch.stack(pos_embed_y, dim=0)
+
+        modality = [sample[5] for sample in batch]
     
-        return data, patch_size, attn_mask, torch.LongTensor(pos_embed_y)
+        return data, patch_size, attn_mask, torch.LongTensor(pos_embed_y), modality
     
     @staticmethod
     def collate_fn_ft(batch):

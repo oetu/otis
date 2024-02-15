@@ -9,8 +9,6 @@
 # DeiT: https://github.com/facebookresearch/deit
 # --------------------------------------------------------
 
-from typing import Dict
-
 from functools import partial
 
 import torch
@@ -47,9 +45,6 @@ class Attention(nn.Module):
 
         attn, _ = self.mha(q, k, v, key_padding_mask=attn_mask)
 
-        # if attn_mask is not None:
-        #     attn = attn * attn_mask[..., None]
-
         self.attn_map = attn
 
         x = self.proj(attn)
@@ -60,7 +55,7 @@ class Attention(nn.Module):
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """ Vision Transformer with support for global average pooling
     """
-    def __init__(self, img_size, modalities:Dict, patch_size=(1, 100), global_pool=False, attention_pool=False, 
+    def __init__(self, img_size, modalities:dict, patch_size=(1, 100), global_pool=False, attention_pool=False, 
                  masking_blockwise=False, mask_ratio=0.0, mask_c_ratio=0.0, mask_t_ratio=0.0, **kwargs):
         super(VisionTransformer, self).__init__(**kwargs)
 

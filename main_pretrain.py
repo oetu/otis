@@ -75,6 +75,8 @@ def get_args_parser():
                         help='Use (per-patch) normalized pixels as targets for computing loss')
     parser.add_argument('--masked_patch_loss', action='store_true', default=False,
                         help='Compute loss only on masked patches')
+    parser.add_argument('--modality_weighted_loss', action='store_true', default=False,
+                        help='Use weighted loss to consider imbalances between modalities')
 
     parser.add_argument('--ncc_weight', type=float, default=0.1,
                         help='Add normalized cross-correlation (ncc) as additional loss term')
@@ -293,10 +295,12 @@ def main(args):
     # define the model
     model = models_mae.__dict__[args.model](
         modalities=dataset_train.modalities,
+        modality_weights=dataset_train.modality_weights,
         input_channels=args.input_channels,
         patch_size=args.patch_size,
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
+        modality_weighted_loss=args.modality_weighted_loss,
         ncc_weight=args.ncc_weight
     )
 

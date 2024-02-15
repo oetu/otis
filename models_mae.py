@@ -9,8 +9,6 @@
 # DeiT: https://github.com/facebookresearch/deit
 # --------------------------------------------------------
 
-from typing import Dict
-
 from functools import partial
 
 import torch
@@ -58,11 +56,12 @@ class Attention(nn.Module):
 class MaskedAutoencoderViT(nn.Module):
     """ Masked Autoencoder with VisionTransformer backbone
     """
-    def __init__(self, modalities:Dict, input_channels=1, patch_size=(1, 100),
+    def __init__(self, modalities:dict, modality_weights:dict, 
+                 input_channels=1, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
-                 norm_pix_loss=False, masked_patch_loss=False,
+                 norm_pix_loss=False, masked_patch_loss=False, modality_weighted_loss=False,
                  ncc_weight:float=0.0):
         super().__init__()
 
@@ -151,6 +150,9 @@ class MaskedAutoencoderViT(nn.Module):
 
         self.norm_pix_loss = norm_pix_loss
         self.masked_patch_loss = masked_patch_loss
+
+        self.modality_weights = modality_weights
+        self.modality_weighted_loss = modality_weighted_loss
         
         self.ncc_weight = ncc_weight
 
@@ -495,12 +497,13 @@ class MaskedAutoencoderViT(nn.Module):
 
         return x
 
-    def forward_loss(self, imgs, pred, attn_mask, mask):
+    def forward_loss(self, imgs, pred, attn_mask, mask, modality):
         """
         imgs: [N, C, H, W]
         pred: [N, L, p*q*C]
         attn_mask: [N, C', T'], with C'=H/p, T'=W/q and C'*T'=L
         mask: [N, L], 0 is keep, 1 is remove
+        modality: [N], the modality of the sample
         """
         # [N, L, p*q*C]
         target = self.patchify(imgs) 
@@ -531,6 +534,22 @@ class MaskedAutoencoderViT(nn.Module):
         # mean over last dim (for normalization) does not require consideration of the attention mask
         ncc = statistics.ncc(imgs, imgs_hat)
 
+        if self.modality_weighted_loss:
+            # compute modality weighted loss
+            modality_losses = {}
+            unique_modalities = list(set(modality))
+            for mod_current in unique_modalities: 
+                mod_indices = torch.tensor([mod == mod_current for mod in modality], device=imgs.device)
+                if self.masked_patch_loss:
+                    # compute loss only on masked patches
+                    mod_loss = (loss * mask)[mod_indices].sum() / (torch.sum((attn_mask.flatten(1) * mask)[mod_indices]) + 1e-9)
+                else:
+                    mod_loss = loss[mod_indices].sum() / (torch.sum(attn_mask[mod_indices]) + 1e-9)
+                modality_losses.update( {mod_current: mod_loss} )
+
+            weighted_loss = torch.tensor( [modality_losses[mod] * self.modality_weights[mod] for mod in unique_modalities] ).sum()
+            return (1 - self.ncc_weight) * weighted_loss + self.ncc_weight * (1 - ncc)
+
         if self.masked_patch_loss:
             # compute loss only on masked patches
             loss = (loss * mask).sum() / (torch.sum(attn_mask.flatten(1) * mask) + 1e-9)
@@ -539,7 +558,7 @@ class MaskedAutoencoderViT(nn.Module):
 
         return (1 - self.ncc_weight) * loss + self.ncc_weight * (1 - ncc)
 
-    def forward(self, imgs, attn_mask, pos_embed_y, mask_ratio=0.75):
+    def forward(self, imgs, attn_mask, pos_embed_y, modality, mask_ratio=0.75):
         """
         imgs: [N, C, H, W]
         attn_mask: [N, C', T'], with C'*T'=L and C'=H/p, T'=W/q
@@ -547,7 +566,7 @@ class MaskedAutoencoderViT(nn.Module):
         """
         latent, mask, ids_restore = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
         pred = self.forward_decoder(latent, attn_mask, pos_embed_y, ids_restore)  # [N, L, p*q*C]
-        loss = self.forward_loss(imgs, pred, attn_mask, mask)
+        loss = self.forward_loss(imgs, pred, attn_mask, mask, modality)
 
         # orig_patched = self.patchify(imgs)
         # orig_masked_unpatched = self.unpatchify(orig_patched*(1-mask).unsqueeze(dim=-1), attn_mask)
