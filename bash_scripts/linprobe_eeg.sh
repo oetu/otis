@@ -3,21 +3,21 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-batch_size=(16)
+batch_size=(64)
 accum_iter=(1)
 
 epochs="200"
 warmup_epochs="5"
 
 # Callback parameters
-patience="25"
+patience="15"
 max_delta="0.25"
 
 # Model parameters
 input_channels="1"
-input_electrodes="32"
+input_electrodes="30"
 time_steps="6000"
-model_size="smallDeep"
+model_size="tinyDeep"
 model="vit_"$model_size"_patchX"
 
 patch_height="1"
@@ -39,7 +39,7 @@ min_lr="0.0"
 weight_decay=(0.1)
 
 # Criterion parameters
-smoothing=(0.2)
+smoothing=(0.1)
 
 from_scratch="False"
 
@@ -52,10 +52,10 @@ do
     path="tower"
     if [ "$path" = "tower" ]; then
         data_base="/home/oturgut/data/processed/lemon/kfold/fold"$fold
-        checkpoint_base="/home/oturgut/mae"
+        checkpoint_base="/home/oturgut/SiT"
     else
         data_base="/vol/aimspace/users/tuo/data/lemon/kfold/fold"$fold
-        checkpoint_base="/vol/aimspace/users/tuo/mae"
+        checkpoint_base="/vol/aimspace/users/tuo/SiT"
     fi
 
     # Dataset parameters
@@ -81,7 +81,7 @@ do
     # Log specifications
     save_output="False"
     wandb="True"
-    wandb_project="MAE_EEG_Lin_Tiny_Age"
+    wandb_project="MAE_EEG_Age"
     wandb_id=""
 
     plot_attention_map="False"
@@ -92,6 +92,8 @@ do
     # Pretraining specifications
     pre_batch_size=(128)
     pre_blr=(1e-5)
+    ignore_pos_embed_y="False"
+    trainable_pos_embed_y="True"
 
     # EVALUATE
     eval="False"
@@ -110,7 +112,7 @@ do
                     for smth in "${smoothing[@]}"
                     do
 
-                        folder="lemon/kfold/fold"$fold"/eeg/Age/mimic_pretrained"
+                        folder="lemon/kfold/fold"$fold"/eeg/Age/SiT"
                         subfolder="seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$weight_decay"/m0.8"
 
                         pre_data="b"$pre_batch_size"_blr"$pre_blr
@@ -118,7 +120,8 @@ do
                         
                         # finetune=$checkpoint_base"/output/pre/tuh/eeg/all/15ch/ncc_weight0.1/seed0/tiny/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-196-ncc-0.78.pth"
 
-                        finetune="/home/oturgut/mae/output/pre/mimic/ecg/ncc_weight0.1/seed0/smallDeep2/checkpoint-396-ncc-0.9709.pth" 
+                        finetune="/home/oturgut/SiT/output/pre/test4/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-280-ncc-0.6527.pth"
+                        # finetune="/home/oturgut/mae/output/pre/mimic/ecg/ncc_weight0.1/seed0/smallDeep2/checkpoint-396-ncc-0.9709.pth" 
                         # finetune="/home/oturgut/mae/output/pre/tuh/250Hz/eeg/10ch/ncc_weight0.1/seed0/tinyUp/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-199-ncc-0.8074.pth"
                         # finetune="/home/oturgut/mae/output/pre/tuh/250Hz/eeg/ncc_weight0.1/seed0/tiny/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-199-ncc-0.8500.pth"
                         # finetune="/home/oturgut/mae/checkpoints/mm_v230_mae_checkpoint.pth"
@@ -131,6 +134,14 @@ do
 
                         cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                         
+                        if [ "$ignore_pos_embed_y" = "True" ]; then
+                            cmd=$cmd" --ignore_pos_embed_y"
+                        fi
+
+                        if [ "$trainable_pos_embed_y" = "True" ]; then
+                            cmd=$cmd" --trainable_pos_embed_y"
+                        fi
+
                         if [ "$downstream_task" = "regression" ]; then    
                             cmd=$cmd" --lower_bnd $lower_bnd --upper_bnd $upper_bnd"
                         fi

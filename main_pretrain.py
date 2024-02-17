@@ -71,6 +71,9 @@ def get_args_parser():
     parser.add_argument('--patch_size', default=(1, 100), type=Tuple,
                         help='patch size')
 
+    parser.add_argument('--separate_pos_embed_y', action='store_true', default=False,
+                        help='Use separate position embeddings Y for the decoder')
+
     parser.add_argument('--norm_pix_loss', action='store_true', default=False,
                         help='Use (per-patch) normalized pixels as targets for computing loss')
     parser.add_argument('--masked_patch_loss', action='store_true', default=False,
@@ -298,6 +301,7 @@ def main(args):
         modality_weights=dataset_train.modality_weights,
         input_channels=args.input_channels,
         patch_size=args.patch_size,
+        separate_pos_embed_y=args.separate_pos_embed_y,
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
         modality_weighted_loss=args.modality_weighted_loss,

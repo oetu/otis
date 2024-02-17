@@ -27,6 +27,7 @@ class SignalDataset(Dataset):
         if finetune:
             # finetuning / online evaluation
             modality = [("ecg", sample.unsqueeze(0)[..., :args.input_electrodes, :].shape) for sample in data]
+            # modality = [("eeg2", sample.unsqueeze(0)[..., :args.input_electrodes, :].shape) for sample in data]
             # modality = [(sample[0], sample[1].shape) for sample in data]
             data = [sample.unsqueeze(0)[..., :args.input_electrodes, :] for sample in data]
             # data = [sample[1] for sample in data]

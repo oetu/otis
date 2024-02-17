@@ -16,15 +16,13 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-input_channels="1"
-input_electrodes="12"
-time_steps="5000"
-
 model_size="tinyDeep2"
 model="mae_vit_"$model_size"_patchX"
 
 patch_height="1"
 patch_width=(100)
+
+separate_pos_embed_y="False"
 
 norm_pix_loss="False"
 masked_patch_loss="False"
@@ -91,6 +89,10 @@ lower_bnd="0"
 upper_bnd="1"
 online_num_classes=2
 
+input_channels="1"
+input_electrodes="12"
+time_steps="5000"
+
 if [ "$path" = "tower" ]; then # ukbb data for online eval
     online_data_base="/home/oturgut/data/processed/ukbb"
 else
@@ -123,7 +125,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="test4"
+            folder="sepDecPosEmbY"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data
@@ -154,6 +156,10 @@ do
 
             if [ "$norm_pix_loss" = "True" ]; then
                 cmd=$cmd" --norm_pix_loss"
+            fi
+
+            if [ "$separate_pos_embed_y" = "True" ]; then
+                cmd=$cmd" --separate_pos_embed_y"
             fi
 
             if [ "$masked_patch_loss" = "True" ]; then
