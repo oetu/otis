@@ -125,7 +125,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="sepDecPosEmbY"
+            folder="correctNCC"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data

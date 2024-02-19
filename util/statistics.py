@@ -1,20 +1,30 @@
 import torch
 
 
-def norm(data:torch.Tensor()) -> torch.Tensor():
+def norm(data:torch.Tensor, attn_mask:torch.Tensor=None) -> torch.Tensor:
     """
     Zero-Normalize data to have mean=0 and standard_deviation=1
 
     Parameters
     ----------
-    data:  tensor
+    data, attn_mask: (B, C, H, W)
     """
-    mean = torch.mean(data, dim=-1, keepdim=True)
-    var = torch.var(data, dim=-1, keepdim=True)
+    if attn_mask is None:
+        mean = torch.mean(data, dim=-1, keepdim=True)
+        var = torch.var(data, dim=-1, keepdim=True)
+        
+        return (data - mean) / (var + 1e-9)**0.5
+    else:
+        mean = torch.sum(data, dim=-1, keepdim=True) / (torch.sum(attn_mask, dim=-1, keepdim=True) + 1e-9)
 
-    return (data - mean) / (var + 1e-9)**0.5
+        # aux_mask matrix is introduced to make sure that the data (zero) padding is not effected by the norm operations
+        # i.e. zero entries remain untouched after the norm operations 
+        aux_mask = ((1 - attn_mask) * mean)
+        var = torch.sum((data - mean + aux_mask)**2, dim=-1, keepdim=True) / (torch.sum(attn_mask, dim=-1, keepdim=True) + 1e-9)
+        
+        return (data - mean + aux_mask) / (var + 1e-9)**0.5
 
-def ncc(data_0:torch.Tensor(), data_1:torch.Tensor()) -> torch.Tensor():
+def ncc(data_0:torch.Tensor, data_1:torch.Tensor, attn_mask:torch.Tensor=None, keep_batch:bool=False) -> torch.Tensor:
     """
     Zero-Normalized cross-correlation coefficient between two data sets
 
@@ -23,16 +33,43 @@ def ncc(data_0:torch.Tensor(), data_1:torch.Tensor()) -> torch.Tensor():
 
     Parameters
     ----------
-    data_0, data_1 :  tensors of same size
+    data_0, data_1, attn_mask : (B, C, H, W)
     """
-
     nb_of_signals = 1
-    for dim in range(data_0.dim() - 1): # all but the last dimension (which is the actual signal)
-        nb_of_signals = nb_of_signals * data_0.shape[dim]
+    if attn_mask is None:
+        for dim in range(data_0.dim() - 1): # all but the last dimension (which is the actual signal)
+            # (B)
+            nb_of_signals = nb_of_signals * data_0.shape[dim]
 
-    cross_corrs = (1.0 / (data_0.shape[-1] - 1)) * torch.sum(norm(data=data_0) * norm(data=data_1), dim=-1)
+        # (B, C, H)
+        cross_corrs = torch.sum(norm(data=data_0) * norm(data=data_1), dim=-1) / (data_0.shape[-1] - 1)
+    else:
+        for dim in range(data_0.dim() - 2):
+            # (B)
+            nb_of_signals = nb_of_signals * data_0.shape[dim]
 
-    return (cross_corrs.sum() / nb_of_signals)
+        # check whether a channel is padding (only zero elements) or signal (at least one non-zero element)
+        # (B, C)
+        nb_of_channels = torch.max(attn_mask, dim=-1)[0].sum(-1)
+        nb_of_signals = nb_of_signals * nb_of_channels
+        # (B, C, H)
+        nb_of_signals = nb_of_signals.unsqueeze(-1)
+
+        # (B, C, H)
+        cross_corrs = torch.sum(norm(data=data_0, attn_mask=attn_mask) * norm(data=data_1, attn_mask=attn_mask), dim=-1) / (torch.sum(attn_mask, dim=-1) - 1)
+
+    if keep_batch == True:
+        # compute ncc of each sample
+        nb_of_signals = nb_of_signals / cross_corrs.shape[0]
+        # (B, C, H)
+        ncc = cross_corrs / nb_of_signals
+        # (B)
+        ncc = ncc.flatten(1).sum(-1)
+    else:
+        # compute ncc of the entire batch
+        ncc = (cross_corrs / nb_of_signals).sum()
+
+    return ncc
 
 def masked_mean(tensor, attn_mask=None, dim=None, keep_dim=False):
     """

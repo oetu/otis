@@ -63,11 +63,11 @@ def train_one_epoch(model: torch.nn.Module,
 
         # compute model prediction
         with torch.cuda.amp.autocast():
-            loss, loss_cos, cos_embed, z_std, samples_hat, samples_hat_masked = model(samples, 
-                                                                                      attn_mask,
-                                                                                      pos_embed_y,
-                                                                                      modality,
-                                                                                      mask_ratio=args.mask_ratio)
+            loss, ncc, loss_cos, cos_embed, z_std, samples_hat, samples_hat_masked = model(samples, 
+                                                                                           attn_mask,
+                                                                                           pos_embed_y,
+                                                                                           modality,
+                                                                                           mask_ratio=args.mask_ratio)
 
         batch_size = len(samples)
 
@@ -75,7 +75,7 @@ def train_one_epoch(model: torch.nn.Module,
         loss_cos_value = loss_cos.item()
         cos_embed_value = cos_embed.item()
         z_std_value = z_std.item()
-        ncc_value = statistics.ncc(samples, samples_hat).item()
+        ncc_value = ncc.item()
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
@@ -287,11 +287,11 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         modality = batch[4]
 
         with torch.cuda.amp.autocast():
-            loss, loss_cos, cos_embed, z_std, samples_hat, _ = model(samples,
-                                                                     attn_mask,
-                                                                     pos_embed_y,
-                                                                     modality,
-                                                                     mask_ratio=args.mask_ratio)
+            loss, ncc, loss_cos, cos_embed, z_std, _, _ = model(samples,
+                                                                attn_mask,
+                                                                pos_embed_y,
+                                                                modality,
+                                                                mask_ratio=args.mask_ratio)
 
         batch_size = len(samples)
 
@@ -299,7 +299,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         loss_cos_value = loss_cos.item()
         cos_embed_value = cos_embed.item()
         z_std_value = z_std.item()
-        ncc_value = statistics.ncc(samples, samples_hat).item()
+        ncc_value = ncc.item()
         
         metric_logger.update(loss=loss_value)
 

@@ -123,8 +123,8 @@ class SignalDataset(Dataset):
     @staticmethod
     def collate_fn(batch):
         # determine the biggest size in the batch
-        shapes = [sample[0].shape for sample in batch]
-        max_values = [max(x) for x in zip(*shapes)]
+        shape = [sample[0].shape for sample in batch]
+        max_values = [max(x) for x in zip(*shape)]
         max_channels = max_values[1] 
         max_timesteps = max_values[2]
 
