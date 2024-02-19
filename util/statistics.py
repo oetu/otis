@@ -42,7 +42,7 @@ def ncc(data_0:torch.Tensor, data_1:torch.Tensor, attn_mask:torch.Tensor=None, k
             nb_of_signals = nb_of_signals * data_0.shape[dim]
 
         # (B, C, H)
-        cross_corrs = torch.sum(norm(data=data_0) * norm(data=data_1), dim=-1) / (data_0.shape[-1] - 1)
+        cross_corrs = torch.sum(norm(data=data_0) * norm(data=data_1), dim=-1) / (data_0.shape[-1] + 1e-9)
     else:
         for dim in range(data_0.dim() - 2):
             # (B)
@@ -56,7 +56,7 @@ def ncc(data_0:torch.Tensor, data_1:torch.Tensor, attn_mask:torch.Tensor=None, k
         nb_of_signals = nb_of_signals.unsqueeze(-1)
 
         # (B, C, H)
-        cross_corrs = torch.sum(norm(data=data_0, attn_mask=attn_mask) * norm(data=data_1, attn_mask=attn_mask), dim=-1) / (torch.sum(attn_mask, dim=-1) - 1)
+        cross_corrs = torch.sum(norm(data=data_0, attn_mask=attn_mask) * norm(data=data_1, attn_mask=attn_mask), dim=-1) / (torch.sum(attn_mask, dim=-1) + 1e-9)
 
     if keep_batch == True:
         # compute ncc of each sample
