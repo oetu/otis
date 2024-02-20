@@ -580,7 +580,7 @@ class MaskedAutoencoderViT(nn.Module):
             loss_batch = torch.mean(loss / nb_patches)
             ncc_batch = torch.mean(ncc)
 
-        return (1 - self.ncc_weight) * loss_batch + self.ncc_weight * (1 - ncc_batch), ncc_batch, imgs_hat
+        return loss_batch + self.ncc_weight * (1 - ncc_batch), ncc_batch, imgs_hat
 
     def forward(self, imgs, attn_mask, pos_embed_y, modality, mask_ratio=0.75):
         """
