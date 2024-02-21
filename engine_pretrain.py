@@ -23,6 +23,8 @@ import util.misc as misc
 import util.lr_sched as lr_sched
 import util.statistics as statistics
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score, average_precision_score
