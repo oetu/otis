@@ -4,6 +4,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+# import numpy as np
+
 import util.transformations as transformations
 import util.augmentations as augmentations
 
@@ -37,7 +39,7 @@ class SignalDataset(Dataset):
             data = [sample[1] for sample in data]
 
         self.modality = modality
-        self.modalities = {modality: shape for modality, shape in sorted(list(set(self.modality))) } # unique modalities
+        self.modalities = {modality: shape for modality, shape in sorted(list(set(self.modality)))} # unique modalities
 
         modality_list = [mod[0] for mod in modality]
         unique_modalities = list(set(modality_list))
@@ -85,23 +87,27 @@ class SignalDataset(Dataset):
         """return a sample from the dataset at index idx"""
         data = self.data[idx]        
         if self.train == False:
-            # if self.finetune:
-            #     transform = transforms.Compose([
-            #         augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], start_idx=0, resize=False),
-            #     ])
-            # else:
-            transform = torch.nn.Identity()
+            transform = transforms.Compose([
+                augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], start_idx=0, resize=False)
+            ])
+            # transform = torch.nn.Identity()
         else:
             # if self.finetune:
             #     transform = transforms.Compose([
-            #         augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], resize=False),
+            #         augmentations.CropResizing(),
             #         augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
             #         augmentations.Jitter(sigma=self.args.jitter_sigma),
             #         augmentations.Rescaling(sigma=self.args.rescaling_sigma),
             #     ])
             # else:
+                # max_nb_patches = int(data.shape[-1] / self.args.patch_size[-1])
+                # random_factor = np.random.uniform(low=0.4, high=1.0)
+
+                # nb_patches = int(max_nb_patches * random_factor)
+                # crop_len =nb_patches * self.args.patch_size[-1]
+
             transform = transforms.Compose([
-                augmentations.CropResizing(),
+                augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], resize=False),
                 augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
                 augmentations.Jitter(sigma=self.args.jitter_sigma),
                 augmentations.Rescaling(sigma=self.args.rescaling_sigma),
