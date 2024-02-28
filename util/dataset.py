@@ -88,7 +88,7 @@ class SignalDataset(Dataset):
             # transform = torch.nn.Identity()
         else:
             transform = transforms.Compose([
-                augmentations.CropResizing(fixed_crop_len=self.args.time_steps, resize=False),
+                augmentations.CropResizing(fixed_resize_len=self.args.time_steps),
                 augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
                 augmentations.Jitter(sigma=self.args.jitter_sigma),
                 augmentations.Rescaling(sigma=self.args.rescaling_sigma),
