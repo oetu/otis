@@ -68,7 +68,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
             self.grid_size.update( {modality: grid_size} )
 
         assert embed_dim % 2 == 0
-        self.max_num_patches_x = max([v[1] for k, v in self.grid_size.items()])
+        self.max_num_patches_x = img_size[-1] // patch_size[1]
         self.pos_embed_x = nn.Parameter(torch.zeros(1, self.max_num_patches_x + 1, embed_dim // 2), requires_grad=False) # +1 cls embed
 
         total_num_embeddings_y = sum([v[0] for k, v in self.grid_size.items()])

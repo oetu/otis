@@ -57,7 +57,7 @@ class MaskedAutoencoderViT(nn.Module):
     """ Masked Autoencoder with VisionTransformer backbone
     """
     def __init__(self, modalities:dict, modality_weights:dict, 
-                 input_channels=1, patch_size=(1, 100),
+                 input_channels=1, time_steps=2500, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
                  separate_pos_embed_y=False,
@@ -78,7 +78,7 @@ class MaskedAutoencoderViT(nn.Module):
             self.grid_size.update( {modality: grid_size} )
 
         assert embed_dim % 2 == 0
-        max_num_patches_x = max([v[1] for k, v in self.grid_size.items()])
+        max_num_patches_x = time_steps // patch_size[1]
         self.pos_embed_x = nn.Parameter(torch.zeros(1, max_num_patches_x + 1, embed_dim // 2), requires_grad=False) # +1 cls embed
 
         total_num_embeddings_y = sum([v[0] for k, v in self.grid_size.items()])
