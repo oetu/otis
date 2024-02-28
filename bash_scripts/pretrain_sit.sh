@@ -3,10 +3,10 @@
 
 # Basic parameters
 seed="0"
-batch_size="128"
+batch_size="320"
 accum_iter=(1)
 
-epochs="300"
+epochs="200"
 warmup_epochs="30"
 
 # Callback parameters
@@ -18,6 +18,9 @@ compile="False"
 
 model_size="tinyDeep2"
 model="mae_vit_"$model_size"_patchX"
+
+input_channels="1"
+time_steps="6000"
 
 patch_height="1"
 patch_width=(100)
@@ -39,11 +42,11 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(3e-5)
+blr_array=(1e-5)
 weight_decay=(0.15)
 
 # Data path
-path="tower"
+path="server"
 dataset="sit"
 
 if [ "$path" = "tower" ]; then
@@ -80,18 +83,15 @@ else
     val_data_path=$data_base"/data_val_new.pt"
 fi
 
-num_workers="8"
+num_workers="16"
 
 # Online evaluation
+input_electrodes="12"
 online_evaluation="True"
 online_evaluation_task="classification"
 lower_bnd="0"
 upper_bnd="1"
 online_num_classes=2
-
-input_channels="1"
-input_electrodes="12"
-time_steps="5000"
 
 if [ "$path" = "tower" ]; then # ukbb data for online eval
     online_data_base="/home/oturgut/data/processed/ukbb"
@@ -125,7 +125,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="correctNCC"
+            folder="fresh/WLoss/randomResizedCrop"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data

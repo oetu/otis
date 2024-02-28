@@ -17,6 +17,7 @@ max_delta="0.15" # for AUROC
 input_channels="1"
 input_electrodes="30"
 time_steps="6000"
+
 model_size="tinyDeep"
 model="vit_"$model_size"_patchX"
 
@@ -44,17 +45,17 @@ weight_decay=(0.1)
 # Criterion parameters
 smoothing=(0.1)
 
-folds=(0 1 2 3 4 5 6 7 8 9)
+folds=(0) # 1 2 3 4 5 6 7 8 9)
 for fold in "${folds[@]}"
 do
 
     # Data path
-    path="tower"
+    path="server"
     if [ "$path" = "tower" ]; then
         data_base="/home/oturgut/data/processed/lemon/kfold/fold"$fold
         checkpoint_base="/home/oturgut/SiT"
     else
-        data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
+        data_base="/vol/aimspace/users/tuo/data/lemon/kfold/fold"$fold
         checkpoint_base="/vol/aimspace/users/tuo/SiT"
     fi
 
@@ -74,12 +75,12 @@ do
     val_labels_path=$data_base"/labels_val_stdNormed.pt"
     # val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
 
-    global_pool=(False)
-    attention_pool=(True)
+    global_pool=(True)
+    attention_pool=(False)
     num_workers="24"
 
     # Log specifications
-    save_output="True"
+    save_output="False"
     wandb="True"
     wandb_project="MAE_EEG_Age"
     wandb_id=""
@@ -87,7 +88,7 @@ do
     plot_attention_map="False"
     plot_embeddings="False"
     save_embeddings="False"
-    save_logits="True"
+    save_logits="False"
 
     # Pretraining specifications
     pre_batch_size=(128)
@@ -128,8 +129,25 @@ do
                                 
                                 # finetune=$checkpoint_base"/output/pre/tuh/eeg/all/15ch/ncc_weight0.1/seed0/tiny/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-196-ncc-0.78.pth"
 
-                                finetune="/home/oturgut/SiT/output/pre/test4/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-280-ncc-0.6527.pth"
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/TempEncoder/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-173-ncc-0.8602.pth"
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/TempEncoder/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-198-ncc-0.8919.pth"
+
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/posEncX60/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8828.pth"
+
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8803.pth"
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.9177.pth"
+
+                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8827.pth"
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.9158.pth"
+
+                                # finetune="/home/oturgut/SiT/output/pre/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-98-ncc-0.8766.pth"
+                                # finetune="/home/oturgut/SiT/output/pre/TempEncoder/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep/t2500/p1x100/wd0.15/m0.8/pre_b576_blr1e-5/checkpoint-198-ncc-0.9233.pth"
+                                # finetune="/home/oturgut/SiT/output/pre/wLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-242-ncc-0.8882.pth"
+                                # finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep/t2500/p1x100/wd0.15/m0.8/pre_b576_blr1e-5/checkpoint-199-ncc-0.8946.pth"
+                                # finetune="/home/oturgut/SiT/output/pre/test4/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-280-ncc-0.6527.pth"
+
                                 # finetune="/home/oturgut/mae/output/pre/siggy/cos_weight0.1/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b1024_blr1e-5/checkpoint-399-ncc-0.8839.pth"
+
                                 # finetune="/home/oturgut/mae/output/pre/tuh/250Hz/eeg/10ch/ncc_weight0.1/seed0/tinyUp/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-199-ncc-0.8074.pth"
                                 # finetune="/home/oturgut/mae/output/pre/tuh/250Hz/eeg/ncc_weight0.1/seed0/tiny/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-199-ncc-0.8500.pth"
                                 # finetune="/home/oturgut/mae/checkpoints/mm_v230_mae_checkpoint.pth"
