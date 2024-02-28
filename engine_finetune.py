@@ -18,7 +18,7 @@ from typing import Iterable, Optional
 import torch
 
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score, average_precision_score
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
 from sklearn.feature_selection import r_regression
 
 import wandb
@@ -129,7 +129,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         training_stats["auroc"] = auc
         training_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
-        rmse = mean_squared_error(logits, labels, multioutput="raw_values", squared=False)
+        rmse = root_mean_squared_error(logits, labels, multioutput="raw_values")
         training_stats["rmse"] = rmse.mean(axis=-1)
 
         mae = mean_absolute_error(logits, labels, multioutput="raw_values")
@@ -280,7 +280,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_stats["auroc"] = auc
         test_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
-        rmse = mean_squared_error(logits, labels, multioutput="raw_values", squared=False)
+        rmse = root_mean_squared_error(logits, labels, multioutput="raw_values")
         test_stats["rmse"] = rmse.mean(axis=-1)
 
         mae = mean_absolute_error(logits, labels, multioutput="raw_values")

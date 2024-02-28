@@ -28,7 +28,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score, average_precision_score
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
 
 from sklearn.feature_selection import r_regression
 
@@ -203,7 +203,7 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
         classifier_auprc_train = average_precision_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=-1), y_score=train_probs, pos_label=1)
     elif args.online_evaluation_task == "regression":
         train_preds = torch.tensor(estimator.predict(train_embeddings), dtype=torch.float16)
-        classifier_rmse_train = mean_squared_error(train_preds, train_labels, multioutput="raw_values", squared=False)
+        classifier_rmse_train = root_mean_squared_error(train_preds, train_labels, multioutput="raw_values")
         classifier_mae_train = mean_absolute_error(train_preds, train_labels, multioutput="raw_values")
         classifier_pcc_train = np.concatenate([r_regression(train_preds[:, i].view(-1, 1), train_labels[:, i]) for i in range(train_labels.shape[-1])], axis=0)
         classifier_r2_train = np.stack([r2_score(train_labels[:, i], train_preds[:, i]) for i in range(train_labels.shape[-1])], axis=0)
@@ -233,7 +233,7 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
         classifier_auprc_val = average_precision_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=-1), y_score=val_probs, pos_label=1)
     elif args.online_evaluation_task == "regression":
         val_preds = torch.tensor(estimator.predict(val_embeddings), dtype=torch.float16)
-        classifier_rmse_val = mean_squared_error(val_preds, val_labels, multioutput="raw_values", squared=False)
+        classifier_rmse_val = root_mean_squared_error(val_preds, val_labels, multioutput="raw_values")
         classifier_mae_val = mean_absolute_error(val_preds, val_labels, multioutput="raw_values")
         classifier_pcc_val = np.concatenate([r_regression(val_preds[:, i].view(-1, 1), val_labels[:, i]) for i in range(val_labels.shape[-1])], axis=0)
         classifier_r2_val = np.stack([r2_score(val_labels[:, i], val_preds[:, i]) for i in range(val_labels.shape[-1])], axis=0)
