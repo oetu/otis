@@ -4,8 +4,6 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-# import numpy as np
-
 import util.transformations as transformations
 import util.augmentations as augmentations
 
@@ -29,10 +27,7 @@ class SignalDataset(Dataset):
         if finetune:
             # finetuning / online evaluation
             modality = [("ecg", sample.unsqueeze(0)[..., :args.input_electrodes, :].shape) for sample in data]
-            # modality = [("eeg2", sample.unsqueeze(0)[..., :args.input_electrodes, :].shape) for sample in data]
-            # modality = [(sample[0], sample[1].shape) for sample in data]
             data = [sample.unsqueeze(0)[..., :args.input_electrodes, :] for sample in data]
-            # data = [sample[1] for sample in data]
         else:
             # pretraining
             modality = [(sample[0], sample[1].shape) for sample in data]
@@ -88,26 +83,12 @@ class SignalDataset(Dataset):
         data = self.data[idx]        
         if self.train == False:
             transform = transforms.Compose([
-                augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], start_idx=0, resize=False)
+                augmentations.CropResizing(fixed_crop_len=self.args.time_steps, start_idx=0, resize=False)
             ])
             # transform = torch.nn.Identity()
         else:
-            # if self.finetune:
-            #     transform = transforms.Compose([
-            #         augmentations.CropResizing(),
-            #         augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
-            #         augmentations.Jitter(sigma=self.args.jitter_sigma),
-            #         augmentations.Rescaling(sigma=self.args.rescaling_sigma),
-            #     ])
-            # else:
-                # max_nb_patches = int(data.shape[-1] / self.args.patch_size[-1])
-                # random_factor = np.random.uniform(low=0.4, high=1.0)
-
-                # nb_patches = int(max_nb_patches * random_factor)
-                # crop_len =nb_patches * self.args.patch_size[-1]
-
             transform = transforms.Compose([
-                augmentations.CropResizing(fixed_crop_len=self.args.input_size[-1], resize=False),
+                augmentations.CropResizing(fixed_crop_len=self.args.time_steps, resize=False),
                 augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
                 augmentations.Jitter(sigma=self.args.jitter_sigma),
                 augmentations.Rescaling(sigma=self.args.rescaling_sigma),
