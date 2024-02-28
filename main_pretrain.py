@@ -21,6 +21,7 @@ import torch
 import torch.backends.cudnn as cudnn
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
+os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 # import torch.multiprocessing
 # torch.multiprocessing.set_sharing_strategy('file_system')
@@ -300,6 +301,7 @@ def main(args):
         modalities=dataset_train.modalities,
         modality_weights=dataset_train.modality_weights,
         input_channels=args.input_channels,
+        time_steps=args.time_steps,
         patch_size=args.patch_size,
         separate_pos_embed_y=args.separate_pos_embed_y,
         norm_pix_loss=args.norm_pix_loss,

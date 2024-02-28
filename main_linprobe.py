@@ -21,6 +21,7 @@ import torch
 import torch.backends.cudnn as cudnn
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
+os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 # assert timm.__version__ == "0.3.2" # version check
 from timm.models.layers import trunc_normal_
