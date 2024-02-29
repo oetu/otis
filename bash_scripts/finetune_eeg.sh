@@ -7,7 +7,7 @@ batch_size=(32)
 accum_iter=(1)
 
 epochs="200"
-warmup_epochs="5"
+warmup_epochs="20"
 
 # Callback parameters
 patience="15"
@@ -30,6 +30,9 @@ mask_ratio="0.00"
 mask_c_ratio="0.00"
 mask_t_ratio="0.00"
 
+crop_lower_bnd="0.8"
+crop_upper_bnd="1.0"
+
 jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
@@ -45,7 +48,7 @@ weight_decay=(0.1)
 # Criterion parameters
 smoothing=(0.1)
 
-folds=(0) # 1 2 3 4 5 6 7 8 9)
+folds=(0 1 2 3 4 5 6 7 8 9)
 for fold in "${folds[@]}"
 do
 
@@ -75,12 +78,12 @@ do
     val_labels_path=$data_base"/labels_val_stdNormed.pt"
     # val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
 
-    global_pool=(True)
-    attention_pool=(False)
+    global_pool=(False)
+    attention_pool=(True)
     num_workers="24"
 
     # Log specifications
-    save_output="False"
+    save_output="True"
     wandb="True"
     wandb_project="MAE_EEG_Age"
     wandb_id=""
@@ -88,11 +91,9 @@ do
     plot_attention_map="False"
     plot_embeddings="False"
     save_embeddings="False"
-    save_logits="False"
+    save_logits="True"
 
     # Pretraining specifications
-    pre_batch_size=(128)
-    pre_blr=(1e-5)
     ignore_pos_embed_y="False"
     trainable_pos_embed_y="True"
 
@@ -102,7 +103,7 @@ do
     eval="False"
     # As filename: State the checkpoint for the inference of a specific model
     # or state the (final) epoch for the inference of all models up to this epoch
-    #resume=$checkpoint_base"/output/fin/"$folder"/id/"$subfolder"/fin_b"$(($batch_size*$accum_iter))"_blr"$blr"_"$pre_data"/checkpoint-89.pth"
+    #resume=$checkpoint_base"/output/fin/"$folder"/id/"$subfolder"/fin_b"$(($batch_size*$accum_iter))"_blr"$blr"/checkpoint-89.pth"
 
     for sd in "${seed[@]}"
     do
@@ -123,9 +124,6 @@ do
 
                                 folder="lemon/kfold/fold"$fold"/eeg/Age/SiT"
                                 subfolder="seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$weight_decay"/m0.8"
-
-                                pre_data="b"$pre_batch_size"_blr"$pre_blr
-                                # finetune=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_"$pre_data"/checkpoint-399.pth"
                                 
                                 # finetune=$checkpoint_base"/output/pre/tuh/eeg/all/15ch/ncc_weight0.1/seed0/tiny/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-196-ncc-0.78.pth"
 
@@ -137,7 +135,12 @@ do
                                 # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8803.pth"
                                 # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.9177.pth"
 
-                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8827.pth"
+                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/NewRandomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8799.pth"
+                                
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/randomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8731.pth"
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8900.pth"
+
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8827.pth"
                                 # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.9158.pth"
 
                                 # finetune="/home/oturgut/SiT/output/pre/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-98-ncc-0.8766.pth"
@@ -154,11 +157,11 @@ do
                                 # finetune="/home/oturgut/mae/checkpoints/tiny/v1/checkpoint-399.pth"
                                 # finetune="/home/oturgut/mae/output/pre/lemon/full/eeg/ncc_weight0.1/seed0/tiny/t6000/p1x100/wd0.15/m0.8/pre_b64_blr1e-4/checkpoint-196-ncc-0.81.pth"
 
-                                output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter))"_blr"$lr"_"$pre_data
+                                output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter))"_blr"$lr
 
-                                # resume=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$bs"_blr"$lr"_"$pre_data"/checkpoint-4-pcc-0.54.pth"
+                                # resume=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$bs"_blr"$lr"/checkpoint-4-pcc-0.54.pth"
 
-                                cmd="python3 main_finetune.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $dp --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                                cmd="python3 main_finetune.py --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $dp --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                                 
                                 if [ "$ignore_pos_embed_y" = "True" ]; then
                                     cmd=$cmd" --ignore_pos_embed_y"

@@ -91,6 +91,11 @@ def get_args_parser():
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='Masking ratio (percentage of removed patches).')
 
+    parser.add_argument('--crop_lower_bnd', default=0.5, type=float,
+                        help='Lower boundary of the cropping ratio (default: 0.5)')
+    parser.add_argument('--crop_upper_bnd', default=1.0, type=float,
+                        help='Upper boundary of the cropping ratio (default: 1.0)')
+
     parser.add_argument('--jitter_sigma', default=0.2, type=float,
                         help='Jitter sigma N(0, sigma) (default: 0.2)')
     parser.add_argument('--rescaling_sigma', default=0.5, type=float,
