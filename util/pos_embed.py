@@ -89,38 +89,6 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
 # References:
 # DeiT: https://github.com/facebookresearch/deit
 # --------------------------------------------------------
-def interpolate_pos_embed(model, checkpoint_model, checkpoint_input_size):
-    if 'pos_embed' in checkpoint_model:
-        pos_embed_checkpoint = checkpoint_model['pos_embed']
-        embedding_size = pos_embed_checkpoint.shape[-1]
-        num_patches = model.patch_embed.num_patches
-        num_extra_tokens = model.pos_embed.shape[-2] - num_patches
-
-        # height, width for the checkpoint position embedding
-        patch_embed_checkpoint = checkpoint_model['patch_embed.proj.weight']
-        orig_patch_heigt = patch_embed_checkpoint.shape[-2]
-        orig_patch_width = patch_embed_checkpoint.shape[-1]
-        orig_height = int(checkpoint_input_size[-2] / orig_patch_heigt)
-        orig_width = int(checkpoint_input_size[-1] / orig_patch_width)
-
-        # height, width for the new position embedding
-        new_height, _ = model.patch_embed.grid_size
-        new_width = int(num_patches / new_height)
-
-        # class_token and dist_token are kept unchanged
-        if orig_width != new_width:
-            print("Position interpolate from %dx%d to %dx%d" % (orig_height, orig_width, new_height, new_width))
-            extra_tokens = pos_embed_checkpoint[:, :num_extra_tokens]
-            # only the position tokens are interpolated
-            pos_tokens = pos_embed_checkpoint[:, num_extra_tokens:]
-            pos_tokens = pos_tokens.reshape(-1, orig_height, orig_width, embedding_size).permute(0, 3, 1, 2)
-            pos_tokens = torch.nn.functional.interpolate(
-                pos_tokens, size=(new_height, new_width), mode='bicubic', align_corners=False)
-            pos_tokens = pos_tokens.permute(0, 2, 3, 1).flatten(1, 2)
-            new_pos_embed = torch.cat((extra_tokens, pos_tokens), dim=1)
-            checkpoint_model['pos_embed'] = new_pos_embed
-
-
 def interpolate_pos_embed_x(model, checkpoint_model):
     if 'pos_embed_x' in checkpoint_model:
         print("Loading position embedding X from checkpoint")

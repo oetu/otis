@@ -53,20 +53,20 @@ def get_args_parser():
     parser.add_argument('--model', default='vit_base_patch200', type=str, metavar='MODEL',
                         help='Name of model to train')
     
-    parser.add_argument('--input_channels', type=int, default=5, metavar='N',
+    parser.add_argument('--input_channels', type=int, default=1, metavar='N',
                         help='input channels')
-    parser.add_argument('--input_electrodes', type=int, default=65, metavar='N',
+    parser.add_argument('--input_electrodes', type=int, default=12, metavar='N',
                         help='input electrodes')
-    parser.add_argument('--time_steps', type=int, default=37000, metavar='N',
+    parser.add_argument('--time_steps', type=int, default=5000, metavar='N',
                         help='input length')
-    parser.add_argument('--input_size', default=(5, 65, 37000), type=Tuple,
+    parser.add_argument('--input_size', default=(1, 12, 5000), type=Tuple,
                         help='images input size')
 
-    parser.add_argument('--patch_height', type=int, default=65, metavar='N',
+    parser.add_argument('--patch_height', type=int, default=1, metavar='N',
                         help='patch height')
-    parser.add_argument('--patch_width', type=int, default=200, metavar='N',
+    parser.add_argument('--patch_width', type=int, default=100, metavar='N',
                         help='patch width')
-    parser.add_argument('--patch_size', default=(65, 200), type=Tuple,
+    parser.add_argument('--patch_size', default=(1, 100), type=Tuple,
                         help='patch size')
 
     parser.add_argument('--drop_path', type=float, default=0.1, metavar='PCT',

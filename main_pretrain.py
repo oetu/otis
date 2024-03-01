@@ -60,9 +60,9 @@ def get_args_parser():
                         help='input channels')
     parser.add_argument('--input_electrodes', type=int, default=12, metavar='N',
                         help='input electrodes')
-    parser.add_argument('--time_steps', type=int, default=2500, metavar='N',
+    parser.add_argument('--time_steps', type=int, default=5000, metavar='N',
                         help='input length')
-    parser.add_argument('--input_size', default=(1, 12, 2500), type=Tuple,
+    parser.add_argument('--input_size', default=(1, 12, 5000), type=Tuple,
                         help='images input size')
                         
     parser.add_argument('--patch_height', type=int, default=1, metavar='N',
@@ -191,7 +191,6 @@ def get_args_parser():
 
 
 def main(args):
-    args.input_size = (args.input_channels, args.input_electrodes, args.time_steps)
     args.patch_size = (args.patch_height, args.patch_width)
 
     # misc.init_distributed_mode(args)
