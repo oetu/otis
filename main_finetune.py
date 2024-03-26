@@ -245,6 +245,16 @@ def main(args):
     # misc.init_distributed_mode(args)
     args.distributed = False
 
+    # wandb logging
+    if args.wandb == True:
+        config = vars(args)
+        if args.wandb_id:
+            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
+        else:
+            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
+
+        args.__dict__ = wandb.config.as_dict()
+
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
 
@@ -305,14 +315,6 @@ def main(args):
         log_writer = SummaryWriter(log_dir=args.log_dir + "/eval")
     else:
         log_writer = None
-
-    # wandb logging
-    if args.wandb == True:
-        config = vars(args)
-        if args.wandb_id:
-            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
-        else:
-            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, 
@@ -598,6 +600,7 @@ def main(args):
 
     if args.wandb:
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
+        wandb.finish()
 
 
 if __name__ == '__main__':

@@ -1,0 +1,66 @@
+name: fin-ap
+project: MAE_ECG_CAD
+
+program: ./../main_finetune.py
+method: grid
+metric:
+  goal: maximize
+  name: test_auroc
+
+parameters:
+  wandb_project:
+    value: "MAE_ECG_CAD"  
+  seed:
+    value: 0
+  batch_size:
+    values: [8, 16, 32, 64]
+  drop_path: 
+    values: [0.0, 0.1]
+  layer_decay:
+    values: [0.5, 0.75]
+  weigth_decay:
+    values: [0.1]
+  smoothing:
+    values: [0.1]
+  epochs:
+    value: 100
+  warmup_epoch:
+    value: 10
+  blr:
+    values: [3e-6, 1e-5, 3e-5, 1e-4]
+
+  data_path:
+    value: "/home/oturgut/data/processed/ukbb/processed/ecgs_train_CAD_all_balanced_float32.pt"
+  labels_path:
+    value: "/home/oturgut/data/processed/ukbb/labelsOneHot/labels_train_CAD_all_balanced.pt"
+  downstream_task:
+    value: "classification"
+  nb_classes:
+    value: 2
+
+  val_data_path:
+    value: "/home/oturgut/data/processed/ukbb/processed/ecgs_val_ecg_imaging_float32.pt"
+  val_labels_path:
+    value: "/home/oturgut/data/processed/ukbb/labelsOneHot/labels_val_CAD_all.pt"
+  pos_label:
+   value: 1
+
+  model:
+    value: "vit_tinyDeep_patchX"
+  time_steps:
+    value: 2500
+
+  finetune:
+    value: "/home/oturgut/SiT/output/pre/server/WLoss/NewRandomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8799.pth"
+
+  patience:
+    value: 15
+  max_delta:
+    value: 0.25
+
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - --wandb
+  - --attention_pool
