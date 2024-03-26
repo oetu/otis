@@ -89,7 +89,8 @@ class SignalDataset(Dataset):
             transform = transforms.Compose([
                 augmentations.CropResizing(fixed_resize_len=self.args.time_steps, 
                                            lower_bnd=self.args.crop_lower_bnd, 
-                                           upper_bnd=self.args.crop_upper_bnd),
+                                           upper_bnd=self.args.crop_upper_bnd,
+                                           resize=True),
                 augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
                 augmentations.Jitter(sigma=self.args.jitter_sigma),
                 augmentations.Rescaling(sigma=self.args.rescaling_sigma),
