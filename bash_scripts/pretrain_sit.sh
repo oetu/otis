@@ -3,7 +3,7 @@
 
 # Basic parameters
 seed="0"
-batch_size="320"
+batch_size="768"
 accum_iter=(1)
 
 epochs="200"
@@ -16,11 +16,11 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="tinyDeep2"
+model_size="baseDeep_dec160d4b"
 model="mae_vit_"$model_size"_patchX"
 
 input_channels="1"
-time_steps="6000"
+time_steps="2500"
 
 patch_height="1"
 patch_width=(100)
@@ -49,8 +49,8 @@ blr_array=(1e-5)
 weight_decay=(0.15)
 
 # Data path
-path="server"
-dataset="sit"
+path="tower"
+dataset="ukbb"
 
 if [ "$path" = "tower" ]; then
     if [ "$dataset" = "ukbb" ]; then
@@ -79,14 +79,14 @@ if [ "$dataset" = "ukbb" ]; then
     # data_path=$data_base"/ecgs_train_ecg_imaging_noBase_gn.pt"
     # val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
 elif [ "$dataset" = "mimic" ]; then
-    data_path=$data_base"/ecgs_train_590k_p1_clean.pt"
+    data_path=$data_base"/ecgs_train_20k_clean.pt"
     val_data_path=$data_base"/ecgs_val_10k_clean.pt"
 else
     data_path=$data_base"/data_train_new.pt"
     val_data_path=$data_base"/data_val_new.pt"
 fi
 
-num_workers="16"
+num_workers="24"
 
 # Online evaluation
 input_electrodes="12"
@@ -128,7 +128,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="fresh/WLoss/RandomResizedCrop"
+            folder="test"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data
