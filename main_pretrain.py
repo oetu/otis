@@ -72,7 +72,7 @@ def get_args_parser():
     parser.add_argument('--patch_size', default=(1, 100), type=Tuple,
                         help='patch size')
 
-    parser.add_argument('--separate_pos_embed_y', action='store_true', default=False,
+    parser.add_argument('--separate_dec_pos_embed_y', action='store_true', default=False,
                         help='Use separate position embeddings Y for the decoder')
 
     parser.add_argument('--norm_pix_loss', action='store_true', default=False,
@@ -307,7 +307,7 @@ def main(args):
         input_channels=args.input_channels,
         time_steps=args.time_steps,
         patch_size=args.patch_size,
-        separate_pos_embed_y=args.separate_pos_embed_y,
+        separate_dec_pos_embed_y=args.separate_dec_pos_embed_y,
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
         modality_weighted_loss=args.modality_weighted_loss,

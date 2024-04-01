@@ -59,7 +59,7 @@ class MaskedAutoencoderViT(nn.Module):
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-                 separate_pos_embed_y=False,
+                 separate_dec_pos_embed_y=False,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
                  norm_pix_loss=False, masked_patch_loss=False, modality_weighted_loss=False,
                  ncc_weight:float=0.0):
@@ -104,8 +104,8 @@ class MaskedAutoencoderViT(nn.Module):
 
         assert decoder_embed_dim % 2 == 0
         self.decoder_pos_embed_x = nn.Parameter(torch.zeros(1, max_num_patches_x + 1, decoder_embed_dim // 2), requires_grad=False) # +1 cls embed
-        self.separate_pos_embed_y = separate_pos_embed_y
-        if self.separate_pos_embed_y:
+        self.separate_dec_pos_embed_y = separate_dec_pos_embed_y
+        if self.separate_dec_pos_embed_y:
             self.decoder_pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, decoder_embed_dim // 2, padding_idx=0) # +1 padding embed
         else:
             self.decoder_pos_embed_y = nn.Linear(embed_dim // 2, decoder_embed_dim // 2)
@@ -180,7 +180,7 @@ class MaskedAutoencoderViT(nn.Module):
         with torch.no_grad():
             self.pos_embed_y.weight[1:] = _pos_embed_y
 
-        if self.separate_pos_embed_y:
+        if self.separate_dec_pos_embed_y:
             _decoder_pos_embed_y = torch.nn.Parameter(torch.randn(self.decoder_pos_embed_y.num_embeddings-1, 
                                                                 self.decoder_pos_embed_y.embedding_dim) * .02)
             trunc_normal_(_decoder_pos_embed_y, std=.02)
@@ -461,7 +461,7 @@ class MaskedAutoencoderViT(nn.Module):
 
         # add pos embed Y
         # (B, C', T', D_dec/2)
-        if self.separate_pos_embed_y:
+        if self.separate_dec_pos_embed_y:
             decoder_pos_embed_y_batch = self.decoder_pos_embed_y(pos_embed_y)
         else:
             decoder_pos_embed_y_batch = self.decoder_pos_embed_y(self.pos_embed_y(pos_embed_y))
