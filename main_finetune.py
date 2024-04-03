@@ -426,6 +426,8 @@ def main(args):
 
     if args.trainable_pos_embed_y:
         model.pos_embed_y.weight.requires_grad = True
+    else:
+        model.pos_embed_y.weight.requires_grad = False
     
     model.to(device, non_blocking=True)
 
