@@ -373,7 +373,7 @@ def main(args):
         #         args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
         #         loss_scaler=loss_scaler, epoch=epoch)
 
-        val_stats, test_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
+        val_stats, val_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
         print(f"Loss / Normalized CC of the network on the {len(dataset_val)} val images: {val_stats['loss']:.4f}\
                / {val_stats['ncc']:.2f}")
 
@@ -434,7 +434,7 @@ def main(args):
 
         total_time = time.time() - start_time
         if args.wandb:
-            wandb.log(train_history | test_history | online_history | {"Time per epoch [sec]": total_time})
+            wandb.log(train_history | val_history | online_history | {"Time per epoch [sec]": total_time})
 
 
 if __name__ == '__main__':
