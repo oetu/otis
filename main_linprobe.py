@@ -26,13 +26,13 @@ os.environ["WANDB__SERVICE_WAIT"] = "500"
 # assert timm.__version__ == "0.3.2" # version check
 from timm.models.layers import trunc_normal_
 
+from util.dataset import SignalDataset
 import util.lr_decay as lrd
 import util.misc as misc
-from util.pos_embed import interpolate_pos_embed_x
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
+from util.pos_embed import interpolate_pos_embed_x
 from util.lars import LARS
 from util.callbacks import EarlyStop
-from util.dataset import SignalDataset
 
 import models_vit
 

@@ -31,8 +31,8 @@ from timm.loss import SoftTargetCrossEntropy #, LabelSmoothingCrossEntropy
 from util.dataset import SignalDataset
 import util.lr_decay as lrd
 import util.misc as misc
-from util.pos_embed import interpolate_pos_embed_x
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
+from util.pos_embed import interpolate_pos_embed_x
 from util.callbacks import EarlyStop
 
 import models_vit

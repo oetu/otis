@@ -29,6 +29,7 @@ os.environ["WANDB__SERVICE_WAIT"] = "500"
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
+from util.dataset import SignalDataset
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.callbacks import EarlyStop
@@ -37,8 +38,6 @@ import models_mae
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
 from engine_pretrain import train_one_epoch, evaluate_online, evaluate
-
-from util.dataset import SignalDataset
 
 
 def get_args_parser():
