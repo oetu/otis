@@ -423,7 +423,10 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
                     mode="increasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
             
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 'epoch': epoch,}
+        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 
+                     **{f'val_{k}': str(v) for k, v in val_stats.items()},
+                     'epoch': epoch, 
+                     'n_parameters': n_parameters}
 
         if args.output_dir and misc.is_main_process():
             if log_writer:

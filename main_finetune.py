@@ -583,10 +583,10 @@ def main(args):
             print(f'Min Root Mean Squared Error (RMSE) / Min Mean Absolute Error (MAE) / Max Pearson Correlation Coefficient (PCC) /',
                   f'Max R Squared (R2): {best_stats["rmse"]:.4f} / {best_stats["mae"]:.4f} / {best_stats["pcc"]:.4f} / {best_stats["r2"]:.4f}\n')
         
-        log_stats = {**{f'train_{k}': str(v) for k, v in train_stats.items()},
-                        **{f'test_{k}': str(v) for k, v in test_stats.items()},
-                        'epoch': epoch,
-                        'n_parameters': n_parameters}
+        log_stats = {**{f'train_{k}': str(v) for k, v in train_stats.items()}, 
+                     **{f'test_{k}': str(v) for k, v in test_stats.items()}, 
+                     'epoch': epoch, 
+                     'n_parameters': n_parameters}
 
         if args.output_dir and misc.is_main_process():
             if log_writer:
