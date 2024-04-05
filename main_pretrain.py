@@ -373,8 +373,8 @@ def main(args):
         #         loss_scaler=loss_scaler, epoch=epoch)
 
         val_stats, val_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
-        print(f"Loss / Normalized CC of the network on the {len(dataset_val)} val images: {val_stats['loss']:.4f}\
-               / {val_stats['ncc']:.2f}")
+        print(f"Loss / Normalized Cross-Correlation (NCC) of the network on {len(dataset_val)} val images:", 
+              f"{val_stats['loss']:.4f} / {val_stats['ncc']:.2f}")
 
         # online evaluation of the downstream task
         online_history = {}

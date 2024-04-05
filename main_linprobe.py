@@ -445,11 +445,11 @@ def main(args):
 
             test_stats, test_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
             if args.downstream_task == 'classification':
-                print(f"Accuracy / F1 / AUROC / AUPRC of the network on the {len(dataset_val)} test images: {test_stats['acc']:.2f}% /"
+                print(f"Accuracy / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: {test_stats['acc']:.2f}% /"
                       f"{test_stats['f1']:.2f}% / {test_stats['auroc']:.2f}% / {test_stats['auprc']:.2f}%")
             elif args.downstream_task == 'regression':
                 print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2)",
-                      f"of the network on the {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} /",
+                      f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} /",
                       f"{test_stats['pcc']:.4f} / {test_stats['r2']:.4f}")
 
             if args.wandb:
@@ -522,7 +522,7 @@ def main(args):
             best_stats['auroc'] = max(best_stats['auroc'], test_stats['auroc'])
             best_stats['auprc'] = max(best_stats['auprc'], test_stats['auprc'])
 
-            print(f"Accuracy / F1 / AUROC / AUPRC of the network on the {len(dataset_val)} test images: {test_stats['acc']:.1f}% /",
+            print(f"Accuracy / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: {test_stats['acc']:.1f}% /",
                   f"{test_stats['f1']:.1f}% / {test_stats['auroc']:.1f}% / {test_stats['auprc']:.1f}%")
             print(f'Max Accuracy / F1 / AUROC / AUPRC: {best_stats["acc"]:.2f}% / {best_stats["f1"]:.2f}% /',
                   f'{best_stats["auroc"]:.2f}% / {best_stats["auprc"]:.2f}%\n')
@@ -535,7 +535,7 @@ def main(args):
             best_stats['r2'] = max(best_stats['r2'], test_stats['r2'])
 
             print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2)",
-                  f"of the network on the {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} /",
+                  f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} /",
                   f"{test_stats['pcc']:.4f} / {test_stats['r2']:.4f}")
             print(f'Min Root Mean Squared Error (RMSE) / Min Mean Absolute Error (MAE) / Max Pearson Correlation Coefficient (PCC) /',
                   f'Max R Squared (R2): {best_stats["rmse"]:.4f} / {best_stats["mae"]:.4f} / {best_stats["pcc"]:.4f} / {best_stats["r2"]:.4f}\n')
