@@ -129,8 +129,8 @@ def get_args_parser():
     
     parser.add_argument('--ignore_pos_embed_y', action='store_true', default=False,
                         help='Ignore pre-trained position embeddings Y (spatial axis) from checkpoint')
-    parser.add_argument('--trainable_pos_embed_y', action='store_true', default=False,
-                        help='Make position embeddings Y (spatial axis) trainable')
+    parser.add_argument('--freeze_pos_embed_y', action='store_true', default=False,
+                        help='Make position embeddings Y (spatial axis) non-trainable')
 
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
@@ -386,7 +386,7 @@ def main(args):
     for _, p in model.head.named_parameters():
         p.requires_grad = True
 
-    if args.trainable_pos_embed_y:
+    if not args.freeze_pos_embed_y:
         model.pos_embed_y.weight.requires_grad = True
     
     model.to(device, non_blocking=True)

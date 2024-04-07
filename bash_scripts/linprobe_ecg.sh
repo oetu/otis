@@ -130,7 +130,7 @@ save_logits="False"
 # Pretraining specifications
 pre_batch_size=(128)
 pre_blr=(1e-4)
-trainable_pos_embed_y="False"
+freeze_pos_embed_y="False"
 
 # EVALUATE
 eval="False"
@@ -169,8 +169,8 @@ do
 
                         cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
 
-                        if [ "$trainable_pos_embed_y" = "True" ]; then
-                            cmd=$cmd" --trainable_pos_embed_y"
+                        if [ "$freeze_pos_embed_y" = "True" ]; then
+                            cmd=$cmd" --freeze_pos_embed_y"
                         fi
 
                         if [ "$downstream_task" = "regression" ]; then

@@ -164,8 +164,8 @@ def get_args_parser():
     
     parser.add_argument('--ignore_pos_embed_y', action='store_true', default=False,
                         help='Ignore pre-trained position embeddings Y (spatial axis) from checkpoint')
-    parser.add_argument('--trainable_pos_embed_y', action='store_true', default=False,
-                        help='Make position embeddings Y (spatial axis) trainable')
+    parser.add_argument('--freeze_pos_embed_y', action='store_true', default=False,
+                        help='Make position embeddings Y (spatial axis) non-trainable')
 
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
@@ -424,9 +424,7 @@ def main(args):
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=0.01)#2e-5)
 
-    if args.trainable_pos_embed_y:
-        model.pos_embed_y.weight.requires_grad = True
-    else:
+    if args.freeze_pos_embed_y:
         model.pos_embed_y.weight.requires_grad = False
     
     model.to(device, non_blocking=True)

@@ -96,7 +96,7 @@ do
     pre_batch_size=(128)
     pre_blr=(1e-5)
     ignore_pos_embed_y="False"
-    trainable_pos_embed_y="True"
+    freeze_pos_embed_y="False"
 
     # EVALUATE
     eval="False"
@@ -141,8 +141,8 @@ do
                             cmd=$cmd" --ignore_pos_embed_y"
                         fi
 
-                        if [ "$trainable_pos_embed_y" = "True" ]; then
-                            cmd=$cmd" --trainable_pos_embed_y"
+                        if [ "$freeze_pos_embed_y" = "True" ]; then
+                            cmd=$cmd" --freeze_pos_embed_y"
                         fi
 
                         if [ "$downstream_task" = "regression" ]; then    

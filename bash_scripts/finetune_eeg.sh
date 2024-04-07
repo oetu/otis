@@ -95,7 +95,7 @@ do
 
     # Pretraining specifications
     ignore_pos_embed_y="False"
-    trainable_pos_embed_y="True"
+    freeze_pos_embed_y="False"
 
     from_scratch="False"
 
@@ -167,8 +167,8 @@ do
                                     cmd=$cmd" --ignore_pos_embed_y"
                                 fi
 
-                                if [ "$trainable_pos_embed_y" = "True" ]; then
-                                    cmd=$cmd" --trainable_pos_embed_y"
+                                if [ "$freeze_pos_embed_y" = "True" ]; then
+                                    cmd=$cmd" --freeze_pos_embed_y"
                                 fi
 
                                 if [ "$downstream_task" = "regression" ]; then    
