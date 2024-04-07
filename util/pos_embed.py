@@ -128,3 +128,44 @@ def interpolate_pos_embed_x(model, checkpoint_model):
         model.pos_embed_x.data.copy_(checkpoint_model['pos_embed_x'])
     else:
         print("Initializing new position embedding X")
+
+
+def interpolate_decoder_pos_embed_x(model, checkpoint_model):
+    if 'decoder_pos_embed_x' in checkpoint_model:
+        print("Loading decoder position embedding X from checkpoint")
+        # (1, 1+T'_max, D_dec/2)
+        pos_embed_checkpoint = checkpoint_model['decoder_pos_embed_x']
+
+        # D_dec/2
+        embedding_size = pos_embed_checkpoint.shape[-1]
+        
+        # (1, 1, D_dec/2)
+        cls_embedding = pos_embed_checkpoint[:, :1]
+
+        num_tokens_ckpt = pos_embed_checkpoint[:, 1:].shape[1]  # T'_max
+        num_tokens_model = model.max_num_patches_x              # T'_model
+
+        if num_tokens_model > num_tokens_ckpt:
+            print("Position interpolate from %dx%d to %dx%d" % (1, num_tokens_ckpt, 1, num_tokens_model))
+            # (1, T'_max, D_dec/2)
+            pos_tokens = pos_embed_checkpoint[:, 1:]
+            # (1, D_dec/2, T'_max)
+            pos_tokens = pos_tokens.permute(0, 2, 1)
+            # (1, D_dec/2, T'_model)
+            pos_tokens = torch.nn.functional.interpolate(
+                pos_tokens, size=num_tokens_model, mode="linear", align_corners=False)
+            # (1, T'_model, D_dec/2)
+            pos_tokens = pos_tokens.permute(0, 2, 1)
+            # (1, 1+T'_model, D_dec/2)
+            new_pos_embed = torch.cat((cls_embedding, pos_tokens), dim=1)
+            checkpoint_model['decoder_pos_embed_x'] = new_pos_embed
+    
+            model.decoder_pos_embed_x = torch.nn.Parameter(torch.zeros(1, num_tokens_model + 1, embedding_size), 
+                                             requires_grad=False)
+        else:
+            model.decoder_pos_embed_x = torch.nn.Parameter(torch.zeros(1, num_tokens_ckpt + 1, embedding_size), 
+                                             requires_grad=False)
+
+        model.decoder_pos_embed_x.data.copy_(checkpoint_model['decoder_pos_embed_x'])
+    else:
+        print("Initializing new decoder position embedding X")

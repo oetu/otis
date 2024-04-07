@@ -58,11 +58,10 @@ class MaskedAutoencoderViT(nn.Module):
     def __init__(self, modalities:dict, modality_weights:dict, 
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
-                 decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16,
-                 separate_dec_pos_embed_y=False,
+                 decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
-                 norm_pix_loss=False, masked_patch_loss=False, modality_weighted_loss=False,
-                 ncc_weight:float=0.0):
+                 norm_pix_loss=False, masked_patch_loss=False, modality_weighted_loss=False, ncc_weight:float=0.0, 
+                 downstream=None):
         super().__init__()
 
         # --------------------------------------------------------------------------
@@ -78,6 +77,7 @@ class MaskedAutoencoderViT(nn.Module):
 
         assert embed_dim % 2 == 0
         max_num_patches_x = time_steps // patch_size[1]
+        self.max_num_patches_x = max_num_patches_x
         self.pos_embed_x = nn.Parameter(torch.zeros(1, max_num_patches_x + 1, embed_dim // 2), requires_grad=False) # +1 cls embed
 
         total_num_embeddings_y = sum([v[0] for k, v in self.grid_size.items()])
@@ -158,6 +158,8 @@ class MaskedAutoencoderViT(nn.Module):
         self.modality_weighted_loss = modality_weighted_loss
         
         self.ncc_weight = ncc_weight
+
+        self.downstream = downstream
 
         self.initialize_weights()
 
@@ -258,12 +260,21 @@ class MaskedAutoencoderViT(nn.Module):
         x: [N, L, D], sequence
         """
         N, L, D = x.shape  # batch, length, dim
-        len_keep = int(L * (1 - mask_ratio))
+        len_keep = int(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
-        noise = torch.rand(N, L, device=x.device)  # noise in [0, 1]
+        if self.downstream == "forecasting":
+            # as only one modality is processed for a downstream task
+            # self.max_num_patches_x can be used regardless of the modality dict
+            nb_of_channels = int(L / self.max_num_patches_x)
+            noise = torch.arange(0, self.max_num_patches_x, device=x.device).repeat(nb_of_channels, 1)
+            noise = noise + torch.linspace(0, 0.5, steps=nb_of_channels, device=x.device).view(nb_of_channels, -1)
+            noise = noise.flatten().repeat(N, 1)
+        else:
+            noise = torch.rand(N, L, device=x.device)   # noise in [0, 1]
         
         # sort noise for each sample
-        ids_shuffle = torch.argsort(noise, dim=1)  # ascend: small is keep, large is remove
+        ids_shuffle = torch.argsort(noise, dim=1)   # ascend: small is keep, large is remove
+
         ids_restore = torch.argsort(ids_shuffle, dim=1)
 
         # keep the first subset
@@ -579,7 +590,7 @@ class MaskedAutoencoderViT(nn.Module):
             loss_batch = torch.mean(loss / nb_patches)
             ncc_batch = torch.mean(ncc)
 
-        return loss_batch + self.ncc_weight * (1 - ncc_batch), ncc_batch, imgs_hat
+        return loss_batch, ncc_batch, imgs_hat
 
     def forward(self, imgs, attn_mask, pos_embed_y, modality, mask_ratio=0.75):
         """
@@ -590,12 +601,6 @@ class MaskedAutoencoderViT(nn.Module):
         latent, mask, ids_restore = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
         pred = self.forward_decoder(latent, attn_mask, pos_embed_y, ids_restore)  # [N, L, p*q*C]
         loss, ncc, imgs_hat = self.forward_loss(imgs, pred, attn_mask, mask, modality)
-
-        # [N, C, H, W]
-        imgs_hat_masked = self.unpatchify(pred*(1-mask).unsqueeze(dim=-1), attn_mask)
-        # [N, C, H, W]
-        attn_mask_input_space = torch.nn.functional.interpolate(attn_mask.unsqueeze(1), scale_factor=self.patch_size, mode="nearest")
-        imgs_hat_masked = imgs_hat_masked * attn_mask_input_space
 
         # contrastive part
         latent2, _, _ = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
@@ -610,18 +615,18 @@ class MaskedAutoencoderViT(nn.Module):
         h1 = self.predictor(p1)
         h2 = self.predictor(p2)
 
-        # loss_cos = - (self.criterion(h1, p2).mean() + self.criterion(h2, p1).mean()) * 0.5
-        loss_cos = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
-        # loss_cos = - (self.criterion(h1, z2).mean() + self.criterion(h2, z1).mean()) * 0.5
-        # loss_cos = - (self.criterion(h1, z2.detach()).mean() + self.criterion(h2, z1.detach()).mean()) * 0.5
+        # cos_sim = - (self.criterion(h1, p2).mean() + self.criterion(h2, p1).mean()) * 0.5
+        cos_sim = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
+        # cos_sim = - (self.criterion(h1, z2).mean() + self.criterion(h2, z1).mean()) * 0.5
+        # cos_sim = - (self.criterion(h1, z2.detach()).mean() + self.criterion(h2, z1.detach()).mean()) * 0.5
 
         # compare the similarity between the actual embeddings
-        cos_embed = self.criterion(z1, z2).mean()
+        cos_sim_embed = self.criterion(z1, z2).mean()
 
         # determine the std across all embeddings in the batch
         z_std = torch.nn.functional.normalize(z1, dim=-1).std(dim=0).mean() * z1.shape[-1]**0.5 
 
-        return loss, ncc, loss_cos, cos_embed, z_std, imgs_hat, imgs_hat_masked
+        return loss, ncc, cos_sim, cos_sim_embed, z_std, imgs_hat, mask
 
 
 # def mae_vit_pluto_patchX_dec192d2b(**kwargs): # nb_params: 1.61M encoder, 0.37M decoder

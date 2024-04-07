@@ -30,8 +30,10 @@ class SignalDataset(Dataset):
             data = [sample.unsqueeze(0)[..., :args.input_electrodes, :] for sample in data]
         else:
             # pretraining
-            modality = [(sample[0], sample[1].shape) for sample in data]
-            data = [sample[1] for sample in data]
+            # modality = [(sample[0], sample[1].shape) for sample in data]
+            # data = [sample[1] for sample in data]
+            modality = [("ecg", sample.unsqueeze(0).shape) for sample in data]
+            data = [sample.unsqueeze(0) for sample in data]
 
         self.modality = modality
         self.modalities = {modality: shape for modality, shape in sorted(list(set(self.modality)))} # unique modalities
@@ -106,7 +108,7 @@ class SignalDataset(Dataset):
             label_mask = torch.ones_like(label)
 
         modality, _ = self.modality[idx]
-            
+        
         return data, label, label_mask, self.args.patch_size, self.offsets[modality], modality
 
     @staticmethod
@@ -126,7 +128,6 @@ class SignalDataset(Dataset):
 
         # (p, q)
         patch_size = batch[0][3]
-
         grid_width = torch.tensor([sample[0].shape[-1] // patch_size[-1] for sample in batch])
         grid_height = torch.tensor([sample[0].shape[-2] // patch_size[-2] for sample in batch])
 
@@ -146,7 +147,7 @@ class SignalDataset(Dataset):
 
         modality = [sample[5] for sample in batch]
     
-        return data, patch_size, attn_mask, torch.LongTensor(pos_embed_y), modality
+        return data, attn_mask, torch.LongTensor(pos_embed_y), modality
     
     @staticmethod
     def collate_fn_ft(batch):

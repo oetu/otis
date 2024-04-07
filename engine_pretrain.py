@@ -21,7 +21,6 @@ import wandb
 
 import util.misc as misc
 import util.lr_sched as lr_sched
-import util.statistics as statistics
 
 import matplotlib
 matplotlib.use('Agg')
@@ -53,7 +52,7 @@ def train_one_epoch(model: torch.nn.Module,
 
     training_history = {}
 
-    for data_iter_step, (samples, patch_size, attn_mask, pos_embed_y, modality) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for data_iter_step, (samples, attn_mask, pos_embed_y, modality) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
@@ -65,28 +64,29 @@ def train_one_epoch(model: torch.nn.Module,
 
         # compute model prediction
         with torch.cuda.amp.autocast():
-            loss, ncc, loss_cos, cos_embed, z_std, samples_hat, samples_hat_masked = model(samples, 
-                                                                                           attn_mask,
-                                                                                           pos_embed_y,
-                                                                                           modality,
-                                                                                           mask_ratio=args.mask_ratio)
+            loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask = model(samples, 
+                                                                                attn_mask, 
+                                                                                pos_embed_y, 
+                                                                                modality, 
+                                                                                mask_ratio=args.mask_ratio)
 
         batch_size = len(samples)
 
         loss_value = loss.item()
-        loss_cos_value = loss_cos.item()
-        cos_embed_value = cos_embed.item()
-        z_std_value = z_std.item()
         ncc_value = ncc.item()
+        cos_sim_value = cos_sim.item()
+        cos_sim_embed_value = cos_sim_embed.item()
+        z_std_value = z_std.item()
 
         if not math.isfinite(loss_value):
             print("Loss is {}, stopping training".format(loss_value))
             sys.exit(1)
 
         loss /= accum_iter
-        loss_cos /= accum_iter
+        ncc /= accum_iter
+        cos_sim /= accum_iter
 
-        total_loss = loss + args.cos_weight * loss_cos
+        total_loss = loss + args.ncc_weight * (1 - ncc) + args.cos_weight * cos_sim
         loss_scaler(total_loss, optimizer, parameters=model.parameters(),
                     update_grad=(data_iter_step + 1) % accum_iter == 0)
         if (data_iter_step + 1) % accum_iter == 0:
@@ -99,10 +99,38 @@ def train_one_epoch(model: torch.nn.Module,
         lr = optimizer.param_groups[0]["lr"]
         metric_logger.update(lr=lr)
 
-        metric_logger.meters['loss_cos'].update(loss_cos_value, n=batch_size)
-        metric_logger.meters['cos_embed'].update(cos_embed_value, n=batch_size)
-        metric_logger.meters['z_std'].update(z_std_value, n=batch_size)
+        metric_logger.meters['total_loss'].update(total_loss.item(), n=batch_size)
+        
         metric_logger.meters['ncc'].update(ncc_value, n=batch_size)
+        metric_logger.meters['cos_sim'].update(cos_sim_value, n=batch_size)
+        metric_logger.meters['cos_sim_embed'].update(cos_sim_embed_value, n=batch_size)
+        metric_logger.meters['z_std'].update(z_std_value, n=batch_size)
+
+        # compute MSE and MAE only of the masked patches
+        # (B, 1, C, T)
+        # 0 is padding, 1 is actual value
+        attn_mask_input_space = torch.nn.functional.interpolate(attn_mask.unsqueeze(1), 
+                                                                scale_factor=args.patch_size, 
+                                                                mode="nearest")
+
+        # (B, 1, C, T)
+        # 0 is keep, 1 is remove
+        mask_input_space = torch.nn.functional.interpolate(mask.reshape(attn_mask.shape).unsqueeze(1), 
+                                                            scale_factor=args.patch_size, 
+                                                            mode="nearest")
+
+        # (B, 1, C, T)
+        combined_mask = attn_mask_input_space * mask_input_space
+
+        # (B, 1, C, T)
+        samples_diff = samples - samples_hat
+
+        # evaluation only on the masked patches
+        mse_value = ((samples_diff**2) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+        mae_value = (abs(samples_diff) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+
+        metric_logger.meters['mse'].update(mse_value, n=batch_size)
+        metric_logger.meters['mae'].update(mae_value, n=batch_size)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -112,38 +140,58 @@ def train_one_epoch(model: torch.nn.Module,
 
     # tensorboard
     if log_writer is not None:
+        log_writer.add_scalar('train/train_total_loss', train_stats["total_loss"], epoch)
         log_writer.add_scalar('train/train_loss', train_stats["loss"], epoch)
-        log_writer.add_scalar('train/train_loss_cos', train_stats["loss_cos"], epoch)
-        log_writer.add_scalar('train/train_cos_embed', train_stats["cos_embed"], epoch)
+        log_writer.add_scalar('train/train_ncc', train_stats["ncc"], epoch)
+        log_writer.add_scalar('train/train_cos_sim', train_stats["cos_sim"], epoch)
+        log_writer.add_scalar('train/train_cos_sim_embed', train_stats["cos_sim_embed"], epoch)
         log_writer.add_scalar('train/train_z_std', train_stats["z_std"], epoch)
         log_writer.add_scalar('lr', train_stats["lr"], epoch)
-        log_writer.add_scalar('train/normalized_corr_coef', train_stats["ncc"], epoch)
+        # evaluation only on the masked patches
+        log_writer.add_scalar('train/train_mse', train_stats["mse"], epoch)
+        log_writer.add_scalar('train/train_mae', train_stats["mae"], epoch)
 
     # wandb
     if args.wandb == True:
         training_history['epoch'] = epoch
+        training_history['train_total_loss'] = train_stats["total_loss"]
         training_history['train_loss'] = train_stats["loss"]
-        training_history['train_loss_cos'] = train_stats["loss_cos"]
-        training_history['train_cos_embed'] = train_stats["cos_embed"]
+        training_history['train_ncc'] = train_stats["ncc"]
+        training_history['train_cos_sim'] = train_stats["cos_sim"]
+        training_history['train_cos_sim_embed'] = train_stats["cos_sim_embed"]
         training_history['train_z_std'] = train_stats["z_std"]
         training_history['lr'] = train_stats["lr"]
-        training_history['Normalized Correlation Coefficient'] = train_stats["ncc"]
+        # evaluation only on the masked patches
+        training_history['train_mse'] = train_stats["mse"]
+        training_history['train_mae'] = train_stats["mae"]
 
         if (epoch % 10) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
             
-            # (B, 1, C, T)
-            attn_mask_input_space = torch.nn.functional.interpolate(attn_mask.unsqueeze(1), 
-                                                                    scale_factor=patch_size, 
-                                                                    mode="nearest")
+            if combined_mask is None:
+                # (B, 1, C, T)
+                # 0 is padding, 1 is actual value
+                attn_mask_input_space = torch.nn.functional.interpolate(attn_mask.unsqueeze(1), 
+                                                                        scale_factor=args.patch_size, 
+                                                                        mode="nearest")
+
+                # (B, 1, C, T)
+                # 0 is keep, 1 is remove
+                mask_input_space = torch.nn.functional.interpolate(mask.reshape(attn_mask.shape).unsqueeze(1), 
+                                                                scale_factor=args.patch_size, 
+                                                                mode="nearest")
+                
+                # (B, 1, C, T)
+                combined_mask = attn_mask_input_space * mask_input_space
 
             # T_indie
             max_steps = int(attn_mask_input_space[idx, 0, 0, :].sum())
 
+            # (1, 1, C, T)
             x = samples[idx][..., :max_steps:steps].detach().cpu().numpy()
             x_hat = samples_hat[idx][..., :max_steps:steps].detach().cpu().numpy()
-            x_hat_masked = samples_hat_masked[idx][..., :max_steps:steps].detach().cpu().numpy()
+            x_hat_masked = x_hat * combined_mask[idx].detach().cpu().numpy()
 
             # samples of shape (Batch, 1, Channel, Time)
             if samples.shape[1] > 1:
@@ -152,18 +200,25 @@ def train_one_epoch(model: torch.nn.Module,
                 ch_idx = 0
 
             plt.close('all')
+            plt.figure(figsize=(8, 6))
             plt.subplot(611)
             plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
+            plt.title("Input")
             plt.subplot(612)
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
+            plt.title("Reconstruction")
             plt.subplot(613)
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
+            plt.title("Reconstruction (masked patches only)")
             plt.subplot(614)
             plt.plot(range(0, x.shape[-1], 1), x[ch_idx, 5, :])
+            plt.title("Input")
             plt.subplot(615)
             plt.plot(range(0, x.shape[-1], 1), x_hat[ch_idx, 5, :])
+            plt.title("Reconstruction")
             plt.subplot(616)
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[ch_idx, 5, :])
+            plt.title("Reconstruction (masked patches only)")
             plt.tight_layout()
             training_history["Reconstruction"] = wandb.Image(plt)
 
@@ -280,35 +335,64 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         samples = batch[0]
         samples = samples.to(device, non_blocking=True)
         
-        attn_mask = batch[2]
+        attn_mask = batch[1]
         attn_mask = attn_mask.to(device, non_blocking=True)
 
-        pos_embed_y = batch[3]
+        pos_embed_y = batch[2]
         pos_embed_y = pos_embed_y.to(device, non_blocking=True)
 
-        modality = batch[4]
+        modality = batch[3]
 
         with torch.cuda.amp.autocast():
-            loss, ncc, loss_cos, cos_embed, z_std, _, _ = model(samples,
-                                                                attn_mask,
-                                                                pos_embed_y,
-                                                                modality,
-                                                                mask_ratio=args.mask_ratio)
+            loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask = model(samples, 
+                                                                                attn_mask, 
+                                                                                pos_embed_y, 
+                                                                                modality, 
+                                                                                mask_ratio=args.mask_ratio)
 
         batch_size = len(samples)
 
         loss_value = loss.item()
-        loss_cos_value = loss_cos.item()
-        cos_embed_value = cos_embed.item()
-        z_std_value = z_std.item()
         ncc_value = ncc.item()
+        cos_sim_value = cos_sim.item()
+        cos_sim_embed_value = cos_sim_embed.item()
+        z_std_value = z_std.item()
         
         metric_logger.update(loss=loss_value)
 
-        metric_logger.meters['loss_cos'].update(loss_cos_value, n=batch_size)
-        metric_logger.meters['cos_embed'].update(cos_embed_value, n=batch_size)
-        metric_logger.meters['z_std'].update(z_std_value, n=batch_size)
+        total_loss_value = loss_value + args.ncc_weight * (1 - ncc_value) + args.cos_weight * cos_sim_value
+        metric_logger.meters['total_loss'].update(total_loss_value, n=batch_size)
+        
         metric_logger.meters['ncc'].update(ncc_value, n=batch_size)
+        metric_logger.meters['cos_sim'].update(cos_sim_value, n=batch_size)
+        metric_logger.meters['cos_sim_embed'].update(cos_sim_embed_value, n=batch_size)
+        metric_logger.meters['z_std'].update(z_std_value, n=batch_size)
+
+        # compute MSE and MAE only of the masked patches
+        # (B, 1, C, T)
+        # 0 is padding, 1 is actual value
+        attn_mask_input_space = torch.nn.functional.interpolate(attn_mask.unsqueeze(1), 
+                                                                scale_factor=args.patch_size, 
+                                                                mode="nearest")
+
+        # (B, 1, C, T)
+        # 0 is keep, 1 is remove
+        mask_input_space = torch.nn.functional.interpolate(mask.reshape(attn_mask.shape).unsqueeze(1), 
+                                                            scale_factor=args.patch_size, 
+                                                            mode="nearest")
+
+        # (B, 1, C, T)
+        combined_mask = attn_mask_input_space * mask_input_space
+
+        # (B, 1, C, T)
+        samples_diff = samples - samples_hat
+
+        # evaluation only on the masked patches
+        mse_value = ((samples_diff**2) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+        mae_value = (abs(samples_diff) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+
+        metric_logger.meters['mse'].update(mse_value, n=batch_size)
+        metric_logger.meters['mae'].update(mae_value, n=batch_size)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -318,19 +402,27 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
 
     # tensorboard
     if log_writer is not None:
+        log_writer.add_scalar('val/val_total_loss', test_stats["total_loss"], epoch)
         log_writer.add_scalar('val/val_loss', test_stats["loss"], epoch)
-        log_writer.add_scalar('val/val_loss_cos', test_stats["loss_cos"], epoch)
-        log_writer.add_scalar('val/val_cos_embed', test_stats["cos_embed"], epoch)
+        log_writer.add_scalar('val/val_ncc', test_stats["ncc"], epoch)
+        log_writer.add_scalar('val/val_cos_sim', test_stats["cos_sim"], epoch)
+        log_writer.add_scalar('val/val_cos_sim_embed', test_stats["cos_sim_embed"], epoch)
         log_writer.add_scalar('val/val_z_std', test_stats["z_std"], epoch)
-        log_writer.add_scalar('val/val_normalized_corr_coef', test_stats["ncc"], epoch)
+        # evaluation only on the masked patches
+        log_writer.add_scalar('val/val_mse', test_stats["mse"], epoch)
+        log_writer.add_scalar('val/val_mae', test_stats["mae"], epoch)
 
     # wandb
     if args.wandb == True:
         test_history['epoch'] = epoch
+        test_history['val_total_loss'] = test_stats["total_loss"]
         test_history['val_loss'] = test_stats["loss"]
-        test_history['val_loss_cos'] = test_stats["loss_cos"]
-        test_history['val_cos_embed'] = test_stats["cos_embed"]
+        test_history['val_ncc'] = test_stats["ncc"]
+        test_history['val_cos_sim'] = test_stats["cos_sim"]
+        test_history['val_cos_sim_embed'] = test_stats["cos_sim_embed"]
         test_history['val_z_std'] = test_stats["z_std"]
-        test_history['Val Normalized Correlation Coefficient'] = test_stats["ncc"]
+        # evaluation only on the masked patches
+        test_history['val_mse'] = test_stats["mse"]
+        test_history['val_mae'] = test_stats["mae"]
 
     return test_stats, test_history

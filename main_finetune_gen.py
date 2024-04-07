@@ -32,12 +32,12 @@ import timm.optim.optim_factory as optim_factory
 from util.dataset import SignalDataset
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
+from util.pos_embed import interpolate_pos_embed_x, interpolate_decoder_pos_embed_x
 from util.callbacks import EarlyStop
 
 import models_mae
-from sklearn.linear_model import LogisticRegression, LinearRegression
 
-from engine_pretrain import train_one_epoch, evaluate_online, evaluate
+from engine_pretrain import train_one_epoch, evaluate
 
 
 def get_args_parser():
@@ -123,38 +123,25 @@ def get_args_parser():
                         help='Early stopping whether val is worse than train for specified nb of epochs (default: -1, i.e. no early stopping)')
     parser.add_argument('--max_delta', default=0, type=float,
                         help='Early stopping threshold (val has to be worse than (train+delta)) (default: 0)')
+    
+    # * Finetuning params
+    parser.add_argument('--finetune', default='',
+                        help='finetune from checkpoint')
+    
+    parser.add_argument('--ignore_pos_embed_y', action='store_true', default=False,
+                        help='Ignore pre-trained position embeddings Y (spatial axis) from checkpoint')
+    parser.add_argument('--freeze_pos_embed_y', action='store_true', default=False,
+                        help='Make position embeddings Y (spatial axis) non-trainable')
 
     # Dataset parameters
+    downstream_tasks = ["forecasting", "imputation"]
+    parser.add_argument('--downstream_task', default='forecasting', type=str, choices=downstream_tasks,
+                        help='downstream task (default: forecasting)')
+    
     parser.add_argument('--data_path', default='_.pt', type=str,
                         help='dataset path')
     parser.add_argument('--val_data_path', default='', type=str,
                         help='validation dataset path')
-    
-    parser.add_argument('--online_evaluation', action='store_true', default=False,
-                        help='Perform online evaluation of a downstream task')
-    parser.add_argument('--online_evaluation_task', default='classification', type=str,
-                        help='Online downstream task (default: classification)')
-    parser.add_argument('--online_num_classes', default=2, type=int,
-                        help='Online classification task classes (default: 2)')
-    
-    parser.add_argument('--lower_bnd', type=int, default=0, metavar='N',
-                        help='lower_bnd')
-    parser.add_argument('--upper_bnd', type=int, default=0, metavar='N',
-                        help='upper_bnd')
-
-    parser.add_argument('--data_path_online', default='_.pt', type=str,
-                        help='dataset path for the online evaluation')
-    parser.add_argument('--labels_path_online', default='_.pt', type=str,
-                        help='labels path for the online evaluation')
-    parser.add_argument('--labels_mask_path_online', default='', type=str,
-                        help='labels path (default: None)')
-    
-    parser.add_argument('--val_data_path_online', default='', type=str,
-                        help='validation dataset path for the online evaluation')
-    parser.add_argument('--val_labels_path_online', default='', type=str,
-                        help='validation labels path for the online evaluation')
-    parser.add_argument('--val_labels_mask_path_online', default='', type=str,
-                        help='labels path (default: None)')
 
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
@@ -173,6 +160,8 @@ def get_args_parser():
 
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
+    parser.add_argument('--eval', action='store_true',
+                        help='Perform evaluation only')
     parser.add_argument('--num_workers', default=0, type=int)
     parser.add_argument('--pin_mem', action='store_true', default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
@@ -208,8 +197,13 @@ def main(args):
     cudnn.benchmark = True
 
     # load data
-    dataset_train = SignalDataset(data_path=args.data_path, train=True, args=args)
-    dataset_val = SignalDataset(data_path=args.val_data_path, train=False, modality_offsets=dataset_train.offsets, args=args)
+    dataset_train = SignalDataset(data_path=args.data_path, 
+                                  train=True, 
+                                  args=args)
+    dataset_val = SignalDataset(data_path=args.val_data_path, 
+                                train=False, 
+                                modality_offsets=dataset_train.offsets, 
+                                args=args)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
@@ -262,43 +256,6 @@ def main(args):
         drop_last=False,
     )
 
-    # online evaluation
-    if args.online_evaluation:
-        dataset_online_train = SignalDataset(data_path=args.data_path_online, 
-                                             labels_path=args.labels_path_online, 
-                                             labels_mask_path=args.labels_mask_path_online, 
-                                             downstream_task=args.online_evaluation_task, 
-                                             finetune=True, train=True, 
-                                             modality_offsets=dataset_train.offsets,
-                                             args=args)
-        dataset_online_val = SignalDataset(data_path=args.val_data_path_online, 
-                                           labels_path=args.val_labels_path_online, 
-                                           labels_mask_path=args.val_labels_mask_path_online, 
-                                           downstream_task=args.online_evaluation_task, 
-                                           finetune=True, train=False, 
-                                           modality_offsets=dataset_train.offsets, 
-                                           args=args)
-
-        data_loader_online_train = torch.utils.data.DataLoader(
-            dataset_online_train, 
-            shuffle=True,
-            batch_size=256,
-            num_workers=args.num_workers,
-            collate_fn=dataset_online_train.collate_fn_ft,
-            pin_memory=args.pin_mem,
-            drop_last=False,
-        )
-
-        data_loader_online_val = torch.utils.data.DataLoader(
-            dataset_online_val, 
-            shuffle=False,
-            batch_size=256,
-            num_workers=args.num_workers,
-            collate_fn=dataset_online_val.collate_fn_ft,
-            pin_memory=args.pin_mem,
-            drop_last=False,
-        )
-
     # define the model
     model = models_mae.__dict__[args.model](
         modalities=dataset_train.modalities,
@@ -310,18 +267,82 @@ def main(args):
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
         modality_weighted_loss=args.modality_weighted_loss,
-        ncc_weight=args.ncc_weight
+        ncc_weight=args.ncc_weight,
+        downstream=args.downstream_task
     )
+
+    if args.finetune and not args.eval:
+        checkpoint = torch.load(args.finetune, map_location='cpu')
+
+        print("Load pre-trained checkpoint from: %s" % args.finetune)
+        checkpoint_model = checkpoint['model']
+        state_dict = model.state_dict()
+        # for k in ['head.weight', 'head.bias']:
+        #     if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
+        #         print(f"Removing key {k} from pretrained checkpoint")
+        #         del checkpoint_model[k]
+
+        # load position embedding X
+        interpolate_pos_embed_x(model, checkpoint_model)
+
+        # load decoder position embedding X
+        interpolate_decoder_pos_embed_x(model, checkpoint_model)
+
+        key = "pos_embed_x"
+        if key in checkpoint_model:
+            print(f"Removing key {key} from pretrained checkpoint")
+            del checkpoint_model[key]
+
+        # load position embedding Y together with modality offsets
+        assert len(dataset_train.modalities) == 1, "There is more than one modality in the target dataset"
+        target_modality = list(dataset_train.modalities.keys())[0]
+        target_shape = list(dataset_train.modalities.values())[0]
+
+        pos_embed_y_available = False
+
+        checkpoint_modalities = checkpoint["modalities"]
+        for modality, shape in checkpoint_modalities.items():
+            if modality == target_modality and shape[1] == target_shape[1]:
+                pos_embed_y_available = True
+                break
+
+        if not args.ignore_pos_embed_y and pos_embed_y_available:
+            print("Loading position embedding Y from checkpoint")
+            model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
+
+            # load modality offsets
+            dataset_train.set_modality_offsets(checkpoint["modality_offsets"])
+            dataset_val.set_modality_offsets(checkpoint["modality_offsets"])
+        else:
+            print("Initializing new position embedding Y")
+
+        key = "pos_embed_y.weight"
+        if key in checkpoint_model:
+            print(f"Removing key {key} from pretrained checkpoint")
+            del checkpoint_model[key]
+
+        # load pre-trained model
+        msg = model.load_state_dict(checkpoint_model, strict=False)
+        print(msg)
+
+        assert set(msg.missing_keys) == {'pos_embed_x', 'pos_embed_y.weight'}
+
+    if args.freeze_pos_embed_y:
+        # encoder
+        model.pos_embed_y.weight.requires_grad = False
+        # decoder
+        model.decoder_pos_embed_y.weight.requires_grad = False
+        model.decoder_pos_embed_y.bias.requires_grad = False
 
     if args.compile:
         model = torch.compile(model)
     model.to(device, non_blocking=True)
 
+    model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_params_encoder = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and "decoder" not in n)
     n_params_decoder = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and "decoder" in n)
 
-    model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))
     print('Number of params (M): %.2f' % (n_parameters / 1.e6))
     print('Number of encoder params (M): %.2f' % (n_params_encoder / 1.e6))
@@ -348,16 +369,42 @@ def main(args):
     print(optimizer)
     loss_scaler = NativeScaler()
 
-    misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+    if not args.eval:
+        misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+
+    if args.eval:
+        sub_strings = args.resume.split("/")
+        if "checkpoint" in sub_strings[-1]:
+            nb_ckpts = 1
+        else:
+            nb_ckpts = int(sub_strings[-1])+1
+
+        for epoch in range(0, nb_ckpts):
+            if "checkpoint" not in sub_strings[-1]:
+                args.resume = "/".join(sub_strings[:-1]) + "/checkpoint-" + str(epoch) + ".pth"
+
+            misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+
+            test_stats, test_history = evaluate(data_loader_val, model, device, epoch, 
+                                                log_writer=log_writer, args=args)
+
+            print(f"Mean Squared Error (MSE) / Mean Absolute Error (MAE) / Normalized Cross-Correlation (NCC)", 
+                  f"of the network on {len(dataset_val)} test images: {test_stats['mse']:.4f} / {test_stats['mae']:.4f} /", 
+                  f"{test_stats['ncc']:.4f}")
+        
+            if args.wandb:
+                wandb.log(test_history)
+
+        exit(0)
 
     # Define callbacks
     early_stop = EarlyStop(patience=args.patience, max_delta=args.max_delta)
 
     print(f"Start training for {args.epochs} epochs")
 
-    eval_criterion = "ncc"
+    eval_criterion = "mse"
     
-    best_stats = {'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
+    best_stats = {'loss':np.inf, 'mse':np.inf, 'mae':np.inf, 'ncc':0.0}
     best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
@@ -367,34 +414,19 @@ def main(args):
 
         train_stats, train_history = train_one_epoch(model, data_loader_train, optimizer, device, epoch, loss_scaler,
                                                      log_writer=log_writer, args=args)
-
-        val_stats, val_history = evaluate(data_loader_val, model, device, epoch, 
+        val_stats, val_history = evaluate(data_loader_val, model, device, epoch,
                                           log_writer=log_writer, args=args)
+        
+        print(f"Loss / Mean Squared Error (MSE) / Mean Absolute Error (MAE) / Normalized Cross-Correlation (NCC)",
+              f"of the network on {len(dataset_val)} val images: {val_stats['loss']:.4f} / {val_stats['mse']:.4f} /",
+               f"{val_stats['mae']:.4f} / {val_stats['ncc']:.2f}")
 
-        print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / Mean Absolute Error (MAE)",
-              f"of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / {val_stats['loss']:.4f} / ", 
-              f"{val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / {val_stats['mae']:.2f}")
-
-        # online evaluation of the downstream task
-        online_history = {}
-        if args.online_evaluation and epoch % 5 == 0:
-            if args.online_evaluation_task == "classification":
-                online_estimator = LogisticRegression(class_weight='balanced', max_iter=2000)
-            elif args.online_evaluation_task == "regression":
-                online_estimator = LinearRegression()
-            
-            online_history = evaluate_online(estimator=online_estimator, model=model, device=device, 
-                                             train_dataloader=data_loader_online_train, 
-                                             val_dataloader=data_loader_online_val, args=args)
-
-        best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
         best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])
-        best_stats['ncc'] = max(best_stats['ncc'], val_stats['ncc'])
-        best_stats['cos_sim'] = max(best_stats['cos_sim'], val_stats['cos_sim'])
         best_stats['mse'] = max(best_stats['mse'], val_stats['mse'])
         best_stats['mae'] = max(best_stats['mae'], val_stats['mae'])
+        best_stats['ncc'] = max(best_stats['ncc'], val_stats['ncc'])
         
-        if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
+        if eval_criterion == "loss":
             if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]):
                 break
             if args.output_dir and val_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
@@ -440,7 +472,7 @@ def main(args):
 
         total_time = time.time() - start_time
         if args.wandb:
-            wandb.log(train_history | val_history | online_history | {"Time per epoch [sec]": total_time})
+            wandb.log(train_history | val_history | {"Time per epoch [sec]": total_time})
 
 
 if __name__ == '__main__':
