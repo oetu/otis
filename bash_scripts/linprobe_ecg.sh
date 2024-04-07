@@ -17,7 +17,7 @@ max_delta="0.25"
 input_channels="1"
 input_electrodes="12"
 time_steps="2500"
-model_size="tinyDeep"
+model_size="baseDeep"
 model="vit_"$model_size"_patchX"
 
 patch_height="1"
@@ -28,6 +28,9 @@ masking_blockwise="False"
 mask_ratio="0.00"
 mask_c_ratio="0.00"
 mask_t_ratio="0.00"
+
+crop_lower_bnd="0.8"
+crop_upper_bnd="1.0"
 
 jitter_sigma="0.2"
 rescaling_sigma="0.5"
@@ -46,13 +49,13 @@ smoothing=(0.1)
 from_scratch="False"
 
 # Data path
-path="server"
+path="tower"
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/ukbb"
-    checkpoint_base="/home/oturgut/mae"
+    checkpoint_base="/home/oturgut/SiT"
 else
     data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
-    checkpoint_base="/vol/aimspace/users/tuo/mae"
+    checkpoint_base="/vol/aimspace/users/tuo/SiT"
 fi
 
 # Dataset parameters
@@ -128,8 +131,7 @@ save_embeddings="False"
 save_logits="False"
 
 # Pretraining specifications
-pre_batch_size=(128)
-pre_blr=(1e-4)
+ignore_pos_embed_y="False"
 freeze_pos_embed_y="False"
 
 # EVALUATE
@@ -151,11 +153,12 @@ do
                     for smth in "${smoothing[@]}"
                     do
 
-                        folder="ukbb/ecg/CAD"
+                        folder="test"
                         subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$wd"/m0.8/atp")
 
-                        pre_data="b"$pre_batch_size"_blr"$pre_blr
-                        finetune="/vol/aimspace/users/tuo/SiT/output/pre/test2/checkpoint-34-ncc-0.5850.pth"
+                        # SiT
+                        finetune="/home/oturgut/SiT/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
+
                         # finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
                         # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
                         # finetune=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_"$pre_data"/checkpoint-399.pth"
@@ -163,11 +166,15 @@ do
                         # finetune=$checkpoint_base"/checkpoints/mm_v283_mae_checkpoint.pth"
                         # finetune=$checkpoint_base"/checkpoints/tiny/v1/checkpoint-399.pth"
 
-                        output_dir=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$(($bs*$accum_iter))"_blr"$lr"_"$pre_data
+                        output_dir=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$(($bs*$accum_iter))"_blr"$lr
 
                         # resume=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$bs"_blr"$lr"_"$pre_data"/checkpoint-6-pcc-0.27.pth"
 
-                        cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                        cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+
+                        if [ "$ignore_pos_embed_y" = "True" ]; then
+                            cmd=$cmd" --ignore_pos_embed_y"
+                        fi
 
                         if [ "$freeze_pos_embed_y" = "True" ]; then
                             cmd=$cmd" --freeze_pos_embed_y"

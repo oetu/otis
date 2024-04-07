@@ -114,7 +114,7 @@ val_labels_path_online=$online_data_base"/labelsOneHot/labels_val_"$target"_all.
 # val_labels_mask_path_online=""
 
 # Log specifications
-save_output="False"
+save_output="True"
 wandb="True"
 wandb_project="OTiS_Pretraining"
 wandb_id=""
@@ -128,7 +128,7 @@ do
 
             pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
 
-            folder="test"
+            folder="refactored"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data

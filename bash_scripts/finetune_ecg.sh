@@ -3,7 +3,7 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-batch_size=(8 16 32)
+batch_size=(512)
 accum_iter=(1)
 
 epochs="100"
@@ -18,7 +18,7 @@ input_channels="1"
 input_electrodes="12"
 time_steps="2500"
 
-model_size="tinyDeep"
+model_size="baseDeep"
 model="vit_"$model_size"_patchX"
 
 patch_height="1"
@@ -41,7 +41,7 @@ drop_path=(0.1)
 layer_decay=(0.75)
 
 # Optimizer parameters
-blr=(1e-6 3e-6) # 3e-5 if from scratch
+blr=(1e-6) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -159,11 +159,11 @@ do
                         for smth in "${smoothing[@]}"
                         do
 
-                            folder="ukbb/ecg/CAD"
+                            folder="test"
                             subfolder=("seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$weight_decay"/m0.8")
 
                             # SiT
-                            finetune="/home/oturgut/SiT/output/pre/server/WLoss/NewRandomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8799.pth"
+                            finetune="/home/oturgut/SiT/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
 
                             # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
                             
