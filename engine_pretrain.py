@@ -126,8 +126,11 @@ def train_one_epoch(model: torch.nn.Module,
         samples_diff = samples - samples_hat
 
         # evaluation only on the masked patches
-        mse_value = ((samples_diff**2) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
-        mae_value = (abs(samples_diff) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+        mse = ((samples_diff**2) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+        mae = (abs(samples_diff) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+        
+        mse_value = mse.item()
+        mae_value = mae.item()
 
         metric_logger.meters['mse'].update(mse_value, n=batch_size)
         metric_logger.meters['mae'].update(mae_value, n=batch_size)
@@ -388,8 +391,11 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         samples_diff = samples - samples_hat
 
         # evaluation only on the masked patches
-        mse_value = ((samples_diff**2) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
-        mae_value = (abs(samples_diff) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+        mse = ((samples_diff**2) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+        mae = (abs(samples_diff) * combined_mask).sum() / (combined_mask.sum() + 1e-9)
+
+        mse_value = mse.item()
+        mae_value = mae.item()
 
         metric_logger.meters['mse'].update(mse_value, n=batch_size)
         metric_logger.meters['mae'].update(mae_value, n=batch_size)
