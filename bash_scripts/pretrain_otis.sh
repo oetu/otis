@@ -3,11 +3,11 @@
 
 # Basic parameters
 seed="0"
-batch_size="768"
+batch_size="512"
 accum_iter=(1)
 
 epochs="200"
-warmup_epochs="30"
+warmup_epochs="20"
 
 # Callback parameters
 patience="-1"
@@ -29,7 +29,7 @@ separate_pos_embed_y="False"
 
 norm_pix_loss="False"
 masked_patch_loss="False"
-modality_weighted_loss="True"
+modality_weighted_loss="False"
 
 ncc_weight=0.1
 cos_weight=0.0
@@ -114,9 +114,9 @@ val_labels_path_online=$online_data_base"/labelsOneHot/labels_val_"$target"_all.
 # val_labels_mask_path_online=""
 
 # Log specifications
-save_output="True"
+save_output="False"
 wandb="True"
-wandb_project="SiT"
+wandb_project="OTiS_Pretraining"
 wandb_id=""
 
 for blr in "${blr_array[@]}"
