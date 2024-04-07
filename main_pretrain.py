@@ -23,9 +23,6 @@ import torch.backends.cudnn as cudnn
 import wandb
 os.environ["WANDB__SERVICE_WAIT"] = "500"
 
-# import torch.multiprocessing
-# torch.multiprocessing.set_sharing_strategy('file_system')
-
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
@@ -391,8 +388,8 @@ def main(args):
         best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])
         best_stats['ncc'] = max(best_stats['ncc'], val_stats['ncc'])
         best_stats['cos_sim'] = max(best_stats['cos_sim'], val_stats['cos_sim'])
-        best_stats['mse'] = max(best_stats['mse'], val_stats['mse'])
-        best_stats['mae'] = max(best_stats['mae'], val_stats['mae'])
+        best_stats['mse'] = min(best_stats['mse'], val_stats['mse'])
+        best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
         
         if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
             if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]):
@@ -428,7 +425,7 @@ def main(args):
                     mode="increasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
             
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 
-                     **{f'val_{k}': str(v) for k, v in val_stats.items()},
+                     **{f'val_{k}': v for k, v in val_stats.items()},
                      'epoch': epoch, 
                      'n_parameters': n_parameters}
 

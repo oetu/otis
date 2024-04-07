@@ -404,7 +404,7 @@ def main(args):
 
     eval_criterion = "mse"
     
-    best_stats = {'loss':np.inf, 'mse':np.inf, 'mae':np.inf, 'ncc':0.0}
+    best_stats = {'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
     best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
@@ -414,19 +414,22 @@ def main(args):
 
         train_stats, train_history = train_one_epoch(model, data_loader_train, optimizer, device, epoch, loss_scaler,
                                                      log_writer=log_writer, args=args)
+        
         val_stats, val_history = evaluate(data_loader_val, model, device, epoch,
                                           log_writer=log_writer, args=args)
-        
-        print(f"Loss / Mean Squared Error (MSE) / Mean Absolute Error (MAE) / Normalized Cross-Correlation (NCC)",
-              f"of the network on {len(dataset_val)} val images: {val_stats['loss']:.4f} / {val_stats['mse']:.4f} /",
-               f"{val_stats['mae']:.4f} / {val_stats['ncc']:.2f}")
 
+        print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / Mean Absolute Error (MAE)",
+              f"of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / {val_stats['loss']:.4f} / ", 
+              f"{val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / {val_stats['mae']:.2f}")
+
+        best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
         best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])
-        best_stats['mse'] = max(best_stats['mse'], val_stats['mse'])
-        best_stats['mae'] = max(best_stats['mae'], val_stats['mae'])
         best_stats['ncc'] = max(best_stats['ncc'], val_stats['ncc'])
+        best_stats['cos_sim'] = max(best_stats['cos_sim'], val_stats['cos_sim'])
+        best_stats['mse'] = min(best_stats['mse'], val_stats['mse'])
+        best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
         
-        if eval_criterion == "loss":
+        if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
             if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]):
                 break
             if args.output_dir and val_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
@@ -460,7 +463,7 @@ def main(args):
                     mode="increasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
             
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 
-                     **{f'val_{k}': str(v) for k, v in val_stats.items()},
+                     **{f'val_{k}': v for k, v in val_stats.items()},
                      'epoch': epoch, 
                      'n_parameters': n_parameters}
 
