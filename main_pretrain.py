@@ -170,7 +170,7 @@ def get_args_parser():
 
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--num_workers', default=0, type=int)
+    parser.add_argument('--num_workers', default=24, type=int)
     parser.add_argument('--pin_mem', action='store_true', default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
     parser.add_argument('--no_pin_mem', action='store_false', dest='pin_mem')
@@ -182,6 +182,8 @@ def get_args_parser():
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
+    parser.add_argument('--dist_eval', action='store_true', default=False,
+                        help='Enabling distributed evaluation (recommended during training for faster monitor)')
 
     return parser
 
@@ -218,7 +220,18 @@ def main(args):
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
         print("Sampler_train = %s" % str(sampler_train))
-        sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+
+        if args.dist_eval:
+            if len(dataset_val) % num_tasks != 0:
+                print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
+                      'This will slightly alter validation results as extra duplicate entries are added to achieve '
+                      'equal num of samples per-process.')
+            sampler_val = torch.utils.data.DistributedSampler(
+                dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=True # shuffle=True to reduce monitor bias
+            )
+        else:
+            sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+        print("Sampler_val = %s" % str(sampler_train))
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
@@ -276,9 +289,28 @@ def main(args):
                                            modality_offsets=dataset_train.offsets, 
                                            args=args)
 
+        sampler_online_train = torch.utils.data.DistributedSampler(
+            dataset_online_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
+        )
+        print("Sampler_online_train = %s" % str(sampler_online_train))
+
+        if args.dist_eval:
+            if len(dataset_val) % num_tasks != 0:
+                print('Warning: Enabling distributed online evaluation with an eval dataset not divisible '
+                      'by process number. '
+                      'This will slightly alter validation results as extra duplicate entries are added '
+                      'to achieve equal num of samples per-process.')
+            sampler_online_val = torch.utils.data.DistributedSampler(
+                dataset_online_val, num_replicas=num_tasks, rank=global_rank, shuffle=False
+            ) 
+        else:
+            sampler_online_val = torch.utils.data.SequentialSampler(dataset_online_val)
+        print("Sampler_online_val = %s" % str(sampler_online_val))
+
         data_loader_online_train = torch.utils.data.DataLoader(
             dataset_online_train, 
-            shuffle=True,
+            sampler=sampler_online_train,
+            shuffle=False,
             batch_size=256,
             num_workers=args.num_workers,
             collate_fn=dataset_online_train.collate_fn_ft,
@@ -288,6 +320,7 @@ def main(args):
 
         data_loader_online_val = torch.utils.data.DataLoader(
             dataset_online_val, 
+            sampler=sampler_online_val,
             shuffle=False,
             batch_size=256,
             num_workers=args.num_workers,
