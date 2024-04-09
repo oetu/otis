@@ -241,7 +241,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
     if args.wandb and args.plot_attention_map:
         attention_map = model.blocks[-1].attn.attn_map
         idx = 1 if args.batch_size > 1 else 0
-        plot.plot_attention(images, attention_map, idx)
+        test_history["Attention"] = plot.plot_attention(images, attention_map, idx)
 
     if args.save_embeddings:
         embeddings = torch.cat(embeddings, dim=0).to(device="cpu", dtype=torch.float32).detach() # (B, D)

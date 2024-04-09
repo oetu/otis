@@ -191,8 +191,9 @@ def get_args_parser():
 def main(args):
     args.patch_size = (args.patch_height, args.patch_width)
 
-    # misc.init_distributed_mode(args)
-    args.distributed = False
+    print(f"cuda devices: {torch.cuda.device_count()}")
+    misc.init_distributed_mode(args)
+    # args.distributed = False
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
@@ -201,6 +202,7 @@ def main(args):
 
     # fix the seed for reproducibility
     seed = args.seed + misc.get_rank()
+    print(f"rank: {misc.get_rank()}")
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -215,7 +217,9 @@ def main(args):
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
+        print(f"num_tasks: {num_tasks}")
         global_rank = misc.get_rank()
+        print(f"global_rank: {global_rank}")
         sampler_train = torch.utils.data.DistributedSampler(
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
@@ -243,7 +247,7 @@ def main(args):
         log_writer = None
 
     # wandb logging
-    if args.wandb == True:
+    if args.wandb == True and misc.is_main_process():
         config = vars(args)
         if args.wandb_id:
             wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
@@ -401,10 +405,6 @@ def main(args):
         val_stats, val_history = evaluate(data_loader_val, model, device, epoch, 
                                           log_writer=log_writer, args=args)
 
-        print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / Mean Absolute Error (MAE)",
-              f"of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / {val_stats['loss']:.4f} / ", 
-              f"{val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / {val_stats['mae']:.2f}")
-
         # online evaluation of the downstream task
         online_history = {}
         if args.online_evaluation and epoch % 5 == 0:
@@ -413,16 +413,9 @@ def main(args):
             elif args.online_evaluation_task == "regression":
                 online_estimator = LinearRegression()
             
-            online_history = evaluate_online(estimator=online_estimator, model=model, device=device, 
+            online_history = evaluate_online(estimator=online_estimator, model=model_without_ddp, device=device, 
                                              train_dataloader=data_loader_online_train, 
                                              val_dataloader=data_loader_online_val, args=args)
-
-        best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
-        best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])
-        best_stats['ncc'] = max(best_stats['ncc'], val_stats['ncc'])
-        best_stats['cos_sim'] = max(best_stats['cos_sim'], val_stats['cos_sim'])
-        best_stats['mse'] = min(best_stats['mse'], val_stats['mse'])
-        best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
         
         if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
             if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]):
@@ -456,6 +449,21 @@ def main(args):
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
                     mode="increasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
+        
+        best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
+        best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])
+        best_stats['ncc'] = max(best_stats['ncc'], val_stats['ncc'])
+        best_stats['cos_sim'] = max(best_stats['cos_sim'], val_stats['cos_sim'])
+        best_stats['mse'] = min(best_stats['mse'], val_stats['mse'])
+        best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
+
+        print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / Mean Absolute Error (MAE)",
+              f"of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / {val_stats['loss']:.4f} / ", 
+              f"{val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / {val_stats['mae']:.2f}")
+
+        print(f"Min Total Loss / Min Loss / Max NCC / Max Cosine Similarity / Min MSE / Min MAE: ",
+              f"{best_stats['total_loss']:.4f} / {best_stats['loss']:.4f} / {best_stats['ncc']:.2f} / ", 
+              f"{best_stats['cos_sim']:.2f} / {best_stats['mse']:.2f} / {best_stats['mae']:.2f}\n")
             
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 
                      **{f'val_{k}': v for k, v in val_stats.items()},
@@ -469,8 +477,12 @@ def main(args):
                 f.write(json.dumps(log_stats) + "\n")
 
         total_time = time.time() - start_time
-        if args.wandb:
+        if args.wandb and misc.is_main_process():
             wandb.log(train_history | val_history | online_history | {"Time per epoch [sec]": total_time})
+
+    if args.wandb and misc.is_main_process():
+        wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
+        wandb.finish()
 
 
 if __name__ == '__main__':

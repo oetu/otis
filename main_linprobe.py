@@ -186,8 +186,6 @@ def get_args_parser():
                         help='start epoch')
     parser.add_argument('--eval', action='store_true',
                         help='Perform evaluation only')
-    parser.add_argument('--dist_eval', action='store_true', default=False,
-                        help='Enabling distributed evaluation (recommended during training for faster monitor)')
     parser.add_argument('--num_workers', default=24, type=int)
     parser.add_argument('--pin_mem', action='store_true', default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
@@ -200,6 +198,8 @@ def get_args_parser():
     parser.add_argument('--dist_on_itp', action='store_true')
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
+    parser.add_argument('--dist_eval', action='store_true', default=False,
+                        help='Enabling distributed evaluation (recommended during training for faster monitor)')
 
     return parser
 
@@ -207,8 +207,9 @@ def main(args):
     args.input_size = (args.input_channels, args.input_electrodes, args.time_steps)
     args.patch_size = (args.patch_height, args.patch_width)
 
-    # misc.init_distributed_mode(args)
-    args.distributed = False
+    print(f"cuda devices: {torch.cuda.device_count()}")
+    misc.init_distributed_mode(args)
+    # args.distributed = False
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
@@ -217,6 +218,7 @@ def main(args):
 
     # fix the seed for reproducibility
     seed = args.seed + misc.get_rank()
+    print(f"rank: {misc.get_rank()}")
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -244,7 +246,9 @@ def main(args):
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
+        print(f"num_tasks: {num_tasks}")
         global_rank = misc.get_rank()
+        print(f"global_rank: {global_rank}")
         sampler_train = torch.utils.data.DistributedSampler(
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
@@ -274,7 +278,7 @@ def main(args):
         log_writer = None
 
     # wandb logging
-    if args.wandb == True:
+    if args.wandb == True and misc.is_main_process():
         config = vars(args)
         if args.wandb_id:
             wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
@@ -454,7 +458,7 @@ def main(args):
                       f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} /",
                       f"{test_stats['pcc']:.4f} / {test_stats['r2']:.4f}")
 
-            if args.wandb:
+            if args.wandb and misc.is_main_process():
                 wandb.log(test_history)
             
         exit(0)
@@ -554,11 +558,12 @@ def main(args):
                 f.write(json.dumps(log_stats) + "\n")
 
         total_time = time.time() - start_time
-        if args.wandb:
+        if args.wandb and misc.is_main_process():
             wandb.log(train_history | test_history | {"Time per epoch [sec]": total_time})
 
-    if args.wandb:
+    if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
+        wandb.finish()
 
 
 if __name__ == '__main__':

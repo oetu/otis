@@ -117,12 +117,12 @@ pos_label="1"
 # val_labels_path=$data_base"/labelsOneHot/labels_val_Regression_stdNormed.pt"
 # val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
 
-global_pool=(False)
-attention_pool=(True)
+global_pool=(True)
+attention_pool=(False)
 num_workers="24"
 
 # Log specifications
-save_output="False"
+save_output="True"
 wandb="True"
 wandb_project="MAE_ECG_CAD"
 wandb_id=""

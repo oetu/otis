@@ -220,10 +220,16 @@ def save_on_master(*args, **kwargs):
 
 def init_distributed_mode(args):
     if args.dist_on_itp:
-        args.rank = int(os.environ['OMPI_COMM_WORLD_RANK'])
-        args.world_size = int(os.environ['OMPI_COMM_WORLD_SIZE'])
-        args.gpu = int(os.environ['OMPI_COMM_WORLD_LOCAL_RANK'])
+        # args.rank = int(os.environ['OMPI_COMM_WORLD_RANK'])
+        # args.world_size = int(os.environ['OMPI_COMM_WORLD_SIZE'])
+        # args.gpu = int(os.environ['OMPI_COMM_WORLD_LOCAL_RANK'])
+        
+        args.rank = int(os.environ.get('RANK', os.environ.get('SLURM_PROCID')))
+        args.world_size = int(os.environ.get('WORLD_SIZE', os.environ.get('SLURM_NTASKS')))
+        args.gpu = int(os.environ.get('LOCAL_RANK', os.environ.get('SLURM_LOCALID')))
+
         args.dist_url = "tcp://%s:%s" % (os.environ['MASTER_ADDR'], os.environ['MASTER_PORT'])
+        
         os.environ['LOCAL_RANK'] = str(args.gpu)
         os.environ['RANK'] = str(args.rank)
         os.environ['WORLD_SIZE'] = str(args.world_size)
@@ -241,12 +247,13 @@ def init_distributed_mode(args):
         args.distributed = False
         return
 
+    print(os.environ)
+
     args.distributed = True
 
     torch.cuda.set_device(args.gpu)
     args.dist_backend = 'nccl'
-    print('| distributed init (rank {}): {}, gpu {}'.format(
-        args.rank, args.dist_url, args.gpu), flush=True)
+    print(f'| distributed init (rank {args.rank}): {args.dist_url}, gpu {args.gpu}', flush=True)
     torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                          world_size=args.world_size, rank=args.rank)
     torch.distributed.barrier()
@@ -329,7 +336,7 @@ def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scale
     file_names = [file for file in file_names if file not in exceptions]
 
     # save the 5 best performing models
-    if len(file_names) >= 5:
+    if len(file_names) >= 5 and is_main_process():
         # file_names = sorted(file_names, key=lambda str: int(re.search(r'\d+', str).group()))
         if mode == "increasing":
             file_names = sorted(file_names, key=lambda x: float(x.split(".pth")[0].split("-")[-1]), reverse=True)

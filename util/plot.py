@@ -80,8 +80,10 @@ def plot_attention(original_signal, attention_map, sample_idx, head_idx=0):
 
     plt.tight_layout()
 
-    wandb.log({"Attention": wandb.Image(fig)})
+    fig_attn = wandb.Image(fig)
     plt.close('all')
+
+    return fig_attn
 
 
 def plot_attention_old(original_signal, attentation_map, idx):
@@ -132,5 +134,7 @@ def plot_attention_old(original_signal, attentation_map, idx):
     [ax.yaxis.set_visible(False) for ax in axes.ravel()]
     plt.tight_layout()
 
-    wandb.log({"Attention": wandb.Image(fig)})
+    fig_attn = wandb.Image(fig)
     plt.close('all')
+
+    return fig_attn
