@@ -406,9 +406,9 @@ def main(args):
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
     
     if args.lr is None:  # only base_lr is specified
-        args.lr = args.blr * eff_batch_size / 4
+        args.lr = args.blr * eff_batch_size / 32
 
-    print("base lr: %.2e" % (args.lr * 4 / eff_batch_size))
+    print("base lr: %.2e" % (args.lr * 32 / eff_batch_size))
     print("actual lr: %.2e" % args.lr)
 
     print("accumulate grad iterations: %d" % args.accum_iter)
