@@ -3,6 +3,11 @@
 
 # Basic parameters
 seed="0"
+num_workers="24"
+
+world_size="2"
+port="29402"
+
 batch_size="512"
 accum_iter=(1)
 
@@ -49,7 +54,7 @@ blr_array=(1e-5)
 weight_decay=(0.15)
 
 # Data path
-path="tower"
+path="server"
 dataset="ukbb"
 
 if [ "$path" = "tower" ]; then
@@ -79,14 +84,12 @@ if [ "$dataset" = "ukbb" ]; then
     # data_path=$data_base"/ecgs_train_ecg_imaging_noBase_gn.pt"
     # val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
 elif [ "$dataset" = "mimic" ]; then
-    data_path=$data_base"/ecgs_train_20k_clean.pt"
+    data_path=$data_base"/ecgs_train_590k_p1_clean.pt"
     val_data_path=$data_base"/ecgs_val_10k_clean.pt"
 else
     data_path=$data_base"/data_train_new.pt"
     val_data_path=$data_base"/data_val_new.pt"
 fi
-
-num_workers="24"
 
 # Online evaluation
 input_electrodes="12"
@@ -138,7 +141,7 @@ do
             if [ "$path" = "tower" ]; then
                 cmd="python3 main_pretrain.py --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             else
-                cmd="torchrun --nproc_per_node 2 --nnodes 1 --node_rank 0 main_pretrain.py --world_size 2 --dist_eval --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+                cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes 1 --node_rank 0 main_pretrain.py --world_size $world_size --dist_eval --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             fi
 
             if [ "$compile" = "True" ]; then
