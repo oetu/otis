@@ -8,7 +8,7 @@
 #SBATCH --gres=gpu:4        # Number of GPUs if needed
 #SBATCH --gpu-bind=none     # NCCL can't deal with task-binding (binding each process to its own GOU), hence allocate the devices manually in the python script
 #SBATCH --cpus-per-task=24  # Number of CPUs (Don't use more than 24 per GPU)
-#SBATCH --mem=256G           # Memory in GB (Don't use more than 126G per GPU)
+#SBATCH --mem=256G          # Memory in GB (Don't use more than 126G per GPU)
 #SBATCH --nodelist=helios
 
 # load python module

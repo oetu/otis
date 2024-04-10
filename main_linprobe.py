@@ -484,7 +484,7 @@ def main(args):
         train_stats, train_history = train_one_epoch(model, criterion, data_loader_train, optimizer, device, epoch, 
                                                      loss_scaler, max_norm=None, log_writer=log_writer, args=args)
 
-        test_stats, test_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
+        test_stats, test_history = evaluate(data_loader_val, model_without_ddp, device, epoch, log_writer=log_writer, args=args)
 
         if eval_criterion == "loss" or eval_criterion == "rmse" or eval_criterion == "mae":
             if early_stop.evaluate_decreasing_metric(val_metric=test_stats[eval_criterion]):
