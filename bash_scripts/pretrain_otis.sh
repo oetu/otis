@@ -3,12 +3,17 @@
 
 # Basic parameters
 seed="0"
-num_workers="24"
+num_workers="24"    # number of CPUs
 
-world_size="2"
-port="29402"
+path="server"       # [tower, server]
+submitit="True"     # only for training on server
 
-batch_size="512"
+nodes="1"
+world_size="2"      # number of GPUs
+mem_per_task="96"   # memory per GPU
+port="29403"
+
+batch_size="320"
 accum_iter=(1)
 
 epochs="200"
@@ -21,7 +26,7 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="baseDeep_dec160d4b"
+model_size="hugeDeep_dec160d4b"
 model="mae_vit_"$model_size"_patchX"
 
 input_channels="1"
@@ -54,7 +59,6 @@ blr_array=(1e-5)
 weight_decay=(0.15)
 
 # Data path
-path="server"
 dataset="ukbb"
 
 if [ "$path" = "tower" ]; then
@@ -129,7 +133,7 @@ do
         for mr in "${mask_ratio[@]}"
         do
 
-            pre_data="pre_b"$(($batch_size*$acc_it))"_blr"$blr
+            pre_data="pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
 
             folder="test2"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
@@ -140,8 +144,10 @@ do
         
             if [ "$path" = "tower" ]; then
                 cmd="python3 main_pretrain.py --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+            elif [ "$submitit" = "True" ]; then
+                cmd="python3 submitit_pretrain.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             else
-                cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes 1 --node_rank 0 main_pretrain.py --world_size $world_size --dist_eval --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+                cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_pretrain.py --world_size $world_size --dist_eval --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             fi
 
             if [ "$compile" = "True" ]; then
