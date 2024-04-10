@@ -1,2 +1,2 @@
-# SiT
-Signal Transformer: Transformers for signal processing at scale
+# OTiS
+An open foundation model for time series analysis at scale
