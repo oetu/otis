@@ -460,6 +460,7 @@ def main(args):
     param_groups = lrd.param_groups_lrd(model_without_ddp, args.weight_decay,
         no_weight_decay_list=model_without_ddp.no_weight_decay(), layer_decay=args.layer_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr)
+    print(optimizer)
     loss_scaler = NativeScaler()
 
     class_weights = class_weights.to(device=device, non_blocking=True)

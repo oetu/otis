@@ -3,17 +3,17 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-num_workers="24"    # number of CPUs
+num_workers="12"    # number of CPUs
 
 path="server"       # [tower, server]
 submitit="False"     # only for training on server
 
 nodes="1"
-world_size="3"      # number of GPUs
-mem_per_task="96"   # memory per GPU
-port="29403"
+world_size="4"      # number of GPUs
+mem_per_task="32"   # memory per GPU
+port="29408"
 
-batch_size=(512)
+batch_size=(1024)
 accum_iter=(1)
 
 epochs="100"
@@ -24,12 +24,12 @@ patience="15"
 max_delta="0.25"
 
 # Model parameters
+model_size="baseDeep"
+model="vit_"$model_size"_patchX"
+
 input_channels="1"
 input_electrodes="12"
 time_steps="2500"
-
-model_size="baseDeep"
-model="vit_"$model_size"_patchX"
 
 patch_height="1"
 patch_width=(100)
@@ -50,7 +50,7 @@ ft_surr_phase_noise="0.075"
 # Optimizer parameters
 blr=(1e-1)
 min_lr="0.0"
-weight_decay=(0.1)
+weight_decay=(0.15)
 
 # Criterion parameters
 smoothing=(0.1)
@@ -160,7 +160,7 @@ do
                     for smth in "${smoothing[@]}"
                     do
 
-                        folder="test"
+                        folder="test2"
                         subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$wd"/m0.8/atp")
 
                         # SiT
@@ -174,7 +174,7 @@ do
                         # finetune=$checkpoint_base"/checkpoints/mm_v283_mae_checkpoint.pth"
                         # finetune=$checkpoint_base"/checkpoints/tiny/v1/checkpoint-399.pth"
 
-                        output_dir=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$(($bs*$accum_iter))"_blr"$lr
+                        output_dir=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 
                         # resume=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$bs"_blr"$lr"_"$pre_data"/checkpoint-6-pcc-0.27.pth"
 

@@ -6,7 +6,7 @@ seed=(0)
 num_workers="24"    # number of CPUs
 
 path="server"       # [tower, server]
-submitit="False"     # only for training on server
+submitit="False"    # only for training on server
 
 nodes="1"
 world_size="3"      # number of GPUs
@@ -24,12 +24,12 @@ patience="15"
 max_delta="0.25" # for AUROC
 
 # Model parameters
+model_size="baseDeep"
+model="vit_"$model_size"_patchX"
+
 input_channels="1"
 input_electrodes="12"
 time_steps="2500"
-
-model_size="baseDeep"
-model="vit_"$model_size"_patchX"
 
 patch_height="1"
 patch_width=(100)
@@ -51,14 +51,14 @@ drop_path=(0.1)
 layer_decay=(0.75)
 
 # Optimizer parameters
-blr=(1e-6) # 3e-5 if from scratch
+blr=(3e-6) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
 # Criterion parameters
 smoothing=(0.1)
 
-from_scratch="False"
+from_scratch="True"
 
 # Data path
 if [ "$path" = "tower" ]; then
@@ -205,7 +205,7 @@ do
                             # # CLOCS
                             # finetune=$checkpoint_base"/checkpoints/ecg/ecg_v150_mae_checkpoint.pth"
 
-                            output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter))"_blr"$lr
+                            output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 
                             # resume=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$bs"_blr"$lr"/checkpoint-4-pcc-0.54.pth"
 

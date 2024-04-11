@@ -18,7 +18,7 @@ import submitit
 
 def parse_args():
     trainer_parser = trainer.get_args_parser()
-    parser = argparse.ArgumentParser("Submitit for MAE pretrain", parents=[trainer_parser])
+    parser = argparse.ArgumentParser("Submitit for OTiS finetune", parents=[trainer_parser])
     parser.add_argument("--mem_per_task", default=96, type=int, help="RAM to request for each task (i.e. GPU)")
     parser.add_argument("--ngpus", default=8, type=int, help="Number of gpus to request on each node")
     parser.add_argument("--nodes", default=1, type=int, help="Number of nodes to request")
@@ -74,7 +74,7 @@ class Trainer(object):
 
     def _setup_gpu_args(self):
         import submitit
-        
+
         job_env = submitit.JobEnvironment()
         # self.args.output_dir = Path(str(self.args.output_dir).replace("%j", str(job_env.job_id)))
         # self.args.log_dir = self.args.output_dir

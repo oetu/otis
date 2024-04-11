@@ -12,13 +12,13 @@ import os
 import uuid
 from pathlib import Path
 
-import main_pretrain as trainer
+import main_finetune_gen as trainer
 import submitit
 
 
 def parse_args():
     trainer_parser = trainer.get_args_parser()
-    parser = argparse.ArgumentParser("Submitit for OTiS pretrain", parents=[trainer_parser])
+    parser = argparse.ArgumentParser("Submitit for OTiS generative finetune", parents=[trainer_parser])
     parser.add_argument("--mem_per_task", default=96, type=int, help="RAM to request for each task (i.e. GPU)")
     parser.add_argument("--ngpus", default=8, type=int, help="Number of gpus to request on each node")
     parser.add_argument("--nodes", default=1, type=int, help="Number of nodes to request")

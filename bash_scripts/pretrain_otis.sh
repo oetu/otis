@@ -133,12 +133,10 @@ do
         for mr in "${mask_ratio[@]}"
         do
 
-            pre_data="pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
-
             folder="test2"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
-            output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data
+            output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
 
             # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data"/checkpoint-60-ncc-0.5985.pth"
         
