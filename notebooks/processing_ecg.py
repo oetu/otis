@@ -48,7 +48,7 @@ class Normalization(object):
             mean = np.array(mean, dtype=sample_dtype)
             var = np.array(var, dtype=sample_dtype)
 
-        normalized_sample = (sample - mean) / (var + 1.e-5)**.5
+        normalized_sample = (sample - mean) / (var + 1.e-9)**.5
 
         return normalized_sample
     

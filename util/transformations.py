@@ -41,7 +41,7 @@ class Normalization(object):
                 mean = torch.cat((mean, mean_group), dim=0)
                 var = torch.cat((var, var_group), dim=0)
 
-        normalized_sample = (sample - mean) / (var + 1.e-12)**.5
+        normalized_sample = (sample - mean) / (var + 1.e-9)**.5
 
         return normalized_sample
 
