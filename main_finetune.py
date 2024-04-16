@@ -41,7 +41,7 @@ from engine_finetune import train_one_epoch, evaluate
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('MAE fine-tuning for image classification', add_help=False)
+    parser = argparse.ArgumentParser('OTiS fine-tuning', add_help=False)
     # Basic parameters
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
@@ -50,8 +50,8 @@ def get_args_parser():
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
 
     # Model parameters
-    parser.add_argument('--model', default='vit_base_patch200', type=str, metavar='MODEL',
-                        help='Name of model to train')
+    parser.add_argument('--model', default='vit_baseDeep_patchX', type=str, metavar='MODEL',
+                        help='Name of model to train (default: vit_baseDeep_patchX)')
     
     parser.add_argument('--input_channels', type=int, default=1, metavar='N',
                         help='input channels')

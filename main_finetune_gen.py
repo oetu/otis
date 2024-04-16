@@ -35,13 +35,13 @@ from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.pos_embed import interpolate_pos_embed_x, interpolate_decoder_pos_embed_x
 from util.callbacks import EarlyStop
 
-import models_mae
+import models_otis
 
 from engine_pretrain import train_one_epoch, evaluate
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('MAE pre-training', add_help=False)
+    parser = argparse.ArgumentParser('OTiS generative finetuning', add_help=False)
     # Basic parameters
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')
@@ -50,8 +50,8 @@ def get_args_parser():
                         help='Accumulate gradient iterations (for increasing the effective batch size under memory constraints)')
 
     # Model parameters
-    parser.add_argument('--model', default='mae_vit_base_patch200', type=str, metavar='MODEL',
-                        help='Name of model to train')
+    parser.add_argument('--model', default='otis_baseDeep_dec128d2b_patchX', type=str, metavar='MODEL',
+                        help='Name of model to train (default: otis_baseDeep_dec128d2b_patchX)')
     parser.add_argument('--compile', action='store_true', default=False,
                         help='Use torch compile')
 
@@ -274,7 +274,7 @@ def main(args):
     )
 
     # define the model
-    model = models_mae.__dict__[args.model](
+    model = models_otis.__dict__[args.model](
         modalities=dataset_train.modalities,
         modality_weights=dataset_train.modality_weights,
         input_channels=args.input_channels,

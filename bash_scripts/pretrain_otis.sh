@@ -27,7 +27,7 @@ max_delta="0.00"
 compile="False"
 
 model_size="hugeDeep_dec160d4b"
-model="mae_vit_"$model_size"_patchX"
+model="otis_"$model_size"_patchX"
 
 input_channels="1"
 time_steps="2500"

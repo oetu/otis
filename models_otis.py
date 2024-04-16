@@ -52,8 +52,8 @@ class Attention(nn.Module):
         return x
 
 
-class MaskedAutoencoderViT(nn.Module):
-    """ Masked Autoencoder with VisionTransformer backbone
+class OTiS(nn.Module):
+    """ Open foundation model for Time Series analysis with VisionTransformer backbone
     """
     def __init__(self, modalities:dict, modality_weights:dict, 
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
@@ -65,7 +65,7 @@ class MaskedAutoencoderViT(nn.Module):
         super().__init__()
 
         # --------------------------------------------------------------------------
-        # MAE encoder specifics
+        # OTiS encoder specifics
         self.patch_size = patch_size
         self.patch_embed = PatchEmbed(input_channels, patch_size, embed_dim, flatten=False)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -97,7 +97,7 @@ class MaskedAutoencoderViT(nn.Module):
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
-        # MAE decoder specifics
+        # OTiS decoder specifics
         self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
 
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
@@ -650,15 +650,15 @@ class MaskedAutoencoderViT(nn.Module):
 #         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
 #     return model
 
-def mae_vit_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.70M decoder
-    model = MaskedAutoencoderViT(
+def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.70M decoder
+    model = OTiS(
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
-def mae_vit_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.57M decoder
-    model = MaskedAutoencoderViT(
+def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.57M decoder
+    model = OTiS(
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
@@ -678,15 +678,15 @@ def mae_vit_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 
 #         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
 #     return model
 
-def mae_vit_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.74M decoder
-    model = MaskedAutoencoderViT(
+def otis_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.74M decoder
+    model = OTiS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
-def mae_vit_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.60M decoder
-    model = MaskedAutoencoderViT(
+def otis_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.60M decoder
+    model = OTiS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
@@ -706,15 +706,15 @@ def mae_vit_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder,
 #         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
 #     return model
 
-def mae_vit_hugeDeep_patchX_dec160d4b(**kwargs):    # nb_params: 130.81M encoder, 1.78M decoder
-    model = MaskedAutoencoderViT(
+def otis_hugeDeep_patchX_dec160d4b(**kwargs):    # nb_params: 130.81M encoder, 1.78M decoder
+    model = OTiS(
         embed_dim=576, depth=24, num_heads=8,                               # dim=72 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
-def mae_vit_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0.63M decoder
-    model = MaskedAutoencoderViT(
+def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0.63M decoder
+    model = OTiS(
         embed_dim=576, depth=24, num_heads=8,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
@@ -748,18 +748,18 @@ def mae_vit_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder
 
 # mae_vit_base_patchX = mae_vit_base_patchX_dec256d2b  # decoder: 256 dim, 2 blocks
 # mae_vit_base2_patchX = mae_vit_base2_patchX_dec256d2b  # decoder: 128 dim, 2 blocks
-mae_vit_baseDeep_dec160d4b_patchX = mae_vit_baseDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
-mae_vit_baseDeep_dec128d2b_patchX = mae_vit_baseDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
+otis_baseDeep_dec160d4b_patchX = otis_baseDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
+otis_baseDeep_dec128d2b_patchX = otis_baseDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
 
 # mae_vit_large_patchX = mae_vit_large_patchX_dec256d2b  # decoder: 256 dim, 2 blocks
 # mae_vit_large2_patchX = mae_vit_large2_patchX_dec256d2b  # decoder: 128 dim, 2 blocks
-mae_vit_largeDeep_dec160d4b_patchX = mae_vit_largeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
-mae_vit_largeDeep_dec128d2b_patchX = mae_vit_largeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
+otis_largeDeep_dec160d4b_patchX = otis_largeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
+otis_largeDeep_dec128d2b_patchX = otis_largeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
 
 # mae_vit_huge_patchX = mae_vit_huge_patchX_dec256d2b  # decoder: 256 dim, 2 blocks
 # mae_vit_huge2_patchX = mae_vit_huge2_patchX_dec256d2b  # decoder: 128 dim, 2 blocks
-mae_vit_hugeDeep_dec160d4b_patchX = mae_vit_hugeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
-mae_vit_hugeDeep_dec128d2b_patchX = mae_vit_hugeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
+otis_hugeDeep_dec160d4b_patchX = otis_hugeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
+otis_hugeDeep_dec128d2b_patchX = otis_hugeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
 
 # mae_vit_base = mae_vit_base_patchX_dec512d8b  # decoder: 512 dim, 8 blocks
 # mae_vit_large = mae_vit_large_patchX_dec512d8b  # decoder: 512 dim, 8 blocks
