@@ -282,14 +282,14 @@ def main(args):
                                              labels_path=args.labels_path_online, 
                                              labels_mask_path=args.labels_mask_path_online, 
                                              downstream_task=args.online_evaluation_task, 
-                                             finetune=True, train=True, 
+                                             train=True, 
                                              modality_offsets=dataset_train.offsets,
                                              args=args)
         dataset_online_val = SignalDataset(data_path=args.val_data_path_online, 
                                            labels_path=args.val_labels_path_online, 
                                            labels_mask_path=args.val_labels_mask_path_online, 
                                            downstream_task=args.online_evaluation_task, 
-                                           finetune=True, train=False, 
+                                           train=False, 
                                            modality_offsets=dataset_train.offsets, 
                                            args=args)
 

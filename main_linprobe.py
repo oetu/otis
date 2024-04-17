@@ -228,13 +228,13 @@ def main(args):
                                   labels_path=args.labels_path, 
                                   labels_mask_path=args.labels_mask_path,
                                   downstream_task=args.downstream_task, 
-                                  finetune=True, train=True, 
+                                  train=True, 
                                   args=args)
     dataset_val = SignalDataset(data_path=args.val_data_path, 
                                 labels_path=args.val_labels_path, 
                                 labels_mask_path=args.val_labels_mask_path, 
                                 downstream_task=args.downstream_task, 
-                                finetune=True, train=False, 
+                                train=False, 
                                 modality_offsets=dataset_train.offsets, 
                                 args=args)
 

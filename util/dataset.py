@@ -13,7 +13,7 @@ class SignalDataset(Dataset):
     Unimodal dataset that generates views of signals.
     """
     def __init__(self, data_path, labels_path=None, labels_mask_path=None, downstream_task:str=None, 
-                 finetune=False, train=False, modality_offsets:Dict=None, args=None) -> None:
+                 train=False, modality_offsets:Dict=None, args=None) -> None:
         """
             labels_path: path to labels (finetuning / online evaluation)
             labels_mask_path: path to labels masks (finetuning / online evaluation)
@@ -23,17 +23,9 @@ class SignalDataset(Dataset):
         """
         data = torch.load(data_path, map_location=torch.device('cpu')) # load to ram
 
-        self.finetune = finetune
-        if finetune:
-            # finetuning / online evaluation
-            modality = [("ecg", sample.unsqueeze(0)[..., :args.input_electrodes, :].shape) for sample in data]
-            data = [sample.unsqueeze(0)[..., :args.input_electrodes, :] for sample in data]
-        else:
-            # pretraining
-            # modality = [(sample[0], sample[1].shape) for sample in data]
-            # data = [sample[1] for sample in data]
-            modality = [("ecg", sample.unsqueeze(0).shape) for sample in data]
-            data = [sample.unsqueeze(0) for sample in data]
+        # .unsqueeze(0) to add auxiliary channel (similar to rgb in imgs)
+        modality = [(sample[0], sample[1].unsqueeze(0).shape) for sample in data]
+        data = [sample[1].unsqueeze(0) for sample in data]
 
         self.modality = modality
         self.modalities = {modality: shape for modality, shape in sorted(list(set(self.modality)))} # unique modalities
