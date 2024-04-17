@@ -5,7 +5,7 @@
 seed="0"
 num_workers="24"    # number of CPUs
 
-path="server"       # [tower, server]
+path="tower"       # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
@@ -13,7 +13,7 @@ world_size="4"      # number of GPUs
 mem_per_task="69"   # memory per GPU
 port="29410"
 
-batch_size="512"
+batch_size="768"
 accum_iter=(1)
 
 epochs="100"
@@ -27,7 +27,9 @@ max_delta="0.00"
 compile="False"
 
 model_size="baseDeep_dec128d2b"
-model="mae_vit_"$model_size"_patchX"
+model="otis_"$model_size"_patchX"
+
+from_scratch="True"
 
 input_channels="1"
 input_electrodes="12"
@@ -46,7 +48,7 @@ ncc_weight=0.1
 cos_weight=0.0
 
 # Augmentation parameters
-mask_ratio=(0.75)
+mask_ratio=(0.5)
 
 crop_lower_bnd="0.8"
 crop_upper_bnd="1.0"
@@ -62,16 +64,16 @@ weight_decay=(0.15)
 num_workers="24"
 downstream_task="forecasting"
 
-from_scratch="False"
-
 # Data path
-dataset="mimic"
+dataset="etth"
 
 if [ "$path" = "tower" ]; then
     if [ "$dataset" = "ukbb" ]; then
         data_base="/home/oturgut/data/processed/ukbb"
     elif  [ "$dataset" = "mimic" ]; then
         data_base="/home/oturgut/data/processed/mimic-ecg-text"
+    elif [ "$dataset" = "etth" ]; then
+        data_base="/home/oturgut/data/processed/benchmarks/forecasting"
     else 
         data_base="/home/oturgut/data/processed/signalnet"
     fi
@@ -81,6 +83,8 @@ else
         data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
     elif [ "$dataset" = "mimic" ]; then
         data_base="/vol/aimspace/projects/physionet/mimic/processed/mimic-ecg-text"
+    elif [ "$dataset" = "etth" ]; then
+        data_base="/vol/aimspace/users/tuo/data/processed/benchmarks/forecasting"
     else
         data_base="/vol/aimspace/users/tuo/data/signalnet"
     fi
@@ -96,13 +100,16 @@ if [ "$dataset" = "ukbb" ]; then
 elif [ "$dataset" = "mimic" ]; then
     data_path=$data_base"/ecgs_train_20k_clean.pt"
     val_data_path=$data_base"/ecgs_val_10k_clean.pt"
+elif [ "$dataset" = "etth" ]; then
+    data_path=$data_base"/data_etth_all.pt"
+    val_data_path=$data_base"/data_etth_all.pt"
 else
     data_path=$data_base"/data_train_new.pt"
     val_data_path=$data_base"/data_val_new.pt"
 fi
 
 # Log specifications
-save_output="True"
+save_output="False"
 wandb="True"
 wandb_project="OTiS_Generative_Tasks"
 wandb_id=""
@@ -110,6 +117,7 @@ wandb_id=""
 # Pretraining specifications
 ignore_pos_embed_y="False"
 freeze_pos_embed_y="False"
+freeze_encoder="True"
 
 # EVALUATE
 eval="False"
@@ -149,6 +157,10 @@ do
 
             if [ "$freeze_pos_embed_y" = "True" ]; then
                 cmd=$cmd" --freeze_pos_embed_y"
+            fi
+
+            if [ "$freeze_encoder" = "True" ]; then
+                cmd=$cmd" --freeze_encoder"
             fi
             
             if [ "$from_scratch" = "False" ]; then

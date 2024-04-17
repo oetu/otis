@@ -132,6 +132,8 @@ def get_args_parser():
                         help='Ignore pre-trained position embeddings Y (spatial axis) from checkpoint')
     parser.add_argument('--freeze_pos_embed_y', action='store_true', default=False,
                         help='Make position embeddings Y (spatial axis) non-trainable')
+    parser.add_argument('--freeze_encoder', action='store_true', default=False,
+                        help='Make the encoder (i.e. the feature extractor) non-trainable, thus only train the decoder')
 
     # Dataset parameters
     downstream_tasks = ["forecasting", "imputation"]
@@ -344,6 +346,10 @@ def main(args):
 
         assert set(msg.missing_keys) == {'pos_embed_x', 'pos_embed_y.weight'}
 
+    if args.freeze_encoder:
+        for _, p in model.blocks.named_parameters():
+            p.requires_grad = False
+    
     if args.freeze_pos_embed_y:
         # encoder
         model.pos_embed_y.weight.requires_grad = False
