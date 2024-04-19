@@ -168,25 +168,9 @@ def train_one_epoch(model: torch.nn.Module,
         training_history['train_mse'] = train_stats["mse"]
         training_history['train_mae'] = train_stats["mae"]
 
-        if (epoch % 10) == 0:
+        if (epoch % 1) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
-            
-            if combined_mask is None:
-                # (B, 1, C, T)
-                # 0 is padding, 1 is actual value
-                attn_mask_input_space = torch.nn.functional.interpolate(attn_mask.unsqueeze(1), 
-                                                                        scale_factor=args.patch_size, 
-                                                                        mode="nearest")
-
-                # (B, 1, C, T)
-                # 0 is keep, 1 is remove
-                mask_input_space = torch.nn.functional.interpolate(mask.reshape(attn_mask.shape).unsqueeze(1), 
-                                                                scale_factor=args.patch_size, 
-                                                                mode="nearest")
-                
-                # (B, 1, C, T)
-                combined_mask = attn_mask_input_space * mask_input_space
 
             # T_indie
             max_steps = int(attn_mask_input_space[idx, 0, 0, :].sum())
@@ -194,11 +178,12 @@ def train_one_epoch(model: torch.nn.Module,
             # (1, 1, C, T)
             x = samples[idx][..., :max_steps:steps].detach().cpu().numpy()
             x_hat = samples_hat[idx][..., :max_steps:steps].detach().cpu().numpy()
-            x_hat_masked = x_hat * combined_mask[idx].detach().cpu().numpy()
+            x_hat_masked = (samples_hat[idx] * combined_mask[idx])[..., :max_steps:steps].detach().cpu().numpy()
 
             # samples of shape (Batch, 1, Channel, Time)
-            if samples.shape[1] > 1:
-                ch_idx = 2
+            max_channels = int(attn_mask_input_space[idx, 0, :, 0].sum())
+            if max_channels > 1:
+                ch_idx = random.randint(0, max_channels-1)
             else:
                 ch_idx = 0
 
@@ -214,13 +199,13 @@ def train_one_epoch(model: torch.nn.Module,
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
             plt.title("Reconstruction (masked patches only)")
             plt.subplot(614)
-            plt.plot(range(0, x.shape[-1], 1), x[ch_idx, 5, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
             plt.title("Input")
             plt.subplot(615)
-            plt.plot(range(0, x.shape[-1], 1), x_hat[ch_idx, 5, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
             plt.title("Reconstruction")
             plt.subplot(616)
-            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[ch_idx, 5, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :])
             plt.title("Reconstruction (masked patches only)")
             plt.tight_layout()
             training_history["Reconstruction"] = wandb.Image(plt)
