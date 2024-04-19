@@ -74,7 +74,7 @@ class SignalDataset(Dataset):
 
     def __getitem__(self, idx) -> Tuple[Any, Any]:
         """return a sample from the dataset at index idx"""
-        data = self.data[idx]        
+        data = self.data[idx]
         if self.train == False:
             transform = transforms.Compose([
                 augmentations.CropResizing(fixed_crop_len=self.args.time_steps, start_idx=0, resize=False)
@@ -101,15 +101,23 @@ class SignalDataset(Dataset):
 
         modality, _ = self.modality[idx]
         
-        return data, label, label_mask, self.args.patch_size, self.offsets[modality], modality
+        return data, label, label_mask, self.args.patch_size, self.offsets[modality], modality, self.args.time_steps
 
     @staticmethod
     def collate_fn(batch):
+        # (p, q)
+        patch_size = batch[0][3]
+        grid_width = torch.tensor([sample[0].shape[-1] // patch_size[-1] for sample in batch])
+        grid_height = torch.tensor([sample[0].shape[-2] // patch_size[-2] for sample in batch])
+
         # determine the biggest size in the batch
         shape = [sample[0].shape for sample in batch]
         max_values = [max(x) for x in zip(*shape)]
-        max_channels = max_values[1] 
-        max_timesteps = max_values[2]
+        max_channels = max_values[-2]
+        max_timesteps = min(((max_values[-1] // patch_size[-1]) + 1) * patch_size[-1], batch[0][6]) # multiple of q 
+
+        if grid_width.max() * patch_size[-1] < batch[0][6]:
+            grid_width = grid_width + 1
 
         # Zero pad the input data to the biggest size 
         # (B, 1, C_max, T_max)
@@ -117,11 +125,6 @@ class SignalDataset(Dataset):
                                         pad=(0, int(max_timesteps - sample[0].shape[-1]), 0, int(max_channels - sample[0].shape[-2])), 
                                         mode="constant", value=0) for sample in batch]
         data = torch.stack(data, dim=0)
-
-        # (p, q)
-        patch_size = batch[0][3]
-        grid_width = torch.tensor([sample[0].shape[-1] // patch_size[-1] for sample in batch])
-        grid_height = torch.tensor([sample[0].shape[-2] // patch_size[-2] for sample in batch])
 
         # Create the attention mask 
         # (B, C'_max, T'_max), with C'_max=C_max/p, T'_max=T_max/p
