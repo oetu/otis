@@ -61,16 +61,16 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         embed_dim = kwargs['embed_dim']
         self.patch_embed = PatchEmbed(img_size[0], patch_size, embed_dim, flatten=False) # set flatten to False
 
-        self.grid_size = {}
-        for modality, shape in modalities.items():
-            grid_size = (shape[1] // patch_size[0], shape[2] // patch_size[1])
-            self.grid_size.update( {modality: grid_size} )
+        self.grid_height = {}
+        for modality, input_size in modalities.items():
+            grid_height = input_size[1] // patch_size[0]      # number of variates
+            self.grid_height.update( {modality: grid_height} )
 
         assert embed_dim % 2 == 0
         self.max_num_patches_x = img_size[-1] // patch_size[1]
         self.pos_embed_x = nn.Parameter(torch.zeros(1, self.max_num_patches_x + 1, embed_dim // 2), requires_grad=False) # +1 cls embed
 
-        total_num_embeddings_y = sum([v[0] for k, v in self.grid_size.items()])
+        total_num_embeddings_y = sum([v for k, v in self.grid_height.items()])
         self.pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, embed_dim // 2, padding_idx=0) # +1 padding embed
 
         # split into pos_embed_x and pos_embed_y
@@ -271,41 +271,17 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         return x
 
 
-# def vit_pluto_patchX(**kwargs):
-#     model = VisionTransformer(
-#         embed_dim=256, depth=2, num_heads=8, mlp_ratio=4, qkv_bias=True,
-#         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-# def vit_base_patchX(**kwargs):
-#     model = VisionTransformer(
-#         embed_dim=384, depth=3, num_heads=6, mlp_ratio=4, qkv_bias=True,
-#         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
 def vit_baseDeep_patchX(**kwargs):
     model = VisionTransformer(
         embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
-# def vit_large_patchX(**kwargs):
-#     model = VisionTransformer(
-#         embed_dim=512, depth=4, num_heads=8, mlp_ratio=4, qkv_bias=True,
-#         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
 def vit_largeDeep_patchX(**kwargs):
     model = VisionTransformer(
         embed_dim=384, depth=18, num_heads=6, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
-
-# def vit_huge_patchX(**kwargs):
-#     model = VisionTransformer(
-#         embed_dim=640, depth=5, num_heads=10, mlp_ratio=4, qkv_bias=True,
-#         norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
 
 def vit_hugeDeep_patchX(**kwargs):
     model = VisionTransformer(
