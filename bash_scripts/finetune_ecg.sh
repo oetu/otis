@@ -27,6 +27,8 @@ max_delta="0.25" # for AUROC
 model_size="baseDeep"
 model="vit_"$model_size"_patchX"
 
+from_scratch="False"
+
 input_channels="1"
 input_electrodes="12"
 time_steps="2500"
@@ -57,8 +59,6 @@ weight_decay=(0.1)
 
 # Criterion parameters
 smoothing=(0.1)
-
-from_scratch="True"
 
 # Data path
 if [ "$path" = "tower" ]; then
