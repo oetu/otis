@@ -9,9 +9,9 @@ path="tower"       # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
-world_size="4"      # number of GPUs
+world_size="1"      # number of GPUs
 mem_per_task="69"   # memory per GPU
-port="29410"
+port="29421"
 
 batch_size="768"
 accum_iter=(1)
@@ -74,8 +74,10 @@ if [ "$path" = "tower" ]; then
         data_base="/home/oturgut/data/processed/mimic-ecg-text"
     elif [ "$dataset" = "etth" ]; then
         data_base="/home/oturgut/data/processed/benchmarks/forecasting"
+    elif  [ "$dataset" = "ticorp" ]; then
+        data_base="/home/oturgut/data/processed/TiCorp"
     else 
-        data_base="/home/oturgut/data/processed/signalnet"
+        data_base="/home/oturgut/data/processed/TiCorp"
     fi
     checkpoint_base="/home/oturgut/SiT"
 else
@@ -85,24 +87,27 @@ else
         data_base="/vol/aimspace/projects/physionet/mimic/processed/mimic-ecg-text"
     elif [ "$dataset" = "etth" ]; then
         data_base="/vol/aimspace/users/tuo/data/processed/benchmarks/forecasting"
+    elif  [ "$dataset" = "ticorp" ]; then
+        data_base="/vol/aimspace/users/tuo/data/processed/TiCorp"
     else
-        data_base="/vol/aimspace/users/tuo/data/signalnet"
+        data_base="/vol/aimspace/users/tuo/data/processed/TiCorp"
     fi
     checkpoint_base="/vol/aimspace/users/tuo/SiT"
 fi
 
 # Dataset parameters
 if [ "$dataset" = "ukbb" ]; then
-    data_path=$data_base"/processed/ecgs_train_ecg_imaging_float32.pt"
-    val_data_path=$data_base"/processed/ecgs_val_ecg_imaging_float32.pt"
-    # data_path=$data_base"/ecgs_train_ecg_imaging_noBase_gn.pt"
-    # val_data_path=$data_base"/ecgs_val_ecg_imaging_noBase_gn.pt"
+    data_path=$data_base"/otis/ecgs_train_ecg_imaging_float32.pt"
+    val_data_path=$data_base"/otis/ecgs_val_ecg_imaging_float32.pt"
 elif [ "$dataset" = "mimic" ]; then
-    data_path=$data_base"/ecgs_train_20k_clean.pt"
-    val_data_path=$data_base"/ecgs_val_10k_clean.pt"
+    data_path=$data_base"/ecgs_train_300k.pt"
+    val_data_path=$data_base"/ecgs_val_10k.pt"
 elif [ "$dataset" = "etth" ]; then
     data_path=$data_base"/data_etth_all.pt"
     val_data_path=$data_base"/data_etth_all.pt"
+elif [ "$dataset" = "ticorp" ]; then
+    data_path=$data_base"/train.pt"
+    val_data_path=$data_base"/val.pt"
 else
     data_path=$data_base"/data_train_new.pt"
     val_data_path=$data_base"/data_val_new.pt"
