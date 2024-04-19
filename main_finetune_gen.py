@@ -78,8 +78,8 @@ def get_args_parser():
                         help='Use (per-patch) normalized pixels as targets for computing loss')
     parser.add_argument('--masked_patch_loss', action='store_true', default=False,
                         help='Compute loss only on masked patches')
-    parser.add_argument('--modality_weighted_loss', action='store_true', default=False,
-                        help='Use weighted loss to consider imbalances between modalities')
+    parser.add_argument('--domain_weighted_loss', action='store_true', default=False,
+                        help='Use weighted loss to consider imbalances between domains')
 
     parser.add_argument('--ncc_weight', type=float, default=0.1,
                         help='Add normalized cross-correlation (ncc) as additional loss term')
@@ -208,7 +208,7 @@ def main(args):
                                   args=args)
     dataset_val = SignalDataset(data_path=args.val_data_path, 
                                 train=False, 
-                                modality_offsets=dataset_train.offsets, 
+                                domain_offsets=dataset_train.offsets, 
                                 args=args)
 
     print("Training set size: ", len(dataset_train))
@@ -277,15 +277,15 @@ def main(args):
 
     # define the model
     model = models_otis.__dict__[args.model](
-        modalities=dataset_train.modalities,
-        modality_weights=dataset_train.modality_weights,
+        domains=dataset_train.domains,
+        domain_weights=dataset_train.domain_weights,
         input_channels=args.input_channels,
         time_steps=args.time_steps,
         patch_size=args.patch_size,
         separate_dec_pos_embed_y=args.separate_dec_pos_embed_y,
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
-        modality_weighted_loss=args.modality_weighted_loss,
+        domain_weighted_loss=args.domain_weighted_loss,
         ncc_weight=args.ncc_weight,
         downstream=args.downstream_task
     )
@@ -312,16 +312,16 @@ def main(args):
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
 
-        # load position embedding Y together with modality offsets
-        assert len(dataset_train.modalities) == 1, "There is more than one modality in the target dataset"
-        target_modality = list(dataset_train.modalities.keys())[0]
-        target_shape = list(dataset_train.modalities.values())[0]
+        # load position embedding Y together with domain offsets
+        assert len(dataset_train.domains) == 1, "There is more than one domain in the target dataset"
+        target_domain = list(dataset_train.domains.keys())[0]
+        target_shape = list(dataset_train.domains.values())[0]
 
         pos_embed_y_available = False
 
-        checkpoint_modalities = checkpoint["modalities"]
-        for modality, shape in checkpoint_modalities.items():
-            if modality == target_modality and shape[1] == target_shape[1]:
+        checkpoint_domains = checkpoint["domains"]
+        for domain, shape in checkpoint_domains.items():
+            if domain == target_domain and shape[1] == target_shape[1]:
                 pos_embed_y_available = True
                 break
 
@@ -329,9 +329,9 @@ def main(args):
             print("Loading position embedding Y from checkpoint")
             model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
 
-            # load modality offsets
-            dataset_train.set_modality_offsets(checkpoint["modality_offsets"])
-            dataset_val.set_modality_offsets(checkpoint["modality_offsets"])
+            # load domain offsets
+            dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
+            dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
         else:
             print("Initializing new position embedding Y")
 
@@ -456,7 +456,7 @@ def main(args):
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
-                    mode="decreasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
+                    mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
             if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]):
                 break
@@ -472,7 +472,7 @@ def main(args):
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
-                    mode="increasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
+                    mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
 
         best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
         best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])

@@ -57,12 +57,12 @@ class Attention(nn.Module):
 class OTiS(nn.Module):
     """ Open foundation model for Time Series analysis with VisionTransformer backbone
     """
-    def __init__(self, modalities:dict, modality_weights:dict, 
+    def __init__(self, domains:dict, domain_weights:dict, 
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
-                 norm_pix_loss=False, masked_patch_loss=False, modality_weighted_loss=False, ncc_weight:float=0.0,
+                 norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False, ncc_weight:float=0.0,
                  include_forecasting_mask=False,
                  downstream=None):
         super().__init__()
@@ -74,9 +74,9 @@ class OTiS(nn.Module):
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         self.grid_height = {}
-        for modality, input_size in modalities.items():
+        for domain, input_size in domains.items():
             grid_height = input_size[1] // patch_size[0]      # number of variates
-            self.grid_height.update( {modality: grid_height} )
+            self.grid_height.update( {domain: grid_height} )
 
         assert embed_dim % 2 == 0
         max_num_patches_x = time_steps // patch_size[1]
@@ -157,8 +157,8 @@ class OTiS(nn.Module):
         self.norm_pix_loss = norm_pix_loss
         self.masked_patch_loss = masked_patch_loss
 
-        self.modality_weights = modality_weights
-        self.modality_weighted_loss = modality_weighted_loss
+        self.domain_weights = domain_weights
+        self.domain_weighted_loss = domain_weighted_loss
         
         self.ncc_weight = ncc_weight
 
@@ -553,13 +553,13 @@ class OTiS(nn.Module):
 
         return x
 
-    def forward_loss(self, imgs, pred, attn_mask, mask, modality):
+    def forward_loss(self, imgs, pred, attn_mask, mask, domain):
         """
         imgs: [N, C, H, W]
         pred: [N, L, p*q*C]
         attn_mask: [N, C', T'], with C'=H/p, T'=W/q and C'*T'=L
         mask: [N, L], 0 is keep, 1 is remove
-        modality: [N], the modality of the sample
+        domain: [N], the domain of the sample
         """
         # [N, L, p*q*C]
         target = self.patchify(imgs) 
@@ -629,13 +629,13 @@ class OTiS(nn.Module):
             # [N]
             nb_patches = nb_patches[nb_patches > 0]
 
-        if self.modality_weighted_loss:
+        if self.domain_weighted_loss:
             # weighted mean
-            modality_weights_batch = torch.stack( [self.modality_weights[mod] for mod in modality] ).to(device=imgs.device, non_blocking=True)
+            domain_weights_batch = torch.stack( [self.domain_weights[mod] for mod in domain] ).to(device=imgs.device, non_blocking=True)
             
-            batch_weight = torch.sum( modality_weights_batch ) + 1e-9
-            loss_batch = torch.sum( modality_weights_batch * loss / nb_patches ) / batch_weight
-            ncc_batch = torch.sum( modality_weights_batch * ncc ) / batch_weight
+            batch_weight = torch.sum( domain_weights_batch ) + 1e-9
+            loss_batch = torch.sum( domain_weights_batch * loss / nb_patches ) / batch_weight
+            ncc_batch = torch.sum( domain_weights_batch * ncc ) / batch_weight
         else:
             # mean
             loss_batch = torch.mean(loss / nb_patches)
@@ -643,7 +643,7 @@ class OTiS(nn.Module):
 
         return loss_batch, ncc_batch, imgs_hat
 
-    def forward(self, imgs, attn_mask, pos_embed_y, modality, mask_ratio=0.75):
+    def forward(self, imgs, attn_mask, pos_embed_y, domain, mask_ratio=0.75):
         """
         imgs: [N, C, H, W]
         attn_mask: [N, C', T'], with C'*T'=L and C'=H/p, T'=W/q
@@ -651,7 +651,7 @@ class OTiS(nn.Module):
         """
         latent, mask, ids_restore = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
         pred = self.forward_decoder(latent, attn_mask, pos_embed_y, ids_restore)  # [N, L, p*q*C]
-        loss, ncc, imgs_hat = self.forward_loss(imgs, pred, attn_mask, mask, modality)
+        loss, ncc, imgs_hat = self.forward_loss(imgs, pred, attn_mask, mask, domain)
 
         # contrastive part
         latent2, _, _ = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)

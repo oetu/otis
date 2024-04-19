@@ -52,7 +52,7 @@ def train_one_epoch(model: torch.nn.Module,
 
     training_history = {}
 
-    for data_iter_step, (samples, attn_mask, pos_embed_y, modality) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+    for data_iter_step, (samples, attn_mask, pos_embed_y, domain) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
@@ -67,7 +67,7 @@ def train_one_epoch(model: torch.nn.Module,
             loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask = model(samples, 
                                                                                 attn_mask, 
                                                                                 pos_embed_y, 
-                                                                                modality, 
+                                                                                domain, 
                                                                                 mask_ratio=args.mask_ratio)
 
         batch_size = len(samples)
@@ -329,13 +329,13 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         pos_embed_y = batch[2]
         pos_embed_y = pos_embed_y.to(device, non_blocking=True)
 
-        modality = batch[3]
+        domain = batch[3]
 
         with torch.cuda.amp.autocast():
             loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask = model(samples, 
                                                                                 attn_mask, 
                                                                                 pos_embed_y, 
-                                                                                modality, 
+                                                                                domain, 
                                                                                 mask_ratio=args.mask_ratio)
 
         batch_size = len(samples)

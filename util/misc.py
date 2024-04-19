@@ -324,7 +324,7 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
         model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-%s" % epoch_name, client_state=client_state)
 
 def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, test_stats, evaluation_criterion, 
-                    mode="increasing", modalities:Dict=None, modality_offsets:Dict=None):
+                    mode="increasing", domains:Dict=None, domain_offsets:Dict=None):
     output_dir = Path(args.output_dir)
     epoch_name = str(epoch)
 
@@ -354,10 +354,10 @@ def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scale
                 'scaler': loss_scaler.state_dict(),
                 'args': args,
             }
-            if modalities is not None:
-                to_save.update( {'modalities': modalities} )
-            if modality_offsets is not None:
-                to_save.update( {'modality_offsets': modality_offsets} )
+            if domains is not None:
+                to_save.update( {'domains': domains} )
+            if domain_offsets is not None:
+                to_save.update( {'domain_offsets': domain_offsets} )
 
             save_on_master(to_save, checkpoint_path)
     else:

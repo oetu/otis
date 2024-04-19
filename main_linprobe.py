@@ -235,7 +235,7 @@ def main(args):
                                 labels_mask_path=args.val_labels_mask_path, 
                                 downstream_task=args.downstream_task, 
                                 train=False, 
-                                modality_offsets=dataset_train.offsets, 
+                                domain_offsets=dataset_train.offsets, 
                                 args=args)
 
     # train balanced
@@ -308,7 +308,7 @@ def main(args):
     )
 
     model = models_vit.__dict__[args.model](
-        modalities=dataset_train.modalities,
+        domains=dataset_train.domains,
         img_size=args.input_size,
         patch_size=args.patch_size,
         num_classes=args.nb_classes,
@@ -339,16 +339,16 @@ def main(args):
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
         
-        # load position embedding Y together with modality offsets
-        assert len(dataset_train.modalities) == 1, "There is more than one modality in the target dataset"
-        target_modality = list(dataset_train.modalities.keys())[0]
-        target_shape = list(dataset_train.modalities.values())[0]
+        # load position embedding Y together with domain offsets
+        assert len(dataset_train.domains) == 1, "There is more than one domain in the target dataset"
+        target_domain = list(dataset_train.domains.keys())[0]
+        target_shape = list(dataset_train.domains.values())[0]
 
         pos_embed_y_available = False
 
-        checkpoint_modalities = checkpoint["modalities"]
-        for modality, shape in checkpoint_modalities.items():
-            if modality == target_modality and shape[1] == target_shape[1]:
+        checkpoint_domains = checkpoint["domains"]
+        for domain, shape in checkpoint_domains.items():
+            if domain == target_domain and shape[1] == target_shape[1]:
                 pos_embed_y_available = True
                 break
 
@@ -356,9 +356,9 @@ def main(args):
             print("Loading position embedding Y from checkpoint")
             model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
 
-            # load modality offsets
-            dataset_train.set_modality_offsets(checkpoint["modality_offsets"])
-            dataset_val.set_modality_offsets(checkpoint["modality_offsets"])
+            # load domain offsets
+            dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
+            dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
         else:
             print("Initializing new position embedding Y")
 

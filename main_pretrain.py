@@ -75,8 +75,8 @@ def get_args_parser():
                         help='Use (per-patch) normalized pixels as targets for computing loss')
     parser.add_argument('--masked_patch_loss', action='store_true', default=False,
                         help='Compute loss only on masked patches')
-    parser.add_argument('--modality_weighted_loss', action='store_true', default=False,
-                        help='Use weighted loss to consider imbalances between modalities')
+    parser.add_argument('--domain_weighted_loss', action='store_true', default=False,
+                        help='Use weighted loss to consider imbalances between domains')
 
     parser.add_argument('--ncc_weight', type=float, default=0.1,
                         help='Add normalized cross-correlation (ncc) as additional loss term')
@@ -212,7 +212,7 @@ def main(args):
 
     # load data
     dataset_train = SignalDataset(data_path=args.data_path, train=True, args=args)
-    dataset_val = SignalDataset(data_path=args.val_data_path, train=False, modality_offsets=dataset_train.offsets, args=args)
+    dataset_val = SignalDataset(data_path=args.val_data_path, train=False, domain_offsets=dataset_train.offsets, args=args)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
@@ -285,14 +285,14 @@ def main(args):
                                              labels_mask_path=args.labels_mask_path_online, 
                                              downstream_task=args.online_evaluation_task, 
                                              train=True, 
-                                             modality_offsets=dataset_train.offsets,
+                                             domain_offsets=dataset_train.offsets,
                                              args=args)
         dataset_online_val = SignalDataset(data_path=args.val_data_path_online, 
                                            labels_path=args.val_labels_path_online, 
                                            labels_mask_path=args.val_labels_mask_path_online, 
                                            downstream_task=args.online_evaluation_task, 
                                            train=False, 
-                                           modality_offsets=dataset_train.offsets, 
+                                           domain_offsets=dataset_train.offsets, 
                                            args=args)
 
         sampler_online_train = torch.utils.data.DistributedSampler(
@@ -337,15 +337,15 @@ def main(args):
 
     # define the model
     model = models_otis.__dict__[args.model](
-        modalities=dataset_train.modalities,
-        modality_weights=dataset_train.modality_weights,
+        domains=dataset_train.domains,
+        domain_weights=dataset_train.domain_weights,
         input_channels=args.input_channels,
         time_steps=args.time_steps,
         patch_size=args.patch_size,
         separate_dec_pos_embed_y=args.separate_dec_pos_embed_y,
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
-        modality_weighted_loss=args.modality_weighted_loss,
+        domain_weighted_loss=args.domain_weighted_loss,
         ncc_weight=args.ncc_weight,
         include_forecasting_mask=args.include_forecasting_mask,
     )
@@ -435,7 +435,7 @@ def main(args):
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
-                    mode="decreasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
+                    mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
             if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]):
                 break
@@ -451,7 +451,7 @@ def main(args):
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
-                    mode="increasing", modalities=dataset_train.modalities, modality_offsets=dataset_train.offsets)
+                    mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         
         best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
         best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])

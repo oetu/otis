@@ -13,40 +13,40 @@ class SignalDataset(Dataset):
     Unimodal dataset that generates views of signals.
     """
     def __init__(self, data_path, labels_path=None, labels_mask_path=None, downstream_task:str=None, 
-                 train=False, modality_offsets:Dict=None, args=None) -> None:
+                 train=False, domain_offsets:Dict=None, args=None) -> None:
         """
             labels_path: path to labels (finetuning / online evaluation)
             labels_mask_path: path to labels masks (finetuning / online evaluation)
             downstream_task: downstream task (finetuning / online evaluation)
 
-            modality_offsets: offsets for positional embedding Y
+            domain_offsets: offsets for positional embedding Y
         """
         data = torch.load(data_path, map_location=torch.device('cpu')) # load to ram
 
         # .unsqueeze(0) to add auxiliary channel (similar to rgb in imgs)
-        modality = [(sample[0], sample[1].unsqueeze(0).shape) for sample in data]
+        domain = [(sample[0], sample[1].unsqueeze(0).shape) for sample in data]
         data = [sample[1].unsqueeze(0) for sample in data]
 
-        self.modality = modality
-        self.modalities = {modality: shape for modality, shape in sorted(list(set(self.modality)))} # unique modalities
+        self.domain = domain
+        self.domains = {domain: shape for domain, shape in sorted(list(set(self.domain)))} # unique domains
 
-        modality_list = [mod[0] for mod in modality]
-        unique_modalities = list(set(modality_list))
+        domain_list = [mod[0] for mod in domain]
+        unique_domains = list(set(domain_list))
         
-        self.modality_weights = {}
-        for mod_current in unique_modalities:
-            mod_indices = torch.tensor([mod == mod_current for mod in modality_list])
-            mod_weight = len(modality) / (len(unique_modalities) * mod_indices.sum())
-            self.modality_weights.update( {mod_current: mod_weight} )
+        self.domain_weights = {}
+        for mod_current in unique_domains:
+            mod_indices = torch.tensor([mod == mod_current for mod in domain_list])
+            mod_weight = len(domain) / (len(unique_domains) * mod_indices.sum())
+            self.domain_weights.update( {mod_current: mod_weight} )
 
         self.offsets = {}
-        if modality_offsets is None:
+        if domain_offsets is None:
             offset = 0
-            for modality, shape in self.modalities.items():
-                self.offsets.update( {modality: offset} )
+            for domain, shape in self.domains.items():
+                self.offsets.update( {domain: offset} )
                 offset += shape[-2]
         else:
-            self.offsets = modality_offsets
+            self.offsets = domain_offsets
 
         self.data = data
 
@@ -64,9 +64,9 @@ class SignalDataset(Dataset):
         self.train = train 
         self.args = args
 
-    def set_modality_offsets(self, modality_offsets:Dict=None):
-        """set predefined modality offsets"""
-        self.offsets = modality_offsets
+    def set_domain_offsets(self, domain_offsets:Dict=None):
+        """set predefined domain offsets"""
+        self.offsets = domain_offsets
 
     def __len__(self) -> int:
         """return the number of samples in the dataset"""
@@ -99,9 +99,9 @@ class SignalDataset(Dataset):
             label = self.labels[idx].type(torch.LongTensor).argmax(dim=-1)
             label_mask = torch.ones_like(label)
 
-        modality, _ = self.modality[idx]
+        domain, _ = self.domain[idx]
         
-        return data, label, label_mask, self.args.patch_size, self.offsets[modality], modality, self.args.time_steps
+        return data, label, label_mask, self.args.patch_size, self.offsets[domain], domain, self.args.time_steps
 
     @staticmethod
     def collate_fn(batch):
@@ -140,9 +140,9 @@ class SignalDataset(Dataset):
                                                mode="constant", value=0) for idx, sample in enumerate(batch)]
         pos_embed_y = torch.stack(pos_embed_y, dim=0)
 
-        modality = [sample[5] for sample in batch]
+        domain = [sample[5] for sample in batch]
     
-        return data, attn_mask, torch.LongTensor(pos_embed_y), modality
+        return data, attn_mask, torch.LongTensor(pos_embed_y), domain
     
     @staticmethod
     def collate_fn_ft(batch):

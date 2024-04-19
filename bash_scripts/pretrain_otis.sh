@@ -39,7 +39,7 @@ separate_pos_embed_y="False"
 
 norm_pix_loss="False"
 masked_patch_loss="False"
-modality_weighted_loss="False"
+domain_weighted_loss="False"
 
 ncc_weight=0.1
 cos_weight=0.0
@@ -182,8 +182,8 @@ do
                 cmd=$cmd" --masked_patch_loss"
             fi
 
-            if [ "$modality_weighted_loss" = "True" ]; then
-                cmd=$cmd" --modality_weighted_loss"
+            if [ "$domain_weighted_loss" = "True" ]; then
+                cmd=$cmd" --domain_weighted_loss"
             fi
 
             if [ "$include_forecasting_mask" = "True" ]; then

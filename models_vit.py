@@ -54,7 +54,7 @@ class Attention(nn.Module):
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """ Vision Transformer with support for global average pooling
     """
-    def __init__(self, img_size, modalities:dict, patch_size=(1, 100), global_pool=False, attention_pool=False, 
+    def __init__(self, img_size, domains:dict, patch_size=(1, 100), global_pool=False, attention_pool=False, 
                  masking_blockwise=False, mask_ratio=0.0, mask_c_ratio=0.0, mask_t_ratio=0.0, **kwargs):
         super(VisionTransformer, self).__init__(**kwargs)
 
@@ -62,9 +62,9 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         self.patch_embed = PatchEmbed(img_size[0], patch_size, embed_dim, flatten=False) # set flatten to False
 
         self.grid_height = {}
-        for modality, input_size in modalities.items():
+        for domain, input_size in domains.items():
             grid_height = input_size[1] // patch_size[0]      # number of variates
-            self.grid_height.update( {modality: grid_height} )
+            self.grid_height.update( {domain: grid_height} )
 
         assert embed_dim % 2 == 0
         self.max_num_patches_x = img_size[-1] // patch_size[1]
