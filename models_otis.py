@@ -11,6 +11,8 @@
 
 from functools import partial
 
+import random
+
 import torch
 import torch.nn as nn
 
@@ -60,7 +62,8 @@ class OTiS(nn.Module):
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
-                 norm_pix_loss=False, masked_patch_loss=False, modality_weighted_loss=False, ncc_weight:float=0.0, 
+                 norm_pix_loss=False, masked_patch_loss=False, modality_weighted_loss=False, ncc_weight:float=0.0,
+                 include_forecasting_mask=False,
                  downstream=None):
         super().__init__()
 
@@ -70,17 +73,17 @@ class OTiS(nn.Module):
         self.patch_embed = PatchEmbed(input_channels, patch_size, embed_dim, flatten=False)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
-        self.grid_size = {}
+        self.grid_height = {}
         for modality, input_size in modalities.items():
-            grid_size = (input_size[1] // patch_size[0], input_size[2] // patch_size[1])
-            self.grid_size.update( {modality: grid_size} )
+            grid_height = input_size[1] // patch_size[0]      # number of variates
+            self.grid_height.update( {modality: grid_height} )
 
         assert embed_dim % 2 == 0
         max_num_patches_x = time_steps // patch_size[1]
         self.max_num_patches_x = max_num_patches_x
         self.pos_embed_x = nn.Parameter(torch.zeros(1, max_num_patches_x + 1, embed_dim // 2), requires_grad=False) # +1 cls embed
 
-        total_num_embeddings_y = sum([v[0] for k, v in self.grid_size.items()])
+        total_num_embeddings_y = sum([v for k, v in self.grid_height.items()])
         self.pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, embed_dim // 2, padding_idx=0) # +1 padding embed
 
         self.blocks = nn.ModuleList([
@@ -158,6 +161,8 @@ class OTiS(nn.Module):
         self.modality_weighted_loss = modality_weighted_loss
         
         self.ncc_weight = ncc_weight
+
+        self.include_forecasting_mask = include_forecasting_mask
 
         self.downstream = downstream
 
@@ -253,35 +258,69 @@ class OTiS(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], img_channels, h * p, w * q))
         return imgs
 
-    def random_masking(self, x, mask_ratio):
+    def random_masking(self, x, attn_mask, mask_ratio):
         """
         Perform per-sample random masking by per-sample shuffling.
         Per-sample shuffling is done by argsort random noise.
         x: [N, L, D], sequence
+        attn_mask: [N, C', T'], with L=C'*T'
         """
         N, L, D = x.shape  # batch, length, dim
         len_keep = int(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
-        if self.downstream == "forecasting":
-            # as only one modality is processed for a downstream task
-            # self.max_num_patches_x can be used regardless of the modality dict
-            nb_of_channels = int(L / self.max_num_patches_x)
-            noise = torch.arange(0, self.max_num_patches_x, device=x.device).repeat(nb_of_channels, 1)
+        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.25):
+            nb_of_channels, nb_of_patches = attn_mask.shape[1], attn_mask.shape[2]
+            # [C', T']
+            noise = torch.arange(0, nb_of_patches, device=x.device).repeat(nb_of_channels, 1)
+            # [C', T']
             noise = noise + torch.linspace(0, 0.5, steps=nb_of_channels, device=x.device).view(nb_of_channels, -1)
-            noise = noise.flatten().repeat(N, 1)
+            # [N, C', T']
+            noise = noise.repeat(N, 1, 1)
+            # [N, C', T']
+            noise = noise * attn_mask
+
+            # [N, 1]
+            noise_max = torch.max(noise.flatten(1), dim=-1)[0].view(-1, 1)
+
+            # create an auxiliary mask that shows which tokens to keep
+            # tokens to keep = 0, tokens to toss = inf (small is keep, large is remove)
+
+            # keep_indices for each sample as they may vary in the number of time points
+            # [N, 1]
+            len_keeps = torch.tensor([int(sample[0].sum() * (10 - 10 * mask_ratio)/10) for sample in attn_mask], device=x.device).view(-1, 1)
+            
+            # [N, C', T']
+            aux_mask = torch.arange(noise.size(2), device=x.device).expand(noise.size(0), noise.size(1), noise.size(2)) < len_keeps.unsqueeze(-1)
+            aux_mask = 1 - aux_mask.to(torch.float32)
+            aux_mask = torch.nan_to_num(aux_mask * torch.inf) * attn_mask
+            # as these positions are infinity, they are certainly removed and thus have to be reconstructed
+
+            # [N, C', T']
+            noise = noise + aux_mask
+
+            # [N, C', T']
+            # make sure that the padding tokens have larger values than actual tokens
+            # by sampling random noise and adding noise_max (only for the padding tokens)
+            noise = noise + (1 - attn_mask) * (noise_max.unsqueeze(-1) + torch.rand(noise.size(1), noise.size(2), device=x.device).unsqueeze(0))
+
+            # [N, L]
+            noise = noise.flatten(1)
         else:
             noise = torch.rand(N, L, device=x.device)   # noise in [0, 1]
         
         # sort noise for each sample
+        # [N, L]
         ids_shuffle = torch.argsort(noise, dim=1)   # ascend: small is keep, large is remove
-
         ids_restore = torch.argsort(ids_shuffle, dim=1)
 
         # keep the first subset
+        # [N, len_keep]
         ids_keep = ids_shuffle[:, :len_keep]
+        # [N, len_keep, D]
         x_masked = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, D))
 
         # generate the binary mask: 0 is keep, 1 is remove
+        # [N, L]
         mask = torch.ones([N, L], device=x.device)
         mask[:, :len_keep] = 0
 
@@ -339,7 +378,7 @@ class OTiS(nn.Module):
 
         # masking: length -> length * mask_ratio
         # (B, N', D), with N'=C'*T'*(1-mask_ratio)
-        x, mask, ids_restore = self.random_masking(x, mask_ratio)
+        x, mask, ids_restore = self.random_masking(x, attn_mask, mask_ratio)
 
         # append cls token
         # (1, 1, D)
@@ -349,7 +388,7 @@ class OTiS(nn.Module):
         x = torch.cat((cls_tokens, x), dim=1)
 
         # apply Transformer blocks
-        # (B, N)
+        # (B, N')
         attn_mask_visible_patches = attn_mask.flatten(1)[mask==0].view(attn_mask.shape[0], -1)
         # (B, 1+N'), add cls token to attn mask
         attn_mask_visible_patches = torch.cat((torch.ones(size=(attn_mask.shape[0], 1), device=x.device), attn_mask_visible_patches), dim=1)
@@ -552,37 +591,49 @@ class OTiS(nn.Module):
         # batch_size = len(imgs)
         if self.masked_patch_loss:
             # compute loss only on masked patches
-            # [N]
-            loss = torch.sum(loss * mask, dim=-1)
-            # [N]
-            nb_patches = torch.sum(attn_mask.flatten(1) * mask, dim=-1) 
-
             # [N, C, H, W]
             combined_mask = attn_mask.flatten(1) * mask # attention mask combined with the actual mask (visible vs masked tokens)
             combined_mask_input_space = torch.nn.functional.interpolate(combined_mask.reshape(attn_mask.shape).unsqueeze(1), 
                                                                         scale_factor=self.patch_size, 
                                                                         mode="nearest")
+            # [N]
+            # number of reconstructed (masked only) patches
+            # may also be 0 if time series length < patch size
+            # hence only consider the samples with nb_patches > 0 
+            nb_patches = torch.sum(combined_mask, dim=-1)
+
+            # [N]
+            loss = torch.sum(loss * mask, dim=-1)[nb_patches > 0]
 
             # [N, C, H, W]
             imgs_masked_patches = imgs * combined_mask_input_space
             imgs_hat_masked_patches = imgs_hat * combined_mask_input_space
 
             # [N]
-            ncc = statistics.ncc(imgs_masked_patches, imgs_hat_masked_patches, combined_mask_input_space, keep_batch=True)
+            ncc = statistics.ncc(imgs_masked_patches, imgs_hat_masked_patches, combined_mask_input_space, keep_batch=True)[nb_patches > 0]
+            
+            # [N]
+            nb_patches = nb_patches[nb_patches > 0]
         else:
+            # compute loss on all (masked + visible) patches
             # [N]
-            loss = torch.sum(loss, dim=-1)
-            # [N]
+            # number of reconstructed (masked + visible) patches
             nb_patches = torch.sum(attn_mask.flatten(1), dim=-1)
             
             # [N]
-            ncc = statistics.ncc(imgs, imgs_hat, attn_mask_input_space, keep_batch=True)
+            loss = torch.sum(loss, dim=-1)[nb_patches > 0]
+
+            # [N]
+            ncc = statistics.ncc(imgs, imgs_hat, attn_mask_input_space, keep_batch=True)[nb_patches > 0]
+
+            # [N]
+            nb_patches = nb_patches[nb_patches > 0]
 
         if self.modality_weighted_loss:
             # weighted mean
             modality_weights_batch = torch.stack( [self.modality_weights[mod] for mod in modality] ).to(device=imgs.device, non_blocking=True)
             
-            batch_weight = torch.sum(modality_weights_batch) + 1e-9
+            batch_weight = torch.sum( modality_weights_batch ) + 1e-9
             loss_batch = torch.sum( modality_weights_batch * loss / nb_patches ) / batch_weight
             ncc_batch = torch.sum( modality_weights_batch * ncc ) / batch_weight
         else:
@@ -629,27 +680,6 @@ class OTiS(nn.Module):
         return loss, ncc, cos_sim, cos_sim_embed, z_std, imgs_hat, mask
 
 
-# def mae_vit_pluto_patchX_dec192d2b(**kwargs): # nb_params: 1.61M encoder, 0.37M decoder
-#     model = MaskedAutoencoderViT(
-#         embed_dim=256, depth=2, num_heads=8, # dim=32 per head
-#         decoder_embed_dim=160, decoder_depth=1, decoder_num_heads=8, # dim=20 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-# def mae_vit_base_patchX_dec256d2b(**kwargs): # nb_params: 5.36M encoder, 1.7M decoder
-#     model = MaskedAutoencoderViT(
-#         embed_dim=384, depth=3, num_heads=6, # dim=64 per head
-#         decoder_embed_dim=256, decoder_depth=2, decoder_num_heads=8, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-# def mae_vit_base2_patchX_dec256d2b(**kwargs): # nb_params: 5.36M encoder, 1.7M decoder
-#     model = MaskedAutoencoderViT(
-#         embed_dim=384, depth=3, num_heads=6, # dim=64 per head
-#         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
 def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.70M decoder
     model = OTiS(
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
@@ -664,20 +694,6 @@ def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.5
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
-# def mae_vit_large_patchX_dec256d2b(**kwargs): # nb_params: 12.66M encoder, 1.74M decoder
-#     model = MaskedAutoencoderViT(
-#         embed_dim=512, depth=4, num_heads=8, # dim=64 per head
-#         decoder_embed_dim=256, decoder_depth=2, decoder_num_heads=8, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-# def mae_vit_large2_patchX_dec256d2b(**kwargs): # nb_params: 12.66M encoder, 1.74M decoder
-#     model = MaskedAutoencoderViT(
-#         embed_dim=512, depth=4, num_heads=8, # dim=64 per head
-#         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
 def otis_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.74M decoder
     model = OTiS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
@@ -691,20 +707,6 @@ def otis_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
-
-# def mae_vit_huge_patchX_dec256d2b(**kwargs): # nb_params: 24.68M encoder, 1.77M decoder
-#     model = MaskedAutoencoderViT(
-#         embed_dim=640, depth=5, num_heads=10, # dim=64 per head
-#         decoder_embed_dim=256, decoder_depth=2, decoder_num_heads=8, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-# def mae_vit_huge2_patchX_dec256d2b(**kwargs): # nb_params: 24.68M encoder, 1.77M decoder
-#     model = MaskedAutoencoderViT(
-#         embed_dim=640, depth=5, num_heads=10, # dim=64 per head
-#         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
 
 def otis_hugeDeep_patchX_dec160d4b(**kwargs):    # nb_params: 130.81M encoder, 1.78M decoder
     model = OTiS(
@@ -744,26 +746,14 @@ def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0
 
 
 # set recommended archs
-# mae_vit_pluto_patchX = mae_vit_pluto_patchX_dec192d2b  # decoder: 256 dim, 2 blocks
-
-# mae_vit_base_patchX = mae_vit_base_patchX_dec256d2b  # decoder: 256 dim, 2 blocks
-# mae_vit_base2_patchX = mae_vit_base2_patchX_dec256d2b  # decoder: 128 dim, 2 blocks
 otis_baseDeep_dec160d4b_patchX = otis_baseDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_baseDeep_dec128d2b_patchX = otis_baseDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
 
-# mae_vit_large_patchX = mae_vit_large_patchX_dec256d2b  # decoder: 256 dim, 2 blocks
-# mae_vit_large2_patchX = mae_vit_large2_patchX_dec256d2b  # decoder: 128 dim, 2 blocks
 otis_largeDeep_dec160d4b_patchX = otis_largeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_largeDeep_dec128d2b_patchX = otis_largeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
 
-# mae_vit_huge_patchX = mae_vit_huge_patchX_dec256d2b  # decoder: 256 dim, 2 blocks
-# mae_vit_huge2_patchX = mae_vit_huge2_patchX_dec256d2b  # decoder: 128 dim, 2 blocks
 otis_hugeDeep_dec160d4b_patchX = otis_hugeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_hugeDeep_dec128d2b_patchX = otis_hugeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
-
-# mae_vit_base = mae_vit_base_patchX_dec512d8b  # decoder: 512 dim, 8 blocks
-# mae_vit_large = mae_vit_large_patchX_dec512d8b  # decoder: 512 dim, 8 blocks
-# mae_vit_huge = mae_vit_huge_patchX_dec512d8b  # decoder: 512 dim, 8 blocks
 
 
 # def _attention_forward_wrapper(self, attn_obj):

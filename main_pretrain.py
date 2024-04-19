@@ -86,6 +86,8 @@ def get_args_parser():
     # Augmentation parameters
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='Masking ratio (percentage of removed patches).')
+    parser.add_argument('--include_forecasting_mask', action='store_true', default=False,
+                        help='Introduce also masking for forecasting (i.e. right-sided masking).')
 
     parser.add_argument('--crop_lower_bnd', default=0.5, type=float,
                         help='Lower boundary of the cropping ratio (default: 0.5)')
@@ -344,7 +346,8 @@ def main(args):
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
         modality_weighted_loss=args.modality_weighted_loss,
-        ncc_weight=args.ncc_weight
+        ncc_weight=args.ncc_weight,
+        include_forecasting_mask=args.include_forecasting_mask,
     )
 
     if args.compile:
