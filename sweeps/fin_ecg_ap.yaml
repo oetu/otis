@@ -18,7 +18,7 @@ parameters:
     values: [0.0, 0.1]
   layer_decay:
     values: [0.5, 0.75]
-  weigth_decay:
+  weight_decay:
     values: [0.1]
   smoothing:
     values: [0.1]

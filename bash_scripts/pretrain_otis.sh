@@ -3,21 +3,21 @@
 
 # Basic parameters
 seed="0"
-num_workers="24"    # number of CPUs
+num_workers="32"    # number of CPUs
 
-path="tower"       # [tower, server]
-submitit="True"     # only for training on server
+path="server"       # [tower, server]
+submitit="False"     # only for training on server
 
 nodes="1"
-world_size="2"      # number of GPUs
-mem_per_task="96"   # memory per GPU
-port="29403"
+world_size="4"      # number of GPUs
+mem_per_task="200"   # memory per GPU
+port="29436"
 
 batch_size="512"
 accum_iter=(1)
 
-epochs="200"
-warmup_epochs="20"
+epochs="100"
+warmup_epochs="10"
 
 # Callback parameters
 patience="-1"
@@ -26,27 +26,27 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="baseDeep_dec160d4b"
+model_size="baseDeep_dec128d2b"
 model="otis_"$model_size"_patchX"
 
 input_channels="1"
-time_steps="2500"
+time_steps="1008"
 
 patch_height="1"
-patch_width=(100)
+patch_width=(24)
 
 separate_pos_embed_y="False"
 
 norm_pix_loss="False"
 masked_patch_loss="False"
-domain_weighted_loss="False"
+domain_weighted_loss="True"
 
 ncc_weight=0.1
 cos_weight=0.0
 
 # Augmentation parameters
-mask_ratio=(0.8)
-include_forecasting_mask="False"
+mask_ratio=(0.75)
+include_forecasting_mask="True"
 
 crop_lower_bnd="0.5"
 crop_upper_bnd="1.0"
@@ -60,7 +60,7 @@ blr_array=(1e-5)
 weight_decay=(0.15)
 
 # Data path
-dataset="ticorp"
+dataset="ticorp_light"
 
 if [ "$path" = "tower" ]; then
     if [ "$dataset" = "ukbb" ]; then
@@ -97,8 +97,8 @@ elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train.pt"
     val_data_path=$data_base"/val.pt"
 else
-    data_path=$data_base"/data_train_new.pt"
-    val_data_path=$data_base"/data_val_new.pt"
+    data_path=$data_base"/train_light.pt"
+    val_data_path=$data_base"/val.pt"
 fi
 
 # Online evaluation
@@ -123,7 +123,7 @@ val_data_path_online=$online_data_base"/otis/ecgs_val_ecg_imaging_float32.pt"
 val_labels_path_online=$online_data_base"/labelsOneHot/labels_val_"$target"_all.pt"
 
 # Log specifications
-save_output="False"
+save_output="True"
 wandb="True"
 wandb_project="OTiS_Pretraining"
 wandb_id=""
@@ -135,7 +135,7 @@ do
         for mr in "${mask_ratio[@]}"
         do
 
-            folder="test_forecastingMask"
+            folder="otis/fm0.1"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
