@@ -183,7 +183,7 @@ def train_one_epoch(model: torch.nn.Module,
             # samples of shape (Batch, 1, Channel, Time)
             max_channels = int(attn_mask_input_space[idx, 0, :, 0].sum())
             if max_channels > 1:
-                ch_idx = random.randint(0, max_channels-1)
+                ch_idx = random.randint(1, max_channels-1)
             else:
                 ch_idx = 0
 
@@ -191,7 +191,7 @@ def train_one_epoch(model: torch.nn.Module,
             plt.figure(figsize=(8, 6))
             plt.subplot(611)
             plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
-            plt.title("Input")
+            plt.title(f"Input ({domain[idx]}, channel {0})")
             plt.subplot(612)
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
             plt.title("Reconstruction")
@@ -200,7 +200,7 @@ def train_one_epoch(model: torch.nn.Module,
             plt.title("Reconstruction (masked patches only)")
             plt.subplot(614)
             plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
-            plt.title("Input")
+            plt.title(f"Input ({domain[idx]}, channel {ch_idx})")
             plt.subplot(615)
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
             plt.title("Reconstruction")

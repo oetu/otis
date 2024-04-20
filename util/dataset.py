@@ -26,6 +26,10 @@ class SignalDataset(Dataset):
         # .unsqueeze(0) to add auxiliary channel (similar to rgb in imgs)
         domain = [(sample[0], sample[1].unsqueeze(0).shape) for sample in data]
         data = [sample[1].unsqueeze(0) for sample in data]
+        # if train:
+        #     data = [sample[1][..., :10452].unsqueeze(0) for sample in data]
+        # if not train:
+        #     data = [sample[1][..., 10452:13936].unsqueeze(0) for sample in data]
 
         self.domain = domain
         self.domains = {domain: shape for domain, shape in sorted(list(set(self.domain)))} # unique domains
