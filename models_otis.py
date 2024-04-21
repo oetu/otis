@@ -62,7 +62,7 @@ class OTiS(nn.Module):
                  embed_dim=1024, depth=24, num_heads=16,
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
-                 norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False, ncc_weight:float=0.0,
+                 norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False,
                  include_forecasting_mask=False,
                  downstream=None):
         super().__init__()
@@ -159,8 +159,6 @@ class OTiS(nn.Module):
 
         self.domain_weights = domain_weights
         self.domain_weighted_loss = domain_weighted_loss
-        
-        self.ncc_weight = ncc_weight
 
         self.include_forecasting_mask = include_forecasting_mask
 
@@ -268,45 +266,90 @@ class OTiS(nn.Module):
         N, L, D = x.shape  # batch, length, dim
         len_keep = int(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
-        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.25):
-            nb_of_channels, nb_of_patches = attn_mask.shape[1], attn_mask.shape[2]
+        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.1):
+            # [N, C', T']
+            N, nb_of_channels, nb_of_patches = attn_mask.shape
+
+            # Generate noise
             # [C', T']
-            noise = torch.arange(0, nb_of_patches, device=x.device).repeat(nb_of_channels, 1)
+            noise = torch.arange(0, nb_of_patches, device=x.device).to(torch.float32).repeat(nb_of_channels, 1).unsqueeze(0)
             # [C', T']
-            noise = noise + torch.linspace(0, 0.5, steps=nb_of_channels, device=x.device).view(nb_of_channels, -1)
+            noise.add(torch.linspace(0, 0.5, steps=nb_of_channels, device=x.device).view(-1, 1))
             # [N, C', T']
             noise = noise.repeat(N, 1, 1)
             # [N, C', T']
-            noise = noise * attn_mask
+            noise.mul_(attn_mask)
 
-            # [N, 1]
-            noise_max = torch.max(noise.flatten(1), dim=-1)[0].view(-1, 1)
+            # Determine maximum noise value
+            # [N, 1, 1]
+            noise_max = noise.flatten(1).max(dim=-1)[0].view(-1, 1, 1)
 
-            # create an auxiliary mask that shows which tokens to keep
-            # tokens to keep = 0, tokens to toss = inf (small is keep, large is remove)
-
-            # keep_indices for each sample as they may vary in the number of time points
-            # [N, 1]
-            len_keeps = torch.tensor([int(sample[0].sum() * (10 - 10 * mask_ratio)/10) for sample in attn_mask], device=x.device).view(-1, 1)
-            
+            # Create auxiliary mask
+            # to set values of masked patches to infinity such that they are certainly removed
+            # [N, 1, 1]
+            len_keeps = ( attn_mask[:, 0, ...].sum(dim=-1) * (10 - 10 * mask_ratio) / 10 ).to(torch.long).view(-1, 1, 1)
             # [N, C', T']
-            aux_mask = torch.arange(noise.size(2), device=x.device).expand(noise.size(0), noise.size(1), noise.size(2)) < len_keeps.unsqueeze(-1)
+            aux_mask = torch.arange(nb_of_patches, device=x.device).expand(N, nb_of_channels, nb_of_patches) < len_keeps
             aux_mask = 1 - aux_mask.to(torch.float32)
-            aux_mask = torch.nan_to_num(aux_mask * torch.inf) * attn_mask
-            # as these positions are infinity, they are certainly removed and thus have to be reconstructed
+            aux_mask.mul_(attn_mask)
+            aux_mask = torch.nan_to_num(aux_mask * torch.inf, nan=0.0)
 
+            # Apply auxiliary mask
             # [N, C', T']
-            noise = noise + aux_mask
+            noise.add_(aux_mask)
 
+            # Assign random values to padding tokens such that
+            # visible_patches.values < padding_tokens.values < masked_patches.values
             # [N, C', T']
-            # make sure that the padding tokens have larger values than actual tokens
-            # by sampling random noise and adding noise_max (only for the padding tokens)
-            noise = noise + (1 - attn_mask) * (noise_max.unsqueeze(-1) + torch.rand(noise.size(1), noise.size(2), device=x.device).unsqueeze(0))
+            padding_noise = noise_max + torch.rand(nb_of_channels, nb_of_patches, device=x.device).unsqueeze(0)
+            noise.add_((1 - attn_mask) * padding_noise)
 
+            # Flatten noise
             # [N, L]
             noise = noise.flatten(1)
         else:
-            noise = torch.rand(N, L, device=x.device)   # noise in [0, 1]
+            # [N, C', T']
+            N, nb_of_channels, nb_of_patches = attn_mask.shape
+
+            # Generate noise
+            # [N, C', T']
+            noise = torch.rand(N, nb_of_channels, nb_of_patches, device=x.device)
+            noise.mul_(attn_mask)
+            noise.add_(torch.nan_to_num((1 - attn_mask) * torch.inf, nan=0.0))
+
+            # Create auxiliary mask
+            # to set values of masked patches to infinity such that they are certainly removed
+            # [N, 1, 1]
+            len_keeps = ( attn_mask[:, 0, :].sum(dim=-1) * (10 - 10 * mask_ratio) / 10 ).to(torch.long).view(-1, 1, 1)
+            # [N, C', T']
+            aux_mask = torch.arange(nb_of_patches, device=x.device).expand(N, nb_of_channels, nb_of_patches) < len_keeps
+            aux_mask = 1 - aux_mask.to(torch.float32)
+            aux_mask.mul_(attn_mask)
+            aux_mask = torch.nan_to_num(aux_mask * torch.inf, nan=0.0)
+
+            # Sort noise
+            # [N, C', T']
+            noise, aux_ids_shuffle = torch.sort(noise, dim=-1)
+            aux_ids_restore = torch.argsort(aux_ids_shuffle, dim=-1)
+
+            # Apply auxiliary mask and restore noise
+            # [N, C', T']
+            noise.add_(aux_mask)
+            noise = torch.gather(noise, dim=-1, index=aux_ids_restore)
+
+            # Apply attention mask
+            # [N, C', T']
+            noise.mul_(attn_mask)
+
+            # Assign random values to padding tokens such that
+            # visible_patches.values < padding_tokens.values < masked_patches.values
+            # [N, C', T']
+            padding_noise = torch.rand(1, nb_of_channels, nb_of_patches, device=x.device) + 1
+            noise.add_((1 - attn_mask) * padding_noise)
+
+            # Flatten noise
+            # [N, L]
+            noise = noise.flatten(1)
         
         # sort noise for each sample
         # [N, L]
