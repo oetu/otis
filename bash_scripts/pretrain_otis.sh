@@ -9,9 +9,9 @@ path="server"       # [tower, server]
 submitit="False"     # only for training on server
 
 nodes="1"
-world_size="4"      # number of GPUs
+world_size="8"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29436"
+port="29443"
 
 batch_size="512"
 accum_iter=(1)
@@ -56,7 +56,7 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(1e-5)
+blr_array=(1e-4)
 weight_decay=(0.15)
 
 # Data path
@@ -135,7 +135,7 @@ do
         for mr in "${mask_ratio[@]}"
         do
 
-            folder="otis/fm0.1"
+            folder="otis_refactored/fm0.1"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
