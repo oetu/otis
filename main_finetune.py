@@ -297,7 +297,7 @@ def main(args):
         sampler_train = torch.utils.data.DistributedSampler(
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
-        print("Sampler_train = %s" % str(sampler_train))
+        # print("Sampler_train = %s" % str(sampler_train))
 
         if args.dist_eval:
             if len(dataset_val) % num_tasks != 0:
@@ -308,7 +308,7 @@ def main(args):
                 dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=True)  # shuffle=True to reduce monitor bias
         else:
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
-        print("Sampler_val = %s" % str(sampler_val))
+        # print("Sampler_val = %s" % str(sampler_val))
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)

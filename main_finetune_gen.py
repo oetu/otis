@@ -222,7 +222,7 @@ def main(args):
         sampler_train = torch.utils.data.DistributedSampler(
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
-        print("Sampler_train = %s" % str(sampler_train))
+        # print("Sampler_train = %s" % str(sampler_train))
 
         if args.dist_eval:
             if len(dataset_val) % num_tasks != 0:
@@ -234,7 +234,7 @@ def main(args):
             )
         else:
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
-        print("Sampler_val = %s" % str(sampler_train))
+        # print("Sampler_val = %s" % str(sampler_train))
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
@@ -286,7 +286,6 @@ def main(args):
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
         domain_weighted_loss=args.domain_weighted_loss,
-        ncc_weight=args.ncc_weight,
         downstream=args.downstream_task
     )
 

@@ -225,7 +225,7 @@ def main(args):
         sampler_train = torch.utils.data.DistributedSampler(
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
-        print("Sampler_train = %s" % str(sampler_train))
+        # print("Sampler_train = %s" % str(sampler_train))
 
         if args.dist_eval:
             if len(dataset_val) % num_tasks != 0:
@@ -237,7 +237,7 @@ def main(args):
             )
         else:
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
-        print("Sampler_val = %s" % str(sampler_train))
+        # print("Sampler_val = %s" % str(sampler_train))
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
@@ -295,10 +295,13 @@ def main(args):
                                            domain_offsets=dataset_train.offsets, 
                                            args=args)
 
+        print("Online training set size: ", len(dataset_online_train))
+        print("Online validation set size: ", len(dataset_online_val))
+
         sampler_online_train = torch.utils.data.DistributedSampler(
             dataset_online_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
         )
-        print("Sampler_online_train = %s" % str(sampler_online_train))
+        # print("Sampler_online_train = %s" % str(sampler_online_train))
 
         if args.dist_eval:
             if len(dataset_val) % num_tasks != 0:
@@ -311,7 +314,7 @@ def main(args):
             ) 
         else:
             sampler_online_val = torch.utils.data.SequentialSampler(dataset_online_val)
-        print("Sampler_online_val = %s" % str(sampler_online_val))
+        # print("Sampler_online_val = %s" % str(sampler_online_val))
 
         data_loader_online_train = torch.utils.data.DataLoader(
             dataset_online_train, 
@@ -346,7 +349,6 @@ def main(args):
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
         domain_weighted_loss=args.domain_weighted_loss,
-        ncc_weight=args.ncc_weight,
         include_forecasting_mask=args.include_forecasting_mask,
     )
 
