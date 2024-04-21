@@ -349,6 +349,7 @@ def main(args):
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
         domain_weighted_loss=args.domain_weighted_loss,
+        contrastive_loss=(args.cos_weight > 0.0),
         include_forecasting_mask=args.include_forecasting_mask,
     )
 
@@ -378,7 +379,7 @@ def main(args):
     print("effective batch size: %d" % eff_batch_size)
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=False)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
     
     # following timm: set wd as 0 for bias and norm layers

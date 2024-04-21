@@ -63,6 +63,7 @@ class OTiS(nn.Module):
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
                  norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False,
+                 contrastive_loss=False,
                  include_forecasting_mask=False,
                  downstream=None):
         super().__init__()
@@ -159,6 +160,8 @@ class OTiS(nn.Module):
 
         self.domain_weights = domain_weights
         self.domain_weighted_loss = domain_weighted_loss
+
+        self.contrastive_loss = contrastive_loss
 
         self.include_forecasting_mask = include_forecasting_mask
 
@@ -696,29 +699,34 @@ class OTiS(nn.Module):
         pred = self.forward_decoder(latent, attn_mask, pos_embed_y, ids_restore)  # [N, L, p*q*C]
         loss, ncc, imgs_hat = self.forward_loss(imgs, pred, attn_mask, mask, domain)
 
-        # contrastive part
-        latent2, _, _ = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
+        if self.contrastive_loss:
+            # contrastive part
+            latent2, _, _ = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
 
-        attn_mask_visible_patches = attn_mask.flatten(1)[mask==0].view(attn_mask.shape[0], -1)
-        z1 = statistics.masked_mean(latent[:, 1:, ...], attn_mask_visible_patches, dim=1)     # global average pooling
-        z2 = statistics.masked_mean(latent2[:, 1:, ...], attn_mask_visible_patches, dim=1)    # global average pooling
-        
-        p1 = self.projector(z1)
-        p2 = self.projector(z2)
+            attn_mask_visible_patches = attn_mask.flatten(1)[mask==0].view(attn_mask.shape[0], -1)
+            z1 = statistics.masked_mean(latent[:, 1:, ...], attn_mask_visible_patches, dim=1)     # global average pooling
+            z2 = statistics.masked_mean(latent2[:, 1:, ...], attn_mask_visible_patches, dim=1)    # global average pooling
+            
+            p1 = self.projector(z1)
+            p2 = self.projector(z2)
 
-        h1 = self.predictor(p1)
-        h2 = self.predictor(p2)
+            h1 = self.predictor(p1)
+            h2 = self.predictor(p2)
 
-        # cos_sim = - (self.criterion(h1, p2).mean() + self.criterion(h2, p1).mean()) * 0.5
-        cos_sim = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
-        # cos_sim = - (self.criterion(h1, z2).mean() + self.criterion(h2, z1).mean()) * 0.5
-        # cos_sim = - (self.criterion(h1, z2.detach()).mean() + self.criterion(h2, z1.detach()).mean()) * 0.5
+            # cos_sim = - (self.criterion(h1, p2).mean() + self.criterion(h2, p1).mean()) * 0.5
+            cos_sim = - (self.criterion(h1, p2.detach()).mean() + self.criterion(h2, p1.detach()).mean()) * 0.5
+            # cos_sim = - (self.criterion(h1, z2).mean() + self.criterion(h2, z1).mean()) * 0.5
+            # cos_sim = - (self.criterion(h1, z2.detach()).mean() + self.criterion(h2, z1.detach()).mean()) * 0.5
 
-        # compare the similarity between the actual embeddings
-        cos_sim_embed = self.criterion(z1, z2).mean()
+            # compare the similarity between the actual embeddings
+            cos_sim_embed = self.criterion(z1, z2).mean()
 
-        # determine the std across all embeddings in the batch
-        z_std = torch.nn.functional.normalize(z1, dim=-1).std(dim=0).mean() * z1.shape[-1]**0.5 
+            # determine the std across all embeddings in the batch
+            z_std = torch.nn.functional.normalize(z1, dim=-1).std(dim=0).mean() * z1.shape[-1]**0.5 
+        else:
+            cos_sim = torch.tensor([0.0], dtype=torch.float32, device=imgs.device)
+            cos_sim_embed = torch.tensor([0.0], dtype=torch.float32, device=imgs.device)
+            z_std = torch.tensor([0.0], dtype=torch.float32, device=imgs.device)
 
         return loss, ncc, cos_sim, cos_sim_embed, z_std, imgs_hat, mask
 
