@@ -21,6 +21,7 @@ import wandb
 
 import util.misc as misc
 import util.lr_sched as lr_sched
+import util.statistics as statistics
 
 import matplotlib
 matplotlib.use('Agg')
@@ -116,8 +117,8 @@ def train_one_epoch(model: torch.nn.Module,
         # (B, 1, C, T)
         # 0 is keep, 1 is remove
         mask_input_space = torch.nn.functional.interpolate(mask.reshape(attn_mask.shape).unsqueeze(1), 
-                                                            scale_factor=args.patch_size, 
-                                                            mode="nearest")
+                                                           scale_factor=args.patch_size, 
+                                                           mode="nearest")
 
         # (B, 1, C, T)
         combined_mask = attn_mask_input_space * mask_input_space
@@ -175,38 +176,61 @@ def train_one_epoch(model: torch.nn.Module,
             # T_indie
             max_steps = int(attn_mask_input_space[idx, 0, 0, :].sum())
 
-            # (1, 1, C, T)
+            # (1, C, T)
             x = samples[idx][..., :max_steps:steps].detach().cpu().numpy()
             x_hat = samples_hat[idx][..., :max_steps:steps].detach().cpu().numpy()
             x_hat_masked = (samples_hat[idx] * combined_mask[idx])[..., :max_steps:steps].detach().cpu().numpy()
+
+            ncc_0 = statistics.ncc(samples[idx, 0, 0], samples_hat[idx, 0, 0])
+            mask_0 = (mask_input_space[idx, 0, 0, :max_steps:steps]==1).cpu().numpy()
 
             # samples of shape (Batch, 1, Channel, Time)
             max_channels = int(attn_mask_input_space[idx, 0, :, 0].sum())
             if max_channels > 1:
                 ch_idx = random.randint(1, max_channels-1)
+                ncc_1 = statistics.ncc(samples[idx, 0, ch_idx], samples_hat[idx, 0, ch_idx])
+                mask_1 = (mask_input_space[idx, 0, ch_idx, :max_steps:steps]==1).cpu().numpy()
             else:
                 ch_idx = 0
+                ncc_1 = ncc_0
+                mask_1 = mask_0
 
+            # Plot reconstructed time series
             plt.close('all')
             plt.figure(figsize=(8, 6))
+
             plt.subplot(611)
-            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
             plt.title(f"Input ({domain[idx]}, channel {0})")
+            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
+
             plt.subplot(612)
+            plt.title(f"Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
-            plt.title("Reconstruction")
+            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, 0, :].min(), y2=x_hat[0, 0, :].max(), 
+                             where=mask_0, color='gray', alpha=0.15)
+
             plt.subplot(613)
+            plt.title("Reconstruction (masked patches only, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
-            plt.title("Reconstruction (masked patches only)")
+            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, 0, :].min(), y2=x_hat_masked[0, 0, :].max(), 
+                             where=mask_0, color='gray', alpha=0.15)
+
             plt.subplot(614)
-            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
             plt.title(f"Input ({domain[idx]}, channel {ch_idx})")
+            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
+
             plt.subplot(615)
+            plt.title(f"Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
-            plt.title("Reconstruction")
+            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, ch_idx, :].min(), y2=x_hat[0, ch_idx, :].max(), 
+                             where=mask_1, color='gray', alpha=0.15)
+
             plt.subplot(616)
+            plt.title("Reconstruction (masked patches only, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :])
-            plt.title("Reconstruction (masked patches only)")
+            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, ch_idx, :].min(), y2=x_hat_masked[0, ch_idx, :].max(), 
+                             where=mask_1, color='gray', alpha=0.15)
+
             plt.tight_layout()
             training_history["Reconstruction"] = wandb.Image(plt)
 
