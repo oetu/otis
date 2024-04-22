@@ -11,9 +11,9 @@ submitit="False"     # only for training on server
 nodes="1"
 world_size="8"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29443"
+port="29411"
 
-batch_size="512"
+batch_size="224"
 accum_iter=(1)
 
 epochs="100"
@@ -26,7 +26,7 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="baseDeep_dec128d2b"
+model_size="hugeDeep_dec128d2b"
 model="otis_"$model_size"_patchX"
 
 input_channels="1"
@@ -39,9 +39,9 @@ separate_pos_embed_y="False"
 
 norm_pix_loss="False"
 masked_patch_loss="False"
-domain_weighted_loss="True"
+domain_weighted_loss="False"
 
-ncc_weight=0.1
+ncc_weight=0.0
 cos_weight=0.0
 
 # Augmentation parameters
@@ -56,11 +56,14 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(1e-4)
+blr_array=(3e-6)
 weight_decay=(0.15)
 
+# Output path
+folder="otis_refactored/noDomainLoss/fm0.1"
+
 # Data path
-dataset="ticorp_light"
+dataset="ticorp_lite"
 
 if [ "$path" = "tower" ]; then
     if [ "$dataset" = "ukbb" ]; then
@@ -97,7 +100,7 @@ elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train.pt"
     val_data_path=$data_base"/val.pt"
 else
-    data_path=$data_base"/train_light.pt"
+    data_path=$data_base"/train_lite.pt"
     val_data_path=$data_base"/val.pt"
 fi
 
@@ -135,7 +138,6 @@ do
         for mr in "${mask_ratio[@]}"
         do
 
-            folder="otis_refactored/fm0.1"
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
