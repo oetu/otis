@@ -12,6 +12,7 @@
 from functools import partial
 
 import random
+import math
 
 import torch
 import torch.nn as nn
@@ -267,9 +268,14 @@ class OTiS(nn.Module):
         attn_mask: [N, C', T'], with L=C'*T'
         """
         N, L, D = x.shape  # batch, length, dim
-        len_keep = int(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
+        len_keep = math.ceil(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
-        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.1):
+        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.10):
+            forecasting_ratio = mask_ratio
+
+            # how much to keep (= 1 - mask out)
+            len_keep = math.ceil(L * (10 - 10 * forecasting_ratio)/10) # factor 10 to compensate float precision 
+            
             # [N, C', T']
             N, nb_of_channels, nb_of_patches = attn_mask.shape
 
@@ -290,7 +296,7 @@ class OTiS(nn.Module):
             # Create auxiliary mask
             # to set values of masked patches to infinity such that they are certainly removed
             # [N, 1, 1]
-            len_keeps = ( attn_mask[:, 0, ...].sum(dim=-1) * (10 - 10 * mask_ratio) / 10 ).to(torch.long).view(-1, 1, 1)
+            len_keeps = torch.ceil( attn_mask[:, 0, ...].sum(dim=-1) * (10 - 10 * forecasting_ratio) / 10 ).to(torch.long).view(-1, 1, 1)
             # [N, C', T']
             aux_mask = torch.arange(nb_of_patches, device=x.device).expand(N, nb_of_channels, nb_of_patches) < len_keeps
             aux_mask = 1 - aux_mask.to(torch.float32)
@@ -323,7 +329,7 @@ class OTiS(nn.Module):
             # Create auxiliary mask
             # to set values of masked patches to infinity such that they are certainly removed
             # [N, 1, 1]
-            len_keeps = ( attn_mask[:, 0, :].sum(dim=-1) * (10 - 10 * mask_ratio) / 10 ).to(torch.long).view(-1, 1, 1)
+            len_keeps = torch.ceil( attn_mask[:, 0, :].sum(dim=-1) * (10 - 10 * mask_ratio) / 10 ).to(torch.long).view(-1, 1, 1)
             # [N, C', T']
             aux_mask = torch.arange(nb_of_patches, device=x.device).expand(N, nb_of_channels, nb_of_patches) < len_keeps
             aux_mask = 1 - aux_mask.to(torch.float32)
