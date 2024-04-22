@@ -182,6 +182,8 @@ def train_one_epoch(model: torch.nn.Module,
             x_hat_masked = (samples_hat[idx] * combined_mask[idx])[..., :max_steps:steps].detach().cpu().numpy()
 
             ncc_0 = statistics.ncc(samples[idx, 0, 0], samples_hat[idx, 0, 0])
+            ncc_0_maskedOnly = statistics.ncc(samples[idx, 0, 0], samples_hat[idx, 0, 0], combined_mask[idx, 0, 0])
+
             mask_0 = (mask_input_space[idx, 0, 0, :max_steps:steps]==1).cpu().numpy()
 
             # samples of shape (Batch, 1, Channel, Time)
@@ -189,10 +191,12 @@ def train_one_epoch(model: torch.nn.Module,
             if max_channels > 1:
                 ch_idx = random.randint(1, max_channels-1)
                 ncc_1 = statistics.ncc(samples[idx, 0, ch_idx], samples_hat[idx, 0, ch_idx])
+                ncc_1_maskedOnly = statistics.ncc(samples[idx, 0, ch_idx], samples_hat[idx, 0, ch_idx], combined_mask[idx, 0, ch_idx])
                 mask_1 = (mask_input_space[idx, 0, ch_idx, :max_steps:steps]==1).cpu().numpy()
             else:
                 ch_idx = 0
                 ncc_1 = ncc_0
+                ncc_1_maskedOnly = ncc_0_maskedOnly
                 mask_1 = mask_0
 
             # Plot reconstructed time series
@@ -210,7 +214,7 @@ def train_one_epoch(model: torch.nn.Module,
                              where=mask_0, color='gray', alpha=0.15)
 
             plt.subplot(613)
-            plt.title("Reconstruction (masked patches only, masked patches in gray)")
+            plt.title(f"Reconstruction of masked patches (NCC {ncc_0_maskedOnly.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
             plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, 0, :].min(), y2=x_hat_masked[0, 0, :].max(), 
                              where=mask_0, color='gray', alpha=0.15)
@@ -226,7 +230,7 @@ def train_one_epoch(model: torch.nn.Module,
                              where=mask_1, color='gray', alpha=0.15)
 
             plt.subplot(616)
-            plt.title("Reconstruction (masked patches only, masked patches in gray)")
+            plt.title(f"Reconstruction of masked patches (NCC {ncc_1_maskedOnly.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :])
             plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, ch_idx, :].min(), y2=x_hat_masked[0, ch_idx, :].max(), 
                              where=mask_1, color='gray', alpha=0.15)
