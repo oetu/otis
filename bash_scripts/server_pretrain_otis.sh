@@ -9,7 +9,7 @@
 #SBATCH --gpu-bind=none     # NCCL can't deal with task-binding (binding each process to its own GPU), hence allocate the devices manually in the python script
 #SBATCH --cpus-per-gpu=32   # Number of CPUs (Don't use more than 24 per GPU)
 #SBATCH --mem-per-gpu=192G  # Memory in GB (Don't use more than 128G per GPU)
-#SBATCH --nodelist=apollo
+#SBATCH --nodelist=hercules
 
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=oezguen.turgut@tum.de
