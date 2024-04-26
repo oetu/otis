@@ -3,17 +3,17 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-num_workers="24"    # number of CPUs
+num_workers="32"    # number of CPUs
 
 path="server"       # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
-world_size="4"      # number of GPUs
+world_size="8"      # number of GPUs
 mem_per_task="96"   # memory per GPU
-port="29416"
+port="29425"
 
-batch_size=(64)
+batch_size=(24)
 accum_iter=(1)
 
 epochs="100"
@@ -24,7 +24,7 @@ patience="15"
 max_delta="0.25" # for AUROC
 
 # Model parameters
-model_size="baseDeep"
+model_size="hugeDeep"
 model="vit_"$model_size"_patchX"
 
 # Pretraining specifications
@@ -57,11 +57,11 @@ jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
-drop_path=(0.1)
-layer_decay=(0.75)
+drop_path=(0.0)
+layer_decay=(0.5)
 
 # Optimizer parameters
-blr=(1e-5) # 3e-5 if from scratch
+blr=(3e-5) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -69,7 +69,7 @@ weight_decay=(0.1)
 smoothing=(0.1)
 
 # Output path
-folder="CAD"
+folder="test"
 
 # Log specifications
 save_output="True"
@@ -170,8 +170,8 @@ do
                             subfolder=("seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$weight_decay"/m0.8")
 
                             # OTiS
-                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
+                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
+                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
 
                             # SiT
                             # finetune="/home/oturgut/SiT/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"

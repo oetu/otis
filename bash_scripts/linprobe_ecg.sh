@@ -59,7 +59,7 @@ smoothing=(0.1)
 
 # Data path
 if [ "$path" = "tower" ]; then
-    data_base="/home/oturgut/data/processed/ukbb"
+    data_base="/home/oturgut/data/processed/UKBB"
     checkpoint_base="/home/oturgut/SiT"
 else
     data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"

@@ -11,9 +11,9 @@ submitit="False"    # only for training on server
 nodes="1"
 world_size="4"      # number of GPUs
 mem_per_task="96"   # memory per GPU
-port="29416"
+port="29425"
 
-batch_size=(64)
+batch_size=(48)
 accum_iter=(1)
 
 epochs="100"
@@ -24,7 +24,7 @@ patience="15"
 max_delta="0.25" # for AUROC
 
 # Model parameters
-model_size="baseDeep"
+model_size="largeDeep"
 model="vit_"$model_size"_patchX"
 
 # Pretraining specifications
@@ -58,10 +58,10 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
 drop_path=(0.1)
-layer_decay=(0.75)
+layer_decay=(0.5)
 
 # Optimizer parameters
-blr=(1e-5) # 3e-5 if from scratch
+blr=(3e-4) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -69,12 +69,12 @@ weight_decay=(0.1)
 smoothing=(0.1)
 
 # Output path
-folder="CAD"
+folder="LV"
 
 # Log specifications
 save_output="True"
 wandb="True"
-wandb_project="MAE_ECG_CAD"
+wandb_project="MAE_ECG_LV"
 wandb_id=""
 
 # Data path
@@ -96,22 +96,22 @@ fi
 # labels_path=$data_base"/labelsOneHot/labels_train_diabetes_all_balanced.pt"
 # downstream_task="classification"
 # nb_classes="2"
-data_path=$data_base"/otis/ecgs_train_CAD_all_balanced_float32.pt"
-labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
-downstream_task="classification"
-nb_classes="2"
+# data_path=$data_base"/otis/ecgs_train_CAD_all_balanced_float32.pt"
+# labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
+# downstream_task="classification"
+# nb_classes="2"
 # data_path=$data_base"/ecgs_train_CAD_hundredth_balanced_noBase_gn.pt"
 # labels_path=$data_base"/labelsOneHot/labels_train_CAD_hundredth_balanced.pt"
 # downstream_task="classification"
 # nb_classes="2"
-# data_path=$data_base"/ecgs_train_Regression_noBase_gn.pt"
-# labels_path=$data_base"/labelsOneHot/labels_train_Regression_stdNormed.pt"
-# labels_mask_path=$data_base"/labels_train_Regression_mask.pt"
-# downstream_task="regression"
-# # LV
-# lower_bnd="0"
-# upper_bnd="6"
-# nb_classes="6"
+data_path=$data_base"/otis/ecgs_train_Regression_float32.pt"
+labels_path=$data_base"/labelsOneHot/labels_train_Regression_stdNormed.pt"
+labels_mask_path=$data_base"/labels_train_Regression_mask.pt"
+downstream_task="regression"
+# LV
+lower_bnd="0"
+upper_bnd="6"
+nb_classes="6"
 # # RV
 # lower_bnd="6"
 # upper_bnd="10"
@@ -130,14 +130,14 @@ nb_classes="2"
 # nb_classes="17"
 
 # Validation unbalanced
-val_data_path=$data_base"/otis/ecgs_val_ecg_imaging_float32.pt"
-val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
+# val_data_path=$data_base"/otis/ecgs_val_ecg_imaging_float32.pt"
+# val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
 # val_labels_path=$data_base"/labelsOneHot/labels_val_diabetes_all.pt"
 # val_labels_path=$data_base"/labelsOneHot/labels_val_flutter_all.pt"
-pos_label="1"
-# val_data_path=$data_base"/ecgs_val_Regression_noBase_gn.pt"
-# val_labels_path=$data_base"/labelsOneHot/labels_val_Regression_stdNormed.pt"
-# val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
+# pos_label="1"
+val_data_path=$data_base"/otis/ecgs_val_Regression_float32.pt"
+val_labels_path=$data_base"/labelsOneHot/labels_val_Regression_stdNormed.pt"
+val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
 
 plot_attention_map="False"
 plot_embeddings="False"
@@ -170,7 +170,9 @@ do
                             subfolder=("seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$weight_decay"/m0.8")
 
                             # OTiS
-                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
+                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2432_blr3e-5/checkpoint-94-ncc-0.7729.pth"
+                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b3328_blr1e-5/checkpoint-97-ncc-0.7665.pth"
+                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
                             # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
 
                             # SiT
