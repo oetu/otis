@@ -11,6 +11,8 @@
 
 from functools import partial
 
+import math 
+
 import torch
 import torch.nn as nn
 
@@ -128,7 +130,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         x: [N, L, D], sequence
         """
         N, L, D = x.shape  # batch, length, dim
-        len_keep = int(L * (1 - mask_ratio))
+        len_keep = math.ceil(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
         noise = torch.rand(N, L, device=x.device)  # noise in [0, 1]
         

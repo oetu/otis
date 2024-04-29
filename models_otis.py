@@ -19,6 +19,7 @@ import torch.nn as nn
 
 from timm.models.vision_transformer import Block
 from timm.models.layers import trunc_normal_
+from timm.models.layers import Mlp
 
 from util.patch_embed import PatchEmbed
 from util.pos_embed import get_1d_sincos_pos_embed
@@ -61,7 +62,9 @@ class OTiS(nn.Module):
     def __init__(self, domains:dict, domain_weights:dict, 
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
+                 output_projection='decoder',
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
+                 head_mlp_ratio=4., head_dropout=0.1, head_activation=nn.GELU,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
                  norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False,
                  contrastive_loss=False,
@@ -102,31 +105,46 @@ class OTiS(nn.Module):
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
-        # OTiS decoder specifics
-        self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
+        # OTiS output projection specifics
+        self.output_projection = output_projection
+        
+        if self.output_projection == 'mlp':
+            self.mask_token_encoder = nn.Parameter(torch.zeros(1, 1, embed_dim))
+            
+            self.mlp = Mlp(
+                in_features=embed_dim,
+                hidden_features=int(embed_dim * head_mlp_ratio),
+                act_layer=head_activation,
+                drop=head_dropout,
+            )
+            
+            self.mlp_norm = norm_layer(embed_dim)
+            self.mlp_pred = nn.Linear(embed_dim, patch_size[0] * patch_size[1] * input_channels, bias=True)
+        else: # decoder
+            self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim, bias=True)
 
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
+            self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
 
-        assert decoder_embed_dim % 2 == 0
-        self.decoder_pos_embed_x = nn.Parameter(torch.zeros(1, max_num_patches_x + 1, decoder_embed_dim // 2), requires_grad=False) # +1 cls embed
-        self.separate_dec_pos_embed_y = separate_dec_pos_embed_y
-        if self.separate_dec_pos_embed_y:
-            self.decoder_pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, decoder_embed_dim // 2, padding_idx=0) # +1 padding embed
-        else:
-            self.decoder_pos_embed_y = nn.Linear(embed_dim // 2, decoder_embed_dim // 2)
+            assert decoder_embed_dim % 2 == 0
+            self.decoder_pos_embed_x = nn.Parameter(torch.zeros(1, max_num_patches_x + 1, decoder_embed_dim // 2), requires_grad=False) # +1 cls embed
+            self.separate_dec_pos_embed_y = separate_dec_pos_embed_y
+            if self.separate_dec_pos_embed_y:
+                self.decoder_pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, decoder_embed_dim // 2, padding_idx=0) # +1 padding embed
+            else:
+                self.decoder_pos_embed_y = nn.Linear(embed_dim // 2, decoder_embed_dim // 2)
 
-        self.decoder_blocks = nn.ModuleList([
-            Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.GELU, norm_layer=norm_layer)
-            for i in range(decoder_depth)])
+            self.decoder_blocks = nn.ModuleList([
+                Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.GELU, norm_layer=norm_layer)
+                for i in range(decoder_depth)])
 
-        self.decoder_norm = norm_layer(decoder_embed_dim)
-        self.decoder_pred = nn.Linear(decoder_embed_dim, patch_size[0] * patch_size[1] * input_channels, bias=True) # decoder to patch
+            self.decoder_norm = norm_layer(decoder_embed_dim)
+            self.decoder_pred = nn.Linear(decoder_embed_dim, patch_size[0] * patch_size[1] * input_channels, bias=True) # decoder to patch
 
-        # modify the attention operation to consider attention masks
-        for block in self.decoder_blocks:
-            block.forward = self._block_forward_wrapper(block)
-            # block.attn.forward = self._attention_forward_wrapper(block.attn)
-            block.attn = Attention(decoder_embed_dim, decoder_num_heads, qkv_bias=True)
+            # modify the attention operation to consider attention masks
+            for block in self.decoder_blocks:
+                block.forward = self._block_forward_wrapper(block)
+                # block.attn.forward = self._attention_forward_wrapper(block.attn)
+                block.attn = Attention(decoder_embed_dim, decoder_num_heads, qkv_bias=True)
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
@@ -189,7 +207,7 @@ class OTiS(nn.Module):
         with torch.no_grad():
             self.pos_embed_y.weight[1:] = _pos_embed_y
 
-        if self.separate_dec_pos_embed_y:
+        if self.output_projection == "decoder" and self.separate_dec_pos_embed_y:
             _decoder_pos_embed_y = torch.nn.Parameter(torch.randn(self.decoder_pos_embed_y.num_embeddings-1, 
                                                                 self.decoder_pos_embed_y.embedding_dim) * .02)
             trunc_normal_(_decoder_pos_embed_y, std=.02)
@@ -202,10 +220,11 @@ class OTiS(nn.Module):
                                                cls_token=True)
         self.pos_embed_x.data.copy_(torch.from_numpy(_pos_embed_x).float().unsqueeze(0))
 
-        _decoder_pos_embed_x = get_1d_sincos_pos_embed(self.decoder_pos_embed_x.shape[-1], 
-                                                       self.decoder_pos_embed_x.shape[-2]-1, 
-                                                       cls_token=True)
-        self.decoder_pos_embed_x.data.copy_(torch.from_numpy(_decoder_pos_embed_x).float().unsqueeze(0))
+        if self.output_projection == "decoder":
+            _decoder_pos_embed_x = get_1d_sincos_pos_embed(self.decoder_pos_embed_x.shape[-1], 
+                                                            self.decoder_pos_embed_x.shape[-2]-1, 
+                                                            cls_token=True)
+            self.decoder_pos_embed_x.data.copy_(torch.from_numpy(_decoder_pos_embed_x).float().unsqueeze(0))
 
         # initialize patch_embed like nn.Linear (instead of nn.Conv2d)
         w = self.patch_embed.proj.weight.data
@@ -213,7 +232,11 @@ class OTiS(nn.Module):
 
         # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
         torch.nn.init.normal_(self.cls_token, std=.02)
-        torch.nn.init.normal_(self.mask_token, std=.02)
+
+        if self.output_projection == "decoder":
+            torch.nn.init.normal_(self.mask_token, std=.02)
+        else: # mlp
+            torch.nn.init.normal_(self.mask_token_encoder, std=.02)
 
         # initialize nn.Linear and nn.LayerNorm
         self.apply(self._init_weights)
@@ -452,6 +475,96 @@ class OTiS(nn.Module):
         x = self.norm(x)
 
         return x, mask, ids_restore
+    
+    def forward_encoder_with_masked_patches(self, x, attn_mask, pos_embed_y, mask_ratio):
+        """
+        input:
+            x: (B, 1, C, T), input signal of size CxT
+            attn_mask: (B, C', T'), with N=C'*T' patches 
+            pos_embed_y: (B, C', T'), with N=C'*T' embedding ids
+
+        output:
+            x: (B, 1+N, D), with 1 cls token + N (visible + masked) patches
+            mask: (B, N), with N (visible + mask) patches, 0 is keep, 1 is remove
+            ids_restore: (B, N)
+        """
+        # embed patches
+        # (B, D, C', T')
+        x = self.patch_embed(x)
+
+        # flatten
+        # (B, N, D), with N=C'*T'
+        x = x.flatten(2).transpose(1, 2)
+
+        # masking: length -> length * mask_ratio
+        # (B, N', D), with N'=C'*T'*(1-mask_ratio)
+        x, mask, ids_restore = self.random_masking(x, attn_mask, mask_ratio)
+
+        # append mask tokens to sequence
+        # (B, N-N', D)
+        mask_tokens = self.mask_token_encoder.repeat(x.shape[0], ids_restore.shape[1] - x.shape[1], 1)
+        # (B, N, D)
+        x_ = torch.cat([x, mask_tokens], dim=1)  # no cls token
+        x = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle
+
+        # permute and reshape
+        # (B, D, N)
+        x = torch.permute(x, (0, 2, 1))
+
+        # (B, D, C', T')
+        x = x.view(x.shape[0], x.shape[1], attn_mask.shape[-2], -1)
+
+        # add pos embed X w/o cls token
+        # (B, D, C', T')
+        pos_embed_x_mask = attn_mask.unsqueeze(1).expand(-1, x.shape[1], -1, -1)
+
+        # (1, 1+T'_max, D/2)
+        pos_embed_x = self.pos_embed_x
+        # (1, 1+T'_max, D), padding left
+        pos_embed_x = torch.nn.functional.pad(pos_embed_x, (x.shape[1]//2, 0), "constant", 0)
+        # (1, D, 1, 1+T'_max)
+        pos_embed_x_batch = torch.permute(pos_embed_x, (0, 2, 1)).unsqueeze(-2)
+        # (B, D, C', T')
+        pos_embed_x_batch = pos_embed_x_mask * pos_embed_x_batch[..., 1:pos_embed_x_mask.shape[-1]+1]
+
+        # (B, D, C', T')
+        x = x + pos_embed_x_batch
+
+        # add pos embed Y
+        # (B, C', T', D/2)
+        pos_embed_y_batch = self.pos_embed_y(pos_embed_y)
+        # (B, C', T', D), padding right
+        pos_embed_y_batch = torch.nn.functional.pad(pos_embed_y_batch, (0, x.shape[1]//2), "constant", 0)
+        # (B, D, C', T')
+        pos_embed_y_batch = torch.permute(pos_embed_y_batch, (0, 3, 1, 2))
+
+        # (B, D, C', T')
+        x = x + pos_embed_y_batch
+
+        # flatten
+        # (B, N, D), with N=C'*T'
+        x = x.flatten(2).transpose(1, 2) 
+
+        # append cls token
+        # (1, 1, D)
+        cls_token = self.cls_token + pos_embed_x[:, :1, :]
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        # (B, 1+N, D)
+        x = torch.cat((cls_tokens, x), dim=1)
+
+        # apply Transformer blocks
+        # (B, N)
+        attn_mask_visible_patches = attn_mask.flatten(1)
+        # (B, 1+N), add cls token to attn mask
+        attn_mask_visible_patches = torch.cat((torch.ones(size=(attn_mask.shape[0], 1), device=x.device), attn_mask_visible_patches), dim=1)
+
+        for blk in self.blocks:
+            x = blk(x, attn_mask_visible_patches)
+
+        # (B, 1+N, D)        
+        x = self.norm(x)
+
+        return x, mask, ids_restore
 
     def forward_encoder_all_patches(self, x,  pos_embed_y):
         """
@@ -460,7 +573,7 @@ class OTiS(nn.Module):
             pos_embed_y: (B, C', T'), with N=C'*T' embedding ids
 
         output:
-            x: (B, 1+N', D), with 1 cls token + N' visible patches
+            x: (B, 1+N, D), with 1 cls token + N (visible + masked) patches
         """
         # embed patches
         # (B, D, C', T')
@@ -528,7 +641,7 @@ class OTiS(nn.Module):
         x = self.decoder_embed(x)
 
         # append mask tokens to sequence
-        mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1)
+        mask_tokens = self.mask_token.repeat(x.shape[0], ids_restore.shape[1] + 1 - x.shape[1], 1) # + 1 because x includes cls token
         x_ = torch.cat([x[:, 1:, :], mask_tokens], dim=1)  # no cls token
         x_ = torch.gather(x_, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))  # unshuffle
         # (B, 1+N, D_dec)
@@ -602,6 +715,34 @@ class OTiS(nn.Module):
         # remove cls token
         # (B, N, p*q*input_channels)
         x = x[:, 1:, :]
+
+        return x
+    
+    def forward_mlp(self, x):
+        """
+        input:
+            x: (B, 1+N, D), with 1 cls token + N (visible + masked) patches
+
+        output:
+            x: (B, N, p*q*input_channels), with p=patch_size_x, q=patch_size_y
+        """
+        # preserve cls token
+        # (B, 1, D)
+        cls_token = x[:, :1, :]
+        
+        # remove cls token
+        x = x[:, 1:, :]
+
+        # apply MLP
+        # (B, N, D)
+        x = self.mlp(x)
+
+        # (B, N, D)
+        x = self.mlp_norm(x)
+
+        # predictor projection
+        # (B, N, p*q*input_channels)
+        x = self.mlp_pred(x)
 
         return x
 
@@ -701,8 +842,13 @@ class OTiS(nn.Module):
         attn_mask: [N, C', T'], with C'*T'=L and C'=H/p, T'=W/q
         pos_embed_y: [N, C', T'], with C'*T'=L and C'=H/p, T'=W/q 
         """
-        latent, mask, ids_restore = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
-        pred = self.forward_decoder(latent, attn_mask, pos_embed_y, ids_restore)  # [N, L, p*q*C]
+        if self.output_projection == 'decoder':
+            latent, mask, ids_restore = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
+            pred = self.forward_decoder(latent, attn_mask, pos_embed_y, ids_restore)  # [N, L, p*q*C]
+        else: # mlp
+            latent, mask, ids_restore = self.forward_encoder_with_masked_patches(imgs, attn_mask, pos_embed_y, mask_ratio)
+            pred = self.forward_mlp(latent)  # [N, L, p*q*C]
+        
         loss, ncc, imgs_hat = self.forward_loss(imgs, pred, attn_mask, mask, domain)
 
         if self.contrastive_loss:

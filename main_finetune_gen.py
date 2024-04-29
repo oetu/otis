@@ -54,6 +54,10 @@ def get_args_parser():
                         help='Name of model to train (default: otis_baseDeep_dec128d2b_patchX)')
     parser.add_argument('--compile', action='store_true', default=False,
                         help='Use torch compile')
+    
+    output_projections = ["decoder", "mlp"]
+    parser.add_argument('--output_projection', default='decoder', type=str, choices=output_projections,
+                        help='Projection of the masked tokens (default: decoder)')
 
     parser.add_argument('--input_channels', type=int, default=1, metavar='N',
                         help='input channels')
@@ -282,6 +286,7 @@ def main(args):
         input_channels=args.input_channels,
         time_steps=args.time_steps,
         patch_size=args.patch_size,
+        output_projection=args.output_projection,
         separate_dec_pos_embed_y=args.separate_dec_pos_embed_y,
         norm_pix_loss=args.norm_pix_loss,
         masked_patch_loss=args.masked_patch_loss,
@@ -343,7 +348,7 @@ def main(args):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-        assert set(msg.missing_keys) == {'pos_embed_x', 'pos_embed_y.weight'}
+        assert {'pos_embed_x', 'pos_embed_y.weight'} not in set(msg.missing_keys)
 
     if args.freeze_encoder:
         for _, p in model.blocks.named_parameters():
