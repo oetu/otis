@@ -129,10 +129,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         training_stats["auroc"] = auc
         training_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
-        rmse = root_mean_squared_error(logits, labels, multioutput="raw_values")
+        rmse = np.float64(root_mean_squared_error(logits, labels, multioutput="raw_values"))
         training_stats["rmse"] = rmse.mean(axis=-1)
 
-        mae = mean_absolute_error(logits, labels, multioutput="raw_values")
+        mae = np.float64(mean_absolute_error(logits, labels, multioutput="raw_values"))
         training_stats["mae"] = mae.mean(axis=-1)
 
         pcc = np.concatenate([r_regression(logits[:, i].view(-1, 1), labels[:, i]) for i in range(labels.shape[-1])], axis=0)
@@ -280,10 +280,10 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_stats["auroc"] = auc
         test_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
-        rmse = root_mean_squared_error(logits, labels, multioutput="raw_values")
+        rmse = np.float64(root_mean_squared_error(logits, labels, multioutput="raw_values"))
         test_stats["rmse"] = rmse.mean(axis=-1)
 
-        mae = mean_absolute_error(logits, labels, multioutput="raw_values")
+        mae = np.float64(mean_absolute_error(logits, labels, multioutput="raw_values"))
         test_stats["mae"] = mae.mean(axis=-1)
 
         pcc = np.concatenate([r_regression(logits[:, i].view(-1, 1), labels[:, i]) for i in range(labels.shape[-1])], axis=0)
