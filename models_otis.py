@@ -294,7 +294,10 @@ class OTiS(nn.Module):
         len_keep = math.ceil(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
         if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.10):
-            forecasting_ratio = mask_ratio
+            if self.include_forecasting_mask:
+                forecasting_ratio = 0.5
+            else:
+                forecasting_ratio = mask_ratio
 
             # how much to keep (= 1 - mask out)
             len_keep = math.ceil(L * (10 - 10 * forecasting_ratio)/10) # factor 10 to compensate float precision 

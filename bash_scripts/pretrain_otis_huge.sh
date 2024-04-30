@@ -11,9 +11,9 @@ submitit="False"     # only for training on server
 nodes="1"
 world_size="8"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29412"
+port="29413"
 
-batch_size="288"
+batch_size="224"
 accum_iter=(1)
 
 epochs="100"
@@ -61,10 +61,10 @@ blr_array=(1e-5)
 weight_decay=(0.15)
 
 # Output path
-folder="otis_final/noDomainLoss/fm0.1/ticorp"
+folder="otis_final/noDomainLoss/fm0.1/ticorp_all"
 
 # Data path
-dataset="ticorp"
+dataset="ticorp_all"
 
 # Log specifications
 save_output="True"
@@ -103,6 +103,9 @@ if [ "$dataset" = "ukbb" ]; then
 elif [ "$dataset" = "mimic" ]; then
     data_path=$data_base"/ecgs_train_300k.pt"
     val_data_path=$data_base"/ecgs_val_10k.pt"
+elif [ "$dataset" = "ticorp_all" ]; then
+    data_path=$data_base"/train_all.pt"
+    val_data_path=$data_base"/val_all.pt"
 elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train.pt"
     val_data_path=$data_base"/val.pt"
