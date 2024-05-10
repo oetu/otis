@@ -5,16 +5,16 @@
 seed="0"
 num_workers="32"    # number of CPUs
 
-path="server"       # [tower, server]
+path="tower"       # [tower, server]
 submitit="False"     # only for training on server
 
 nodes="1"
-world_size="8"      # number of GPUs
+world_size="1"      # number of GPUs
 mem_per_task="200"   # memory per GPU
 port="29422"
 
-batch_size="416"
-accum_iter=(1)
+batch_size="144"
+accum_iter=(2)
 
 epochs="100"
 warmup_epochs="10"
@@ -26,7 +26,7 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="largeDeep_dec128d2b"
+model_size="largeDeep_dec192d6b"
 model="otis_"$model_size"_patchX"
 
 input_channels="1"
@@ -37,6 +37,11 @@ patch_width=(24)
 
 separate_pos_embed_y="False"
 
+# Load encoder
+pretrained_encoder="/home/oturgut/SiT/output/pre/otis/large/dec128d2b/p1x24/pre_896_blr3e-5/checkpoint-98-ncc-0.8688.pth"
+freeze_encoder="True"
+ignore_pos_embed_y="False"
+
 # Loss parameters
 norm_pix_loss="False"
 masked_patch_loss="False"
@@ -46,8 +51,8 @@ ncc_weight=0.1
 cos_weight=0.0
 
 # Augmentation parameters
-mask_ratio=(0.75)
-include_forecasting_mask="True"
+mask_ratio=(0.8)
+include_forecasting_mask="False"
 
 crop_lower_bnd="0.5"
 crop_upper_bnd="1.0"
@@ -57,14 +62,14 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(3e-5)
+blr_array=(3e-4)
 weight_decay=(0.15)
 
 # Output path
-folder="otis_final/noDomainLoss/fm0.1/ticorp"
+folder="otis/ticorp/ft"
 
 # Data path
-dataset="ticorp"
+dataset="ticorp_decOnly"
 
 # Log specifications
 save_output="True"
@@ -106,6 +111,9 @@ elif [ "$dataset" = "mimic" ]; then
 elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train.pt"
     val_data_path=$data_base"/val.pt"
+elif [ "$dataset" = "ticorp_decOnly" ]; then
+    data_path=$data_base"/val_all_new.pt"
+    val_data_path=$data_base"/val_wo_mimic_new.pt"
 else
     data_path=$data_base"/train_lite.pt"
     val_data_path=$data_base"/val.pt"
@@ -113,7 +121,7 @@ fi
 
 # Online evaluation
 input_electrodes="12"
-online_evaluation="True"
+online_evaluation="False"
 online_evaluation_task="classification"
 lower_bnd="0"
 upper_bnd="1"
@@ -152,6 +160,18 @@ do
                 cmd="python3 submitit_pretrain.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             else
                 cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_pretrain.py --world_size $world_size --dist_eval --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+            fi
+
+            if [ ! -z "$pretrained_encoder" ]; then
+                cmd=$cmd" --pretrained_encoder $pretrained_encoder"
+            fi
+
+            if [ "$freeze_encoder" = "True" ]; then
+                cmd=$cmd" --freeze_encoder"
+            fi
+
+            if [ "$ignore_pos_embed_y" = "True" ]; then
+                cmd=$cmd" --ignore_pos_embed_y"
             fi
 
             if [ "$compile" = "True" ]; then
