@@ -81,7 +81,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         loss_value = loss.item()
 
-        if not math.isfinite(loss_value):
+        if not math.isfinite(loss_value) and misc.is_main_process():
             print("Loss is {}, stopping training".format(loss_value))
             sys.exit(1)
 
