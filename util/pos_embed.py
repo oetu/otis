@@ -91,7 +91,7 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
 # --------------------------------------------------------
 def interpolate_pos_embed_x(model, checkpoint_model):
     if 'pos_embed_x' in checkpoint_model:
-        print("Loading position embedding X from checkpoint")
+        print("Loading pos_embed_x from checkpoint")
         # (1, 1+T'_max, D/2)
         pos_embed_checkpoint = checkpoint_model['pos_embed_x']
 
@@ -127,12 +127,12 @@ def interpolate_pos_embed_x(model, checkpoint_model):
 
         model.pos_embed_x.data.copy_(checkpoint_model['pos_embed_x'])
     else:
-        print("Initializing new position embedding X")
+        print("Initializing new pos_embed_x")
 
 
 def interpolate_decoder_pos_embed_x(model, checkpoint_model):
     if 'decoder_pos_embed_x' in checkpoint_model:
-        print("Loading decoder position embedding X from checkpoint")
+        print("Loading decoder_pos_embed_x from checkpoint")
         # (1, 1+T'_max, D_dec/2)
         pos_embed_checkpoint = checkpoint_model['decoder_pos_embed_x']
 
@@ -168,4 +168,4 @@ def interpolate_decoder_pos_embed_x(model, checkpoint_model):
 
         model.decoder_pos_embed_x.data.copy_(checkpoint_model['decoder_pos_embed_x'])
     else:
-        print("Initializing new decoder position embedding X")
+        print("Initializing new decoder_pos_embed_x")
