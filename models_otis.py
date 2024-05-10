@@ -424,7 +424,7 @@ class OTiS(nn.Module):
         """
         # embed patches
         # (B, D, C', T')
-        x = self.patch_embed(x) # TODO: maybe mask this one as well
+        x = self.patch_embed(x)
 
         # add pos embed X w/o cls token
         # (B, D, C', T')
