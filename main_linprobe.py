@@ -204,12 +204,22 @@ def get_args_parser():
     return parser
 
 def main(args):
-    args.input_size = (args.input_channels, args.input_electrodes, args.time_steps)
-    args.patch_size = (args.patch_height, args.patch_width)
-
     print(f"cuda devices: {torch.cuda.device_count()}")
     misc.init_distributed_mode(args)
     # args.distributed = False
+
+    # wandb logging
+    if args.wandb == True and misc.is_main_process():
+        config = vars(args)
+        if args.wandb_id:
+            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
+        else:
+            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
+
+        args.__dict__ = wandb.config.as_dict()
+
+    args.input_size = (args.input_channels, args.input_electrodes, args.time_steps)
+    args.patch_size = (args.patch_height, args.patch_width)
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
@@ -276,14 +286,6 @@ def main(args):
         log_writer = SummaryWriter(log_dir=args.log_dir + "/eval")
     else:
         log_writer = None
-
-    # wandb logging
-    if args.wandb == True and misc.is_main_process():
-        config = vars(args)
-        if args.wandb_id:
-            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
-        else:
-            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, 
@@ -487,7 +489,8 @@ def main(args):
         test_stats, test_history = evaluate(data_loader_val, model_without_ddp, device, epoch, log_writer=log_writer, args=args)
 
         if eval_criterion == "loss" or eval_criterion == "rmse" or eval_criterion == "mae":
-            if early_stop.evaluate_decreasing_metric(val_metric=test_stats[eval_criterion]):
+            if early_stop.evaluate_decreasing_metric(val_metric=test_stats[eval_criterion]) and misc.is_main_process():
+                print("Early stopping the training")
                 break
             if args.output_dir and test_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
@@ -503,7 +506,8 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=eval_criterion, 
                     mode="decreasing")
         else:
-            if early_stop.evaluate_increasing_metric(val_metric=test_stats[eval_criterion]):
+            if early_stop.evaluate_increasing_metric(val_metric=test_stats[eval_criterion]) and misc.is_main_process():
+                print("Early stopping the training")
                 break
             if args.output_dir and test_stats[eval_criterion] >= min(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
@@ -564,6 +568,7 @@ def main(args):
     if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
         wandb.finish()
+        exit(0)
 
 
 if __name__ == '__main__':
