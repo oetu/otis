@@ -29,6 +29,7 @@ import timm.optim.optim_factory as optim_factory
 from util.dataset import SignalDataset
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
+from util.pos_embed import interpolate_pos_embed_x
 from util.callbacks import EarlyStop
 
 import models_otis
@@ -123,6 +124,14 @@ def get_args_parser():
     parser.add_argument('--max_delta', default=0, type=float,
                         help='Early stopping threshold (val has to be worse than (train+delta)) (default: 0)')
 
+    # * Finetuning params
+    parser.add_argument('--pretrained_encoder', default='',
+                        help='load encoder from checkpoint')
+    parser.add_argument('--freeze_encoder', action='store_true', default=False,
+                        help='make encoder (i.e. the feature extractor) non-trainable, i.e., only train the decoder')
+    parser.add_argument('--ignore_pos_embed_y', action='store_true', default=False,
+                        help='ignore pretrained position embeddings Y (spatial axis)')
+    
     # Dataset parameters
     parser.add_argument('--data_path', default='_.pt', type=str,
                         help='dataset path')
@@ -353,6 +362,107 @@ def main(args):
         include_forecasting_mask=args.include_forecasting_mask,
     )
 
+    new_patch_size = False
+    if args.pretrained_encoder:
+        checkpoint = torch.load(args.pretrained_encoder, map_location='cpu')
+
+        print("Load pretrained encoder from: %s" % args.pretrained_encoder)
+        checkpoint_model = checkpoint['model']
+
+        # check if new and old patch_size match
+        checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
+        if checkpoint_patch_size != args.patch_size:
+            new_patch_size = True
+            # initialize new patch_embed module
+            for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
+                        "patch_embed.norm.weight", "patch_embed.norm.bias"]:
+                if key in checkpoint_model:
+                    print(f"Removing key {key} from pretrained checkpoint")
+                    del checkpoint_model[key]
+            print("Initializing new patch_embed")
+
+            # initialize new decoder_pred module
+            for key in ["decoder_pred.weight", "decoder_pred.bias"]:
+                if key in checkpoint_model:
+                    print(f"Removing key {key} from pretrained checkpoint")
+                    del checkpoint_model[key]
+            print("Initializing new decoder_pred")
+
+        # load pos_embed_x
+        interpolate_pos_embed_x(model, checkpoint_model)
+
+        key = "pos_embed_x"
+        if key in checkpoint_model:
+            print(f"Removing key {key} from pretrained checkpoint")
+            del checkpoint_model[key]
+
+        # load pos_embed_y together with domain_offsets
+        if not args.ignore_pos_embed_y:
+            print("Loading pos_embed_y from checkpoint")
+            model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
+
+            # load domain_offsets
+            dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
+            dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
+
+            if args.online_evaluation:
+                dataset_online_train.set_domain_offsets(checkpoint["domain_offsets"])
+                dataset_online_val.set_domain_offsets(checkpoint["domain_offsets"])
+        else:
+            print("Initializing new pos_embed_y")
+
+        key = "pos_embed_y.weight"
+        if key in checkpoint_model:
+            print(f"Removing key {key} from pretrained checkpoint")
+            del checkpoint_model[key]
+
+        # initialize new decoder
+        print("Initializing new decoder")
+        # initialize new decoder_embed, decoder_pos_embed_x, decoder_pos_embed_y,
+        # decoder_blocks, decoder_norm, decoder_pred
+        for key in list(checkpoint_model.keys()):
+            if "decoder" in key:
+                print(f"Removing key {key} from pretrained checkpoint")
+                del checkpoint_model[key]
+                print(f"Initializing new {key}")
+
+        # initialize new mask_token
+        key = "mask_token"
+        if key in checkpoint_model:
+            print(f"Removing key {key} from pretrained checkpoint")
+            del checkpoint_model[key]
+            print(f"Initializing new {key}")
+
+        # load pretrained model
+        msg = model.load_state_dict(checkpoint_model, strict=False)
+        print(msg)
+
+        assert {'pos_embed_x', 'pos_embed_y.weight'} not in set(msg.missing_keys)
+
+    # partially freeze the model
+    skip_list = []
+    if args.freeze_encoder:
+        # freeze patch_embed
+        for n, p in model.patch_embed.named_parameters():
+            p.requires_grad = False
+            skip_list.append(f"patch_embed.{n}")
+        # freeze encoder
+        for n, p in model.blocks[:].named_parameters():
+            p.requires_grad = False
+            skip_list.append(f"blocks.{n}")
+        # freeze norm
+        for n, p in model.norm.named_parameters():
+            p.requires_grad = False
+            skip_list.append(f"norm.{n}")
+
+    if new_patch_size == True:
+        # unfreeze patch_embed
+        for n, p in model.patch_embed.named_parameters():
+            p.requires_grad = True
+            skip_list = [module for module in skip_list if "patch_embed" not in module]
+    
+    print(skip_list)
+
     if args.compile:
         model = torch.compile(model)
     model.to(device, non_blocking=True)
@@ -424,7 +534,8 @@ def main(args):
                                              val_dataloader=data_loader_online_val, args=args)
         
         if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
-            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]):
+            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+                print("Early stopping the training")
                 break
             if args.output_dir and val_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
@@ -440,7 +551,8 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
-            if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]):
+            if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+                print("Early stopping the training")
                 break
             if args.output_dir and val_stats[eval_criterion] >= min(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
@@ -489,6 +601,7 @@ def main(args):
     if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
         wandb.finish()
+        exit(0)
 
 
 if __name__ == '__main__':
