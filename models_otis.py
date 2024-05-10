@@ -188,6 +188,9 @@ class OTiS(nn.Module):
 
         self.initialize_weights()
 
+    def activate_masked_loss(self):
+        self.masked_patch_loss = True
+
     def _block_forward_wrapper(self, block_obj):
         """
         Modified version of def forward() of class Block() in timm.models.vision_transformer
@@ -293,7 +296,7 @@ class OTiS(nn.Module):
         N, L, D = x.shape  # batch, length, dim
         len_keep = math.ceil(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
-        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.10):
+        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.33):
             if self.include_forecasting_mask:
                 forecasting_ratio = 0.5
             else:
@@ -309,7 +312,7 @@ class OTiS(nn.Module):
             # [C', T']
             noise = torch.arange(0, nb_of_patches, device=x.device).to(torch.float32).repeat(nb_of_channels, 1).unsqueeze(0)
             # [C', T']
-            noise.add(torch.linspace(0, 0.5, steps=nb_of_channels, device=x.device).view(-1, 1))
+            noise.add_(torch.linspace(0, 0.5, steps=nb_of_channels, device=x.device).view(-1, 1))
             # [N, C', T']
             noise = noise.repeat(N, 1, 1)
             # [N, C', T']
@@ -759,7 +762,7 @@ class OTiS(nn.Module):
         """
         # [N, L, p*q*C]
         target = self.patchify(imgs) 
-        
+
         if self.norm_pix_loss:
             # mean over last dim does not require consideration of the attention mask
             mean = target.mean(dim=-1, keepdim=True)
@@ -799,17 +802,17 @@ class OTiS(nn.Module):
             nb_patches = torch.sum(combined_mask, dim=-1)
 
             # [N]
-            loss = torch.sum(loss * mask, dim=-1)[nb_patches > 0]
+            loss = (torch.sum(loss * mask, dim=-1) / nb_patches)[nb_patches > 0]
 
-            # [N, C, H, W]
-            imgs_masked_patches = imgs * combined_mask_input_space
-            imgs_hat_masked_patches = imgs_hat * combined_mask_input_space
+            # # [N, C, H, W]
+            # imgs_masked_patches = imgs * combined_mask_input_space
+            # imgs_hat_masked_patches = imgs_hat * combined_mask_input_space
 
-            # [N]
-            ncc = statistics.ncc(imgs_masked_patches, imgs_hat_masked_patches, combined_mask_input_space, keep_batch=True)[nb_patches > 0]
+            # # [N]
+            # ncc = statistics.ncc(imgs_masked_patches, imgs_hat_masked_patches, combined_mask_input_space, keep_batch=True)[nb_patches > 0]
             
-            # [N]
-            nb_patches = nb_patches[nb_patches > 0]
+            # # [N]
+            # nb_patches = nb_patches[nb_patches > 0]
         else:
             # compute loss on all (masked + visible) patches
             # [N]
@@ -817,24 +820,24 @@ class OTiS(nn.Module):
             nb_patches = torch.sum(attn_mask.flatten(1), dim=-1)
             
             # [N]
-            loss = torch.sum(loss, dim=-1)[nb_patches > 0]
+            loss = (torch.sum(loss, dim=-1) / nb_patches)[nb_patches > 0]
 
-            # [N]
-            ncc = statistics.ncc(imgs, imgs_hat, attn_mask_input_space, keep_batch=True)[nb_patches > 0]
+        # [N]
+        ncc = statistics.ncc(imgs, imgs_hat, attn_mask_input_space, keep_batch=True)[nb_patches > 0]
 
-            # [N]
-            nb_patches = nb_patches[nb_patches > 0]
+        # [N]
+        nb_patches = nb_patches[nb_patches > 0]
 
         if self.domain_weighted_loss:
             # weighted mean
             domain_weights_batch = torch.stack( [self.domain_weights[mod] for mod in domain] ).to(device=imgs.device, non_blocking=True)
             
-            batch_weight = torch.sum( domain_weights_batch ) + 1e-9
-            loss_batch = torch.sum( domain_weights_batch * loss / nb_patches ) / batch_weight
-            ncc_batch = torch.sum( domain_weights_batch * ncc ) / batch_weight
+            batch_weight = torch.sum(domain_weights_batch) + 1e-9
+            loss_batch = torch.sum(domain_weights_batch * loss) / batch_weight
+            ncc_batch = torch.sum(domain_weights_batch * ncc) / batch_weight
         else:
             # mean
-            loss_batch = torch.mean(loss / nb_patches)
+            loss_batch = torch.mean(loss)
             ncc_batch = torch.mean(ncc)
 
         return loss_batch, ncc_batch, imgs_hat
