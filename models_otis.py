@@ -792,9 +792,10 @@ class OTiS(nn.Module):
             # compute loss only on masked patches
             # [N, C, H, W]
             combined_mask = attn_mask.flatten(1) * mask # attention mask combined with the actual mask (visible vs masked tokens)
-            combined_mask_input_space = torch.nn.functional.interpolate(combined_mask.reshape(attn_mask.shape).unsqueeze(1), 
-                                                                        scale_factor=self.patch_size, 
-                                                                        mode="nearest")
+            # combined_mask_input_space = torch.nn.functional.interpolate(combined_mask.reshape(attn_mask.shape).unsqueeze(1), 
+            #                                                             scale_factor=self.patch_size, 
+            #                                                             mode="nearest")
+            
             # [N]
             # number of reconstructed (masked only) patches
             # may also be 0 if time series length < patch size
