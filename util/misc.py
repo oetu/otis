@@ -323,6 +323,7 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
         client_state = {'epoch': epoch}
         model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-%s" % epoch_name, client_state=client_state)
 
+
 def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, test_stats, evaluation_criterion, 
                     mode="increasing", domains:Dict=None, domain_offsets:Dict=None):
     output_dir = Path(args.output_dir)
@@ -366,6 +367,7 @@ def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scale
                               tag=f"checkpoint-{epoch_name}-{evaluation_criterion}-{test_stats[evaluation_criterion]:.4f}.pth", 
                               client_state=client_state)
 
+
 def load_model(args, model_without_ddp, optimizer, loss_scaler):
     if args.resume:
         if args.resume.startswith('https'):
@@ -392,3 +394,25 @@ def all_reduce_mean(x):
         return x_reduce.item()
     else:
         return x
+    
+
+def add_weight_decay_unfrozen_modules(model, weight_decay=1e-5, lr_scale=1.0, skip_list=()):
+    skip_list_new = []
+
+    decay = []
+    no_decay = []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue  # frozen weights
+        if name in skip_list:
+            continue  # skip
+        if len(param.shape) == 1 or name.endswith(".bias"):
+            no_decay.append(param)
+        else:
+            decay.append(param)
+        skip_list_new.append(name)
+
+    skip_list_new = skip_list_new + skip_list
+
+    return [{'params': no_decay, 'weight_decay': 0., "lr_scale": lr_scale},
+            {'params': decay, 'weight_decay': weight_decay, "lr_scale": lr_scale}], skip_list_new

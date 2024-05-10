@@ -31,6 +31,7 @@ import timm.optim.optim_factory as optim_factory
 
 from util.dataset import SignalDataset
 import util.misc as misc
+from util.misc import add_weight_decay_unfrozen_modules
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.pos_embed import interpolate_pos_embed_x, interpolate_decoder_pos_embed_x
 from util.callbacks import EarlyStop
@@ -138,6 +139,8 @@ def get_args_parser():
                         help='Make position embeddings Y (spatial axis) non-trainable')
     parser.add_argument('--freeze_encoder', action='store_true', default=False,
                         help='Make the encoder (i.e. the feature extractor) non-trainable, thus only train the decoder')
+    parser.add_argument('--ignore_decoder', action='store_true', default=False,
+                        help='Ignore the pre-trained decoder weights')
 
     # Dataset parameters
     downstream_tasks = ["forecasting", "imputation"]
@@ -187,11 +190,21 @@ def get_args_parser():
 
 
 def main(args):
-    args.patch_size = (args.patch_height, args.patch_width)
-
     print(f"cuda devices: {torch.cuda.device_count()}")
     misc.init_distributed_mode(args)
     # args.distributed = False
+
+    # wandb logging
+    if args.wandb == True and misc.is_main_process():
+        config = vars(args)
+        if args.wandb_id:
+            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
+        else:
+            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
+
+        args.__dict__ = wandb.config.as_dict()
+
+    args.patch_size = (args.patch_height, args.patch_width)
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
@@ -249,14 +262,6 @@ def main(args):
     else:
         log_writer = None
 
-    # wandb logging
-    if args.wandb == True and misc.is_main_process():
-        config = vars(args)
-        if args.wandb_id:
-            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
-        else:
-            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
-
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, 
         sampler=sampler_train,
@@ -294,29 +299,41 @@ def main(args):
         downstream=args.downstream_task
     )
 
+    new_patch_size = False
     if args.finetune and not args.eval:
         checkpoint = torch.load(args.finetune, map_location='cpu')
 
-        print("Load pre-trained checkpoint from: %s" % args.finetune)
+        print("Load pretrained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
-        state_dict = model.state_dict()
-        # for k in ['head.weight', 'head.bias']:
-        #     if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
-        #         print(f"Removing key {k} from pretrained checkpoint")
-        #         del checkpoint_model[k]
 
-        # load position embedding X
+        # check if new and old patch_size match
+        checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
+        if checkpoint_patch_size != args.patch_size:
+            new_patch_size = True
+            # initialize new patch_embed
+            for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
+                        "patch_embed.norm.weight", "patch_embed.norm.bias"]:
+                if key in checkpoint_model:
+                    print(f"Removing key {key} from pretrained checkpoint")
+                    del checkpoint_model[key]
+            print("Initializing new patch_embed")
+
+            # initialize new decoder_pred
+            for key in ["decoder_pred.weight", "decoder_pred.bias"]:
+                if key in checkpoint_model:
+                    print(f"Removing key {key} from pretrained checkpoint")
+                    del checkpoint_model[key]
+            print("Initializing new decoder_pred")
+
+        # load pos_embed_X
         interpolate_pos_embed_x(model, checkpoint_model)
-
-        # load decoder position embedding X
-        interpolate_decoder_pos_embed_x(model, checkpoint_model)
 
         key = "pos_embed_x"
         if key in checkpoint_model:
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
 
-        # load position embedding Y together with domain offsets
+        # load pos_embed_y together with domain_offsets
         assert len(dataset_train.domains) == 1, "There is more than one domain in the target dataset"
         target_domain = list(dataset_train.domains.keys())[0]
         target_shape = list(dataset_train.domains.values())[0]
@@ -330,36 +347,141 @@ def main(args):
                 break
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
-            print("Loading position embedding Y from checkpoint")
+            print("Loading pos_embed_y from checkpoint")
             model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
 
-            # load domain offsets
+            # load domain_offsets
             dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
             dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
         else:
-            print("Initializing new position embedding Y")
+            print("Initializing new pos_embed_y")
 
         key = "pos_embed_y.weight"
         if key in checkpoint_model:
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
 
-        # load pre-trained model
+        if args.ignore_decoder:
+            # initialize new decoder
+            print("Initializing new decoder")
+
+            # initialize new decoder_embed, decoder_pos_embed_x, decoder_pos_embed_y, 
+            # decoder_blocks, decoder_norm, decoder_pred
+            for key in list(checkpoint_model.keys()):
+                if "decoder" in key:
+                    print(f"Removing key {key} from pretrained checkpoint")
+                    del checkpoint_model[key]
+                    print(f"Initializing new {key}")
+
+            # initialize new mask_token
+            key = "mask_token"
+            if key in checkpoint_model:
+                print(f"Removing key {key} from pretrained checkpoint")
+                del checkpoint_model[key]
+                print(f"Initializing new {key}")
+        else:
+            # load decoder_pos_embed_x
+            interpolate_decoder_pos_embed_x(model, checkpoint_model)
+
+            key = "decoder_pos_embed_x"
+            if key in checkpoint_model:
+                print(f"Removing key {key} from pretrained checkpoint")
+                del checkpoint_model[key]
+
+        # load pretrained model
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
         assert {'pos_embed_x', 'pos_embed_y.weight'} not in set(msg.missing_keys)
 
+    # initially freeze the pre-trained model
+    skip_list = []
+    for _, p in model.named_parameters():
+        p.requires_grad = False
+    
+    # make pos_embed_y trainable
+    for n, p in model.pos_embed_y.named_parameters():
+        p.requires_grad = True
+        skip_list.append(f"pos_embed_y.{n}")
+    
+    # make mask_token trainable
+    model.mask_token.requires_grad = True
+    skip_list.append(f"mask_token")
+
+    # make decoder_norm trainable
+    for n, p in model.decoder_norm.named_parameters():
+        p.requires_grad = True
+        skip_list.append(f"decoder_norm.{n}")
+
+    # make decoder_pred trainable
+    for n, p in model.decoder_pred.named_parameters():
+        p.requires_grad = True
+        skip_list.append(f"decoder_pred.{n}")
+
+    if args.ignore_decoder:
+        # mask_token, decoder_norm, decoder_pred already trainable
+        # train new initialized decoder_embeb
+        for _, p in model.decoder_embed.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"decoder_embed.{n}")
+        # train new initialized decoder_pos_embed_y
+        for _, p in model.decoder_pos_embed_y.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"decoder_pos_embed_y.{n}")
+        # train new initialized decoder
+        for _, p in model.decoder_blocks[:].named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"decoder_blocks.{n}")       
+
+    if args.output_projection == "mlp":
+        # train new initialized mlp
+        for n, p in model.mlp.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"mlp.{n}")
+        # train new intialized mlp_norm
+        for n, p in model.mlp_norm.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"mlp_norm.{n}")
+        # train new intialized mlp_pred
+        for n, p in model.mlp_pred.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"mlp_pred.{n}")
+
     if args.freeze_encoder:
-        for _, p in model.blocks.named_parameters():
+        # freeze patch_embed
+        for n, p in model.patch_embed.named_parameters():
             p.requires_grad = False
+        # freeze encoder
+        for n, p in model.blocks[:].named_parameters():
+            p.requires_grad = False
+        # freeze norm
+        for n, p in model.norm.named_parameters():
+            p.requires_grad = False
+
+    if new_patch_size == True:
+        # mask_token, decoder_norm, decoder_pred already trainable
+        # train new intialized patch_embed
+        for n, p in model.patch_embed.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"patch_embed.{n}")
+        # make norm trainable
+        for n, p in model.norm.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"norm.{n}")
+        # make decoder_embed trainable
+        for n, p in model.decoder_embed.named_parameters():
+            p.requires_grad = True
+            skip_list.append(f"decoder_embed.{n}")
     
     if args.freeze_pos_embed_y:
-        # encoder
-        model.pos_embed_y.weight.requires_grad = False
-        # decoder
-        model.decoder_pos_embed_y.weight.requires_grad = False
-        model.decoder_pos_embed_y.bias.requires_grad = False
+        # freeze pos_embed_y
+        for n, p in model.pos_embed_y.named_parameters():
+            p.requires_grad = False
+        # freeze decoder_pos_embed_y
+        for n, p in model.decoder_pos_embed_y.named_parameters():
+            p.requires_grad = False
+    
+    print(skip_list)
 
     if args.compile:
         model = torch.compile(model)
@@ -436,6 +558,32 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
+        if epoch == args.warmup_epochs*10:
+            n_parameters_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
+
+            print("Unfreezing the decoder")
+            for _, p in model.decoder_embed.named_parameters():
+                p.requires_grad = True
+            for n, p in model.decoder_pos_embed_y.named_parameters():
+                p.requires_grad = True
+            for _, p in model.decoder_blocks[:].named_parameters():
+                p.requires_grad = True
+
+            n_parameters_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
+
+            # adding all (new) parameters to the optimizer except for the ones in skip_list
+            # hence, the ones in skip_list are not updated even though requires_grad=True
+            # following timm: set wd as 0 for bias and norm layers
+            param_groups_new, skip_list = add_weight_decay_unfrozen_modules(model_without_ddp, 
+                                                                            args.weight_decay, 
+                                                                            lr_scale=0.033, 
+                                                                            skip_list=skip_list)
+            for params in param_groups_new:
+                optimizer.add_param_group(params)
+            print(optimizer)
+
         if True: #args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
 
@@ -446,7 +594,8 @@ def main(args):
                                           log_writer=log_writer, args=args)
 
         if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
-            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]):
+            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+                print("Early stopping the training")
                 break
             if args.output_dir and val_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
@@ -462,7 +611,8 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
-            if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]):
+            if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+                print("Early stopping the training")
                 break
             if args.output_dir and val_stats[eval_criterion] >= min(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
@@ -511,6 +661,7 @@ def main(args):
     if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
         wandb.finish()
+        exit(0)
 
 
 if __name__ == '__main__':

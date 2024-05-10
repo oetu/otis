@@ -3,9 +3,9 @@
 
 # Basic parameters
 seed="0"
-num_workers="8"    # number of CPUs
+num_workers="4"    # number of CPUs
 
-path="server"       # [tower, server]
+path="tower"       # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
@@ -17,7 +17,7 @@ batch_size="1"
 accum_iter=(1)
 
 epochs="1000"
-warmup_epochs="10"
+warmup_epochs="50"
 
 # Callback parameters
 patience="-1"
@@ -26,19 +26,22 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="baseDeep_dec128d2b"
+model_size="baseDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
+output_projection="decoder"
+
 # Pretraining specifications
-from_scratch="True"
+from_scratch="False"
 
 ignore_pos_embed_y="False"
 freeze_pos_embed_y="False"
-freeze_encoder="True"
+freeze_encoder="False"
+ignore_decoder="False"
 
 input_channels="1"
 input_electrodes="7"
-time_steps="192"
+time_steps="384" # 384, 192
 
 patch_height="1"
 patch_width=(24)
@@ -50,11 +53,11 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=0.1
+ncc_weight=0.0
 cos_weight=0.0
 
 # Augmentation parameters
-mask_ratio=(0.5)
+mask_ratio=(0.125) # 0.125, 0.25
 
 crop_lower_bnd="1.0"
 crop_upper_bnd="1.0"
@@ -64,7 +67,7 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(1e-4)
+blr_array=(3e-1) # 3e-1, 1e-2
 weight_decay=(0.15)
 
 downstream_task="forecasting"
@@ -88,6 +91,8 @@ if [ "$path" = "tower" ]; then
         data_base="/home/oturgut/data/processed/mimic-ecg-text"
     elif [ "$dataset" = "etth" ]; then
         data_base="/home/oturgut/data/processed/benchmarks/forecasting"
+    elif [ "$dataset" = "ili" ]; then
+        data_base="/home/oturgut/data/processed/benchmarks/forecasting"
     elif  [ "$dataset" = "ticorp" ]; then
         data_base="/home/oturgut/data/processed/TiCorp"
     else 
@@ -100,6 +105,8 @@ else
     elif [ "$dataset" = "mimic" ]; then
         data_base="/vol/aimspace/projects/physionet/mimic/processed/mimic-ecg-text"
     elif [ "$dataset" = "etth" ]; then
+        data_base="/vol/aimspace/users/tuo/data/processed/benchmarks/forecasting"
+    elif [ "$dataset" = "ili" ]; then
         data_base="/vol/aimspace/users/tuo/data/processed/benchmarks/forecasting"
     elif  [ "$dataset" = "ticorp" ]; then
         data_base="/vol/aimspace/users/tuo/data/processed/TiCorp"
@@ -119,6 +126,9 @@ elif [ "$dataset" = "mimic" ]; then
 elif [ "$dataset" = "etth" ]; then
     data_path=$data_base"/data_etth_all.pt"
     val_data_path=$data_base"/data_etth_all.pt"
+elif [ "$dataset" = "ili" ]; then
+    data_path=$data_base"/data_ili_all.pt"
+    val_data_path=$data_base"/data_ili_all.pt"
 elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train.pt"
     val_data_path=$data_base"/val.pt"
@@ -147,7 +157,21 @@ do
             # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data"/checkpoint-60-ncc-0.5985.pth"
 
             # OTiS
-            finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
+            # huge
+            # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec128d2b/p1x24/pre_b1024_blr1e-5/checkpoint-96-ncc-0.8690.pth"
+
+            # large
+            # finetune="/home/oturgut/SiT/output/pre/otis/large/dec128d2b/p1x24/pre_896_blr3e-5/checkpoint-98-ncc-0.8688.pth"
+
+            # base
+            # finetune="/home/oturgut/SiT/output/pre/otis/base/dec128d2b/p1x24/forecasting/pre_b1856_blr3e-5/checkpoint-97-ncc-0.8259.pth"
+            finetune="/home/oturgut/SiT/output/pre/otis/base/dec160d4b/p1x24/pre_b1216_blr3e-5/checkpoint-99-ncc-0.8662.pth"
+            # finetune="/home/oturgut/SiT/output/pre/otis/base/dec128d2b/p1x24/pre_b1792_blr3e-5/checkpoint-92-ncc-0.8690.pth"
+
+            # finetune="/home/oturgut/SiT/output/pre/otis_final/checkpoint-95-ncc-0.7729.pth"
+            # finetune="/home/oturgut/SiT/output/pre/otis_final/checkpoint-96-ncc-0.7561.pth"
+
+            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
             # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
 
             # SiT
@@ -155,11 +179,11 @@ do
             # finetune="/vol/aimspace/users/tuo/SiT/output/pre/refactored/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9455.pth"
         
             if [ "$path" = "tower" ]; then
-                cmd="python3 main_finetune_gen.py --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+                cmd="python3 main_finetune_gen.py --output_projection $output_projection --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             elif [ "$submitit" = "True" ]; then
-                cmd="python3 submitit_finetune_gen.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+                cmd="python3 submitit_finetune_gen.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --output_projection $output_projection --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             else
-                cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune_gen.py --world_size $world_size --dist_eval --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+                cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune_gen.py --world_size $world_size --dist_eval --output_projection $output_projection --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             fi
 
             if [ "$ignore_pos_embed_y" = "True" ]; then
@@ -172,6 +196,10 @@ do
 
             if [ "$freeze_encoder" = "True" ]; then
                 cmd=$cmd" --freeze_encoder"
+            fi
+
+            if [ "$ignore_decoder" = "True" ]; then
+                cmd=$cmd" --ignore_decoder"
             fi
             
             if [ "$from_scratch" = "False" ]; then
