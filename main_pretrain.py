@@ -460,6 +460,10 @@ def main(args):
         for n, p in model.patch_embed.named_parameters():
             p.requires_grad = True
             skip_list = [module for module in skip_list if "patch_embed" not in module]
+        # unfreeze norm
+        for n, p in model.norm.named_parameters():
+            p.requires_grad = True
+            skip_list = [module for module in skip_list if module not in ["norm.weight", "norm.bias"]]
     
     print(skip_list)
 
