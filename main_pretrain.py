@@ -133,6 +133,10 @@ def get_args_parser():
                         help='ignore pretrained position embeddings Y (spatial axis)')
     
     # Dataset parameters
+    eval_criterions = ['total_loss', 'loss', 'ncc', 'cos_sim', 'mse', 'mae']
+    parser.add_argument('--eval_criterion', default='ncc', type=str, choices=eval_criterions,
+                        help='pretraining evaluation metric (default: ncc)')
+    
     parser.add_argument('--data_path', default='_.pt', type=str,
                         help='dataset path')
     parser.add_argument('--val_data_path', default='', type=str,
@@ -437,7 +441,7 @@ def main(args):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-        assert {'pos_embed_x', 'pos_embed_y.weight'} not in set(msg.missing_keys)
+        assert {'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
 
     # partially freeze the model
     skip_list = []
@@ -508,11 +512,9 @@ def main(args):
     early_stop = EarlyStop(patience=args.patience, max_delta=args.max_delta)
 
     print(f"Start training for {args.epochs} epochs")
-
-    eval_criterion = "ncc"
     
     best_stats = {'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
-    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[eval_criterion]]}
+    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
@@ -537,39 +539,39 @@ def main(args):
                                              train_dataloader=data_loader_online_train, 
                                              val_dataloader=data_loader_online_val, args=args)
         
-        if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
-            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+        if args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
+            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
-            if args.output_dir and val_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
+            if args.output_dir and val_stats[args.eval_criterion] <= max(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'])
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(val_stats[eval_criterion])
+                best_eval_scores['eval_criterion'].append(val_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=args.eval_criterion, 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
-            if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+            if early_stop.evaluate_increasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
-            if args.output_dir and val_stats[eval_criterion] >= min(best_eval_scores['eval_criterion']):
+            if args.output_dir and val_stats[args.eval_criterion] >= min(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'], reverse=True)
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(val_stats[eval_criterion])
+                best_eval_scores['eval_criterion'].append(val_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=args.eval_criterion, 
                     mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         
         best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
@@ -579,9 +581,10 @@ def main(args):
         best_stats['mse'] = min(best_stats['mse'], val_stats['mse'])
         best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
 
-        print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / Mean Absolute Error (MAE)",
-              f"of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / {val_stats['loss']:.4f} / ", 
-              f"{val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / {val_stats['mae']:.2f}")
+        print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / ",
+              f"Mean Absolute Error (MAE) of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / ",
+              f"{val_stats['loss']:.4f} / {val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / ",
+              f"{val_stats['mae']:.2f}")
 
         print(f"Min Total Loss / Min Loss / Max NCC / Max Cosine Similarity / Min MSE / Min MAE: ",
               f"{best_stats['total_loss']:.4f} / {best_stats['loss']:.4f} / {best_stats['ncc']:.2f} / ", 
