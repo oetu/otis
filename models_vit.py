@@ -249,22 +249,24 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
             q = x[:, 1:, :].mean(dim=1, keepdim=True)
             k = x[:, 1:, :]
             v = x[:, 1:, :]
+            # (B, 1, D)
             x, x_weights = self.attention_pool(q, k, v) # attention pool without cls token
-            outcome = self.fc_norm(x.squeeze(dim=1))
+            # (B, D)
+            outcome = x.squeeze(dim=1)
         elif self.pool == "global_pool":
-            x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
-            outcome = self.fc_norm(x)
+            # (B, D)
+            outcome = x[:, 1:, :].mean(dim=1)  # global pool without cls token
         else: # cls token
+            # (B, 1+N, D)
             x = self.norm(x)
+            # (B, D)
             outcome = x[:, 0]
 
         return outcome
 
     def forward_head(self, x, pre_logits: bool = False):
-        if self.global_pool:
-            x = x[:, self.num_prefix_tokens:].mean(dim=1) if self.global_pool == 'avg' else x[:, :]
         x = self.fc_norm(x)
-        
+
         return x if pre_logits else self.head(x)
     
     def forward(self, x, pos_embed_y):
