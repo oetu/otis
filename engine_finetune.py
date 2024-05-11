@@ -17,7 +17,8 @@ from typing import Iterable, Optional
 
 import torch
 
-from sklearn.metrics import roc_auc_score, f1_score, accuracy_score, average_precision_score
+from sklearn.metrics import f1_score, accuracy_score, balanced_accuracy_score
+from sklearn.metrics import roc_auc_score, average_precision_score, precision_score, recall_score
 from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
 from sklearn.feature_selection import r_regression
 
@@ -118,14 +119,20 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     
     training_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
-        labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)                 # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), pos_label=1)
+        labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)             # (B, num_classes)
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
-        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs)
-        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, pos_label=1)
+        acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
+        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")
+        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="weighted")
 
         training_stats["f1"] = f1
+        training_stats["precision"] = precision
+        training_stats["recall"] = recall
         training_stats["acc"] = acc
+        training_stats["acc_balanced"] = acc_balanced
         training_stats["auroc"] = auc
         training_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
@@ -152,7 +159,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         if args.downstream_task == 'classification':
             log_writer.add_scalar('perf/train_f1', f1, epoch)
+            log_writer.add_scalar('perf/train_precision', precision, epoch)
+            log_writer.add_scalar('perf/train_recall', recall, epoch)
             log_writer.add_scalar('perf/train_acc', acc, epoch)
+            log_writer.add_scalar('perf/train_acc_balanced', acc_balanced, epoch)
             log_writer.add_scalar('perf/train_auroc', auc, epoch)
             log_writer.add_scalar('perf/train_auprc', auprc, epoch)
         elif args.downstream_task == 'regression':
@@ -168,7 +178,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         training_history['lr'] = training_stats["lr"]
         if args.downstream_task == 'classification':
             training_history['f1'] = f1
+            training_history['precision'] = precision
+            training_history['recall'] = recall
             training_history['acc'] = acc
+            training_history['acc_balanced'] = acc_balanced
             training_history['auroc'] = auc
             training_history['auprc'] = auprc
         elif args.downstream_task == 'regression':
@@ -270,13 +283,19 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
     test_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
         labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)                 # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), pos_label=1)
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
-        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs)
-        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, pos_label=1)
+        acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
+        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")
+        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="weighted")
         
         test_stats["f1"] = f1
+        test_stats["precision"] = precision
+        test_stats["recall"] = recall
         test_stats["acc"] = acc
+        test_stats["acc_balanced"] = acc_balanced
         test_stats["auroc"] = auc
         test_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
@@ -293,8 +312,10 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_stats["r2"] = r2.mean(axis=-1)
 
     if args.downstream_task == 'classification':
-        print('* Acc@1 {top1_acc:.3f} F1 {f1:.3f} AUROC {auroc:.3f} AUPRC {auprc:.3f} loss {losses:.3f}'
-            .format(top1_acc=acc, f1=f1, auroc=auc, auprc=auprc, losses=test_stats["loss"]))
+        print('* Acc@1 {top1_acc:.2f} Acc@1 (balanced) {acc_balanced:.2f} Precision {precision:.2f} Recall {recall:.2f} F1 {f1:.2f} \
+               AUROC {auroc:.2f} AUPRC {auprc:.2f} loss {losses:.3f}'
+              .format(top1_acc=acc, acc_balanced=acc_balanced, precision=precision, recall=recall, f1=f1, auroc=auc, auprc=auprc, 
+                      losses=test_stats["loss"]))
     elif args.downstream_task == 'regression':
         print('* RMSE {rmse:.3f} MAE {mae:.3f} PCC {pcc:.3f} R2 {r2:.3f} loss {losses:.3f}'
             .format(rmse=test_stats["rmse"], mae=test_stats["mae"], pcc=test_stats["pcc"], r2=test_stats["r2"], losses=test_stats["loss"]))
@@ -303,7 +324,10 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
     if log_writer is not None:
         if args.downstream_task == 'classification':
             log_writer.add_scalar('perf/test_f1', f1, epoch)
+            log_writer.add_scalar('perf/test_precision', precision, epoch)
+            log_writer.add_scalar('perf/test_recall', recall, epoch)
             log_writer.add_scalar('perf/test_acc', acc, epoch)
+            log_writer.add_scalar('perf/test_acc_balanced', acc_balanced, epoch)
             log_writer.add_scalar('perf/test_auroc', auc, epoch)
             log_writer.add_scalar('perf/test_auprc', auprc, epoch)
         elif args.downstream_task == 'regression':
@@ -318,7 +342,10 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_history = {'epoch' : epoch, 'test_loss' : test_stats['loss']}
         if args.downstream_task == 'classification':
             test_history['test_f1'] = f1
+            test_history['test_precision'] = precision
+            test_history['test_recall'] = recall
             test_history['test_acc'] = acc
+            test_history['test_acc_balanced'] = acc_balanced
             test_history['test_auroc'] = auc
             test_history['test_auprc'] = auprc
         elif args.downstream_task == 'regression':

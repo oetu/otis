@@ -27,7 +27,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-from sklearn.metrics import roc_auc_score, f1_score, accuracy_score, average_precision_score
+from sklearn.metrics import f1_score, accuracy_score, balanced_accuracy_score
+from sklearn.metrics import roc_auc_score, average_precision_score, precision_score, recall_score
 from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
 
 from sklearn.feature_selection import r_regression
@@ -282,10 +283,13 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
     
     if args.online_evaluation_task == "classification":
         train_probs = torch.tensor(estimator.predict_proba(train_embeddings), dtype=torch.float16)
-        classifier_f1_train = f1_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), pos_label=1)
+        classifier_f1_train = f1_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="weighted")
+        classifier_precision_train = precision_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="weighted")
+        classifier_recall_train = recall_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="weighted")
         classifier_acc_train = accuracy_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1))
-        classifier_auc_train = roc_auc_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=-1), y_score=train_probs)
-        classifier_auprc_train = average_precision_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=-1), y_score=train_probs, pos_label=1)
+        classifier_acc_balanced_train = balanced_accuracy_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1))
+        classifier_auc_train = roc_auc_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=-1), y_score=train_probs, average="weighted")
+        classifier_auprc_train = average_precision_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=-1), y_score=train_probs, average="weighted")
     elif args.online_evaluation_task == "regression":
         train_preds = torch.tensor(estimator.predict(train_embeddings), dtype=torch.float16)
         classifier_rmse_train = np.float64(root_mean_squared_error(train_preds, train_labels, multioutput="raw_values"))
@@ -312,10 +316,13 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
     
     if args.online_evaluation_task == "classification":
         val_probs = torch.tensor(estimator.predict_proba(val_embeddings), dtype=torch.float16)
-        classifier_f1_val = f1_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), pos_label=1)
+        classifier_f1_val = f1_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="weighted")
+        classifier_precision_val = precision_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="weighted")
+        classifier_recall_val = recall_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="weighted")
         classifier_acc_val = accuracy_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1))
-        classifier_auc_val = roc_auc_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=-1), y_score=val_probs)
-        classifier_auprc_val = average_precision_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=-1), y_score=val_probs, pos_label=1)
+        classifier_acc_balanced_val = balanced_accuracy_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1))
+        classifier_auc_val = roc_auc_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=-1), y_score=val_probs, average="weighted")
+        classifier_auprc_val = average_precision_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=-1), y_score=val_probs, average="weighted")
     elif args.online_evaluation_task == "regression":
         val_preds = torch.tensor(estimator.predict(val_embeddings), dtype=torch.float16)
         classifier_rmse_val = np.float64(root_mean_squared_error(val_preds, val_labels, multioutput="raw_values"))
@@ -326,12 +333,18 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
     # stats
     if args.online_evaluation_task == "classification":
         online_history['online/train_f1'] = classifier_f1_train
+        online_history['online/train_precision'] = classifier_precision_train
+        online_history['online/train_recall'] = classifier_recall_train
         online_history['online/train_acc'] = classifier_acc_train
+        online_history['online/train_acc_balanced'] = classifier_acc_balanced_train
         online_history['online/train_auc'] = classifier_auc_train
         online_history['online/train_auprc'] = classifier_auprc_train
 
         online_history['online/val_f1'] = classifier_f1_val
+        online_history['online/val_precision'] = classifier_precision_val
+        online_history['online/val_recall'] = classifier_recall_val
         online_history['online/val_acc'] = classifier_acc_val
+        online_history['online/val_acc_balanced'] = classifier_acc_balanced_val
         online_history['online/val_auc'] = classifier_auc_val
         online_history['online/val_auprc'] = classifier_auprc_val
     elif args.online_evaluation_task == "regression":

@@ -170,7 +170,10 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
                         help='downstream task (default: classification)')
-
+    eval_criterions = ["loss", "acc", "acc_balanced", "precision", "recall", "f1", "auroc", "auprc", "rmse", "mae", "pcc", "r2"]
+    parser.add_argument('--eval_criterion', default='auroc', type=str, choices=eval_criterions,
+                        help='downstream task evaluation metric (default: auroc)')
+    
     parser.add_argument('--data_path', default='', type=str,
                         help='dataset path (default: None)')
     parser.add_argument('--labels_path', default='', type=str,
@@ -200,7 +203,9 @@ def get_args_parser():
     parser.add_argument('--log_dir', default='',
                         help='path where to tensorboard log (default: ./logs)')
     parser.add_argument('--wandb', action='store_true', default=False)
-    parser.add_argument('--wandb_project', default='',
+    parser.add_argument('--wandb_entity', default='', type=str,
+                        help='entity of the current run')
+    parser.add_argument('--wandb_project', default='', type=str,
                         help='project where to wandb log')
     parser.add_argument('--wandb_id', default='', type=str,
                         help='id of the current run')
@@ -247,9 +252,9 @@ def main(args):
     if args.wandb == True and misc.is_main_process():
         config = vars(args)
         if args.wandb_id:
-            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
+            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity=args.wandb_entity)
         else:
-            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
+            wandb.init(project=args.wandb_project, config=config, entity=args.wandb_entity)
 
         args.__dict__ = wandb.config.as_dict()
 
@@ -284,7 +289,7 @@ def main(args):
                                 args=args)
 
     # train balanced
-    class_weights = 2.0 / (2.0 * torch.Tensor([1.0, 1.0])) # total_nb_samples / (nb_classes * samples_per_class)
+    # class_weights = 2.0 / (2.0 * torch.Tensor([1.0, 1.0])) # total_nb_samples / (nb_classes * samples_per_class)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
@@ -370,7 +375,7 @@ def main(args):
     if args.finetune and not args.eval:
         checkpoint = torch.load(args.finetune, map_location='cpu')
 
-        print("Load pre-trained checkpoint from: %s" % args.finetune)
+        print("Load pretrained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
         for k in ['head.weight', 'head.bias']:
@@ -378,7 +383,7 @@ def main(args):
                 print(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
 
-        # load position embedding X
+        # load pos_embed_x
         interpolate_pos_embed_x(model, checkpoint_model)
 
         key = "pos_embed_x"
@@ -386,7 +391,7 @@ def main(args):
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
 
-        # load position embedding Y together with domain offsets
+        # load pos_embed_y together with domain_offsets
         assert len(dataset_train.domains) == 1, "There is more than one domain in the target dataset"
         target_domain = list(dataset_train.domains.keys())[0]
         target_shape = list(dataset_train.domains.values())[0]
@@ -400,21 +405,21 @@ def main(args):
                 break
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
-            print("Loading position embedding Y from checkpoint")
+            print("Loading pos_embed_y from checkpoint")
             model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
 
-            # load domain offsets
+            # load domain_offsets
             dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
             dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
         else:
-            print("Initializing new position embedding Y")
+            print("Initializing new pos_embed_y")
 
         key = "pos_embed_y.weight"
         if key in checkpoint_model:
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
 
-        # load pre-trained model
+        # load pretrained model
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
@@ -422,7 +427,8 @@ def main(args):
             assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias', 
                                              'pos_embed_x', 'pos_embed_y.weight'}
         elif args.attention_pool:
-            pass
+            assert {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias', 
+                    'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
         else:
             assert set(msg.missing_keys) == {'head.weight', 'head.bias', 
                                              'pos_embed_x', 'pos_embed_y.weight'}
@@ -432,6 +438,21 @@ def main(args):
 
     if args.freeze_pos_embed_y:
         model.pos_embed_y.weight.requires_grad = False
+    
+    if args.eval:
+        sub_strings = args.resume.split("/")
+        if "checkpoint" in sub_strings[-1]:
+            nb_ckpts = 1
+        else:
+            nb_ckpts = int(sub_strings[-1])+1
+
+        if "checkpoint" not in sub_strings[-1]:
+            args.resume = "/".join(sub_strings[:-1]) + "/checkpoint-" + str(0) + ".pth"
+
+        # load pos_embed_x from checkpoint
+        checkpoint = torch.load(args.resume, map_location='cpu')
+        checkpoint_model = checkpoint['model']
+        interpolate_pos_embed_x(model, checkpoint_model)
     
     model.to(device, non_blocking=True)
 
@@ -463,7 +484,7 @@ def main(args):
     print(optimizer)
     loss_scaler = NativeScaler()
 
-    class_weights = class_weights.to(device=device, non_blocking=True)
+    # class_weights = class_weights.to(device=device, non_blocking=True)
     if args.downstream_task == 'regression':
         criterion = torch.nn.MSELoss()
     elif mixup_fn is not None:
@@ -471,9 +492,11 @@ def main(args):
         criterion = SoftTargetCrossEntropy()
     elif args.smoothing > 0.:
         # criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
-        criterion = torch.nn.CrossEntropyLoss(weight=class_weights, label_smoothing=args.smoothing) 
+        # criterion = torch.nn.CrossEntropyLoss(weight=class_weights, label_smoothing=args.smoothing)
+        criterion = torch.nn.CrossEntropyLoss(label_smoothing=args.smoothing)
     else:
-        criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+        # criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+        criterion = torch.nn.CrossEntropyLoss()
 
     print("criterion = %s" % str(criterion))
 
@@ -495,11 +518,12 @@ def main(args):
 
             test_stats, test_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
             if args.downstream_task == 'classification':
-                print(f"Accuracy / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: {test_stats['acc']:.2f}% /"
+                print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
+                      f"{test_stats['acc']:.2f}% / {test_stats['acc_balanced']:.2f}% / {test_stats['precision']:.2f}% / {test_stats['recall']:.2f}% / ",
                       f"{test_stats['f1']:.2f}% / {test_stats['auroc']:.2f}% / {test_stats['auprc']:.2f}%")
             elif args.downstream_task == 'regression':
-                print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2)",
-                      f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} /",
+                print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2) ",
+                      f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} / ",
                       f"{test_stats['pcc']:.4f} / {test_stats['r2']:.4f}")
         
             if args.wandb and misc.is_main_process():
@@ -511,14 +535,10 @@ def main(args):
     early_stop = EarlyStop(patience=args.patience, max_delta=args.max_delta)
     
     print(f"Start training for {args.epochs} epochs")
-
-    if args.downstream_task == 'classification':
-        eval_criterion = "auroc"
-    elif args.downstream_task == 'regression':
-        eval_criterion = "pcc"
     
-    best_stats = {'loss':np.inf, 'acc':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
-    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[eval_criterion]]}
+    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 
+                  'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
+    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
@@ -530,39 +550,39 @@ def main(args):
 
         test_stats, test_history = evaluate(data_loader_val, model_without_ddp, device, epoch, log_writer=log_writer, args=args)
 
-        if eval_criterion == "loss" or eval_criterion == "rmse" or eval_criterion == "mae":
-            if early_stop.evaluate_decreasing_metric(val_metric=test_stats[eval_criterion]) and misc.is_main_process():
+        if args.eval_criterion in ["loss", "rmse", "mae"]:
+            if early_stop.evaluate_decreasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
-            if args.output_dir and test_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
+            if args.output_dir and test_stats[args.eval_criterion] <= max(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'])
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(test_stats[eval_criterion])
+                best_eval_scores['eval_criterion'].append(test_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
                     mode="decreasing")
         else:
-            if early_stop.evaluate_increasing_metric(val_metric=test_stats[eval_criterion]) and misc.is_main_process():
+            if early_stop.evaluate_increasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
-            if args.output_dir and test_stats[eval_criterion] >= min(best_eval_scores['eval_criterion']):
+            if args.output_dir and test_stats[args.eval_criterion] >= min(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'], reverse=True)
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(test_stats[eval_criterion])
+                best_eval_scores['eval_criterion'].append(test_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
                     mode="increasing")
 
         best_stats['loss'] = min(best_stats['loss'], test_stats['loss'])
@@ -570,13 +590,18 @@ def main(args):
         if args.downstream_task == 'classification':
             # update best stats
             best_stats['f1'] = max(best_stats['f1'], test_stats['f1'])
+            best_stats['precision'] = max(best_stats['precision'], test_stats['precision'])
+            best_stats['recall'] = max(best_stats['recall'], test_stats['recall'])
             best_stats['acc'] = max(best_stats['acc'], test_stats["acc"])
+            best_stats['acc_balanced'] = max(best_stats['acc_balanced'], test_stats["acc_balanced"])
             best_stats['auroc'] = max(best_stats['auroc'], test_stats['auroc'])
             best_stats['auprc'] = max(best_stats['auprc'], test_stats['auprc'])
 
-            print(f"Accuracy / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: {test_stats['acc']:.1f}% /",
-                  f"{test_stats['f1']:.1f}% / {test_stats['auroc']:.1f}% / {test_stats['auprc']:.1f}%")
-            print(f'Max Accuracy / F1 / AUROC / AUPRC: {best_stats["acc"]:.2f}% / {best_stats["f1"]:.2f}% /',
+            print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
+                  f"{test_stats['acc']:.2f}% / {test_stats['acc_balanced']:.2f}% / {test_stats['precision']:.2f}% / {test_stats['recall']:.2f}% / ",
+                  f"{test_stats['f1']:.2f}% / {test_stats['auroc']:.2f}% / {test_stats['auprc']:.2f}%")
+            print(f'Max Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC: {best_stats["acc"]:.2f}% / ',
+                  f'{best_stats["acc_balanced"]:.2f}% / {best_stats["precision"]:.2f}% / {best_stats["recall"]:.2f}% / {best_stats["f1"]:.2f}% / ',
                   f'{best_stats["auroc"]:.2f}% / {best_stats["auprc"]:.2f}%\n')
 
         elif args.downstream_task == 'regression':
@@ -586,10 +611,10 @@ def main(args):
             best_stats['pcc'] = max(best_stats['pcc'], test_stats['pcc'])
             best_stats['r2'] = max(best_stats['r2'], test_stats['r2'])
 
-            print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2)",
-                  f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} /",
+            print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2) ",
+                  f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} / ",
                   f"{test_stats['pcc']:.4f} / {test_stats['r2']:.4f}")
-            print(f'Min Root Mean Squared Error (RMSE) / Min Mean Absolute Error (MAE) / Max Pearson Correlation Coefficient (PCC) /',
+            print(f'Min Root Mean Squared Error (RMSE) / Min Mean Absolute Error (MAE) / Max Pearson Correlation Coefficient (PCC) / ',
                   f'Max R Squared (R2): {best_stats["rmse"]:.4f} / {best_stats["mae"]:.4f} / {best_stats["pcc"]:.4f} / {best_stats["r2"]:.4f}\n')
         
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 

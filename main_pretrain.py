@@ -173,7 +173,9 @@ def get_args_parser():
     parser.add_argument('--log_dir', default='',
                         help='path where to tensorboard log (default: ./logs)')
     parser.add_argument('--wandb', action='store_true', default=False)
-    parser.add_argument('--wandb_project', default='',
+    parser.add_argument('--wandb_entity', default='', type=str,
+                        help='entity of the current run')
+    parser.add_argument('--wandb_project', default='', type=str,
                         help='project where to wandb log')
     parser.add_argument('--wandb_id', default='', type=str,
                         help='id of the current run')
@@ -265,9 +267,9 @@ def main(args):
     if args.wandb == True and misc.is_main_process():
         config = vars(args)
         if args.wandb_id:
-            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
+            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity=args.wandb_entity)
         else:
-            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
+            wandb.init(project=args.wandb_project, config=config, entity=args.wandb_entity)
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train, 
