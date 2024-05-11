@@ -59,7 +59,7 @@ drop_path=(0.1)
 layer_decay=(0.25)
 
 # Optimizer parameters
-blr=(3e-3) # 3e-5 if from scratch
+blr=(3e-1) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -107,7 +107,7 @@ fi
 data_path=$data_base"/train.pt"
 labels_path=$data_base"/train_labels.pt"
 downstream_task="classification"
-eval_criterion="loss"
+eval_criterion="avg"
 
 # Validation unbalanced
 val_data_path=$data_base"/val.pt"
@@ -120,11 +120,9 @@ save_embeddings="False"
 save_logits="False"
 
 # EVALUATE
-eval="False"
 # As filename: State the checkpoint for the inference of a specific model
 # or state the (final) epoch for the inference of all models up to this epoch
-# eval_ckpt="checkpoint-253-auroc-100.0000.pth"
-# eval_ckpt="checkpoint-52-loss-0.2246.pth"
+# eval_ckpt="checkpoint-253-avg-100.0000.pth"
 # blr=(3e-3)
 # val_data_path=$data_base"/test.pt"
 # val_labels_path=$data_base"/test_labels.pt"
@@ -150,7 +148,7 @@ do
                             if [ "$global_pool" = "True" ]; then
                                 subfolder=$subfolder"/gap"
                             elif [ "$attention_pool" = "True" ]; then
-                                subfolder=$subfolder"/attn"
+                                subfolder=$subfolder"/ap"
                             else
                                 subfolder=$subfolder"/cls"
                             fi
@@ -239,7 +237,7 @@ do
                                 cmd=$cmd" --save_logits"
                             fi
 
-                            if [ "$eval" = "True" ]; then
+                            if [ ! -z "$eval_ckpt" ]; then
                                 cmd=$cmd" --eval --resume $output_dir"/"$eval_ckpt"
                             fi
 

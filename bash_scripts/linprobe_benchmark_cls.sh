@@ -56,7 +56,7 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
 # Optimizer parameters
-blr=(3e-1)
+blr=(1e2)
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -104,7 +104,7 @@ fi
 data_path=$data_base"/train.pt"
 labels_path=$data_base"/train_labels.pt"
 downstream_task="classification"
-eval_criterion="auroc"
+eval_criterion="avg"
 
 # Validation unbalanced
 val_data_path=$data_base"/val.pt"
@@ -117,13 +117,12 @@ save_embeddings="False"
 save_logits="False"
 
 # EVALUATE
-eval="False"
 # As filename: State the checkpoint for the inference of a specific model
 # or state the (final) epoch for the inference of all models up to this epoch
-# eval_ckpt="checkpoint-354-auroc-96.0000.pth"
-# blr=(1e-1)
-# val_data_path=$data_base"/test.pt"
-# val_labels_path=$data_base"/test_labels.pt"
+eval_ckpt="checkpoint-314-avg-90.3914.pth"
+blr=(3e1)
+val_data_path=$data_base"/test.pt"
+val_labels_path=$data_base"/test_labels.pt"
 
 for sd in "${seed[@]}"
 do
@@ -139,6 +138,13 @@ do
                     do
 
                         subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$wd)
+                        if [ "$global_pool" = "True" ]; then
+                            subfolder=$subfolder"/gap"
+                        elif [ "$attention_pool" = "True" ]; then
+                            subfolder=$subfolder"/ap"
+                        else
+                            subfolder=$subfolder"/cls"
+                        fi
 
                         # OTiS
                         finetune="/home/oturgut/SiT/output/pre/otis/base/dec160d4b/p1x24/pre_b1216_blr3e-5/checkpoint-99-ncc-0.8662.pth"
@@ -224,7 +230,7 @@ do
                             cmd=$cmd" --save_logits"
                         fi
 
-                        if [ "$eval" = "True" ]; then
+                        if [ ! -z "$eval_ckpt" ]; then
                             cmd=$cmd" --eval --resume $output_dir"/"$eval_ckpt"
                         fi
 
