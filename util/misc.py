@@ -334,7 +334,7 @@ def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scale
     file_names = [file for file in file_names if os.path.isfile(os.path.join(args.output_dir, file))]
     # ignore exceptions from list
     exceptions = ["log.txt"]
-    file_names = [file for file in file_names if file not in exceptions]
+    file_names = [file for file in file_names if file not in exceptions and evaluation_criterion in file]
 
     # save the 5 best performing models
     if len(file_names) >= 5 and is_main_process():
