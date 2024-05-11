@@ -312,13 +312,11 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_stats["r2"] = r2.mean(axis=-1)
 
     if args.downstream_task == 'classification':
-        print('* Acc@1 {top1_acc:.2f} Acc@1 (balanced) {acc_balanced:.2f} Precision {precision:.2f} Recall {recall:.2f} F1 {f1:.2f} \
-               AUROC {auroc:.2f} AUPRC {auprc:.2f} loss {losses:.3f}'
-              .format(top1_acc=acc, acc_balanced=acc_balanced, precision=precision, recall=recall, f1=f1, auroc=auc, auprc=auprc, 
-                      losses=test_stats["loss"]))
+        print('* Acc@1 {top1_acc:.2f} Acc@1 (balanced) {acc_balanced:.2f} Precision {precision:.2f} Recall {recall:.2f} F1 {f1:.2f} AUROC {auroc:.2f} AUPRC {auprc:.2f} loss {losses:.3f}'
+              .format(top1_acc=acc, acc_balanced=acc_balanced, precision=precision, recall=recall, f1=f1, auroc=auc, auprc=auprc, losses=test_stats["loss"]))
     elif args.downstream_task == 'regression':
         print('* RMSE {rmse:.3f} MAE {mae:.3f} PCC {pcc:.3f} R2 {r2:.3f} loss {losses:.3f}'
-            .format(rmse=test_stats["rmse"], mae=test_stats["mae"], pcc=test_stats["pcc"], r2=test_stats["r2"], losses=test_stats["loss"]))
+              .format(rmse=test_stats["rmse"], mae=test_stats["mae"], pcc=test_stats["pcc"], r2=test_stats["r2"], losses=test_stats["loss"]))
 
     # tensorboard
     if log_writer is not None:

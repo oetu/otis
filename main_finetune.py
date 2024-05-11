@@ -170,7 +170,7 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
                         help='downstream task (default: classification)')
-    eval_criterions = ["loss", "acc", "acc_balanced", "precision", "recall", "f1", "auroc", "auprc", "rmse", "mae", "pcc", "r2"]
+    eval_criterions = ["loss", "acc", "acc_balanced", "precision", "recall", "f1", "auroc", "auprc", "avg", "rmse", "mae", "pcc", "r2"]
     parser.add_argument('--eval_criterion', default='auroc', type=str, choices=eval_criterions,
                         help='downstream task evaluation metric (default: auroc)')
     
@@ -536,7 +536,7 @@ def main(args):
     
     print(f"Start training for {args.epochs} epochs")
     
-    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 
+    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 'avg':0.0,
                   'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
     best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
@@ -568,6 +568,9 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
                     mode="decreasing")
         else:
+            if args.eval_criterion == 'avg':
+                test_stats['avg'] = (test_stats['acc'] + test_stats['precision'] + test_stats['recall'] + test_stats['f1']) / 4
+            
             if early_stop.evaluate_increasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
