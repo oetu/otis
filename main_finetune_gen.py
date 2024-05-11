@@ -392,7 +392,7 @@ def main(args):
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
-        assert {'pos_embed_x', 'pos_embed_y.weight'} not in set(msg.missing_keys)
+        assert {'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
 
     # initially freeze the pre-trained model
     skip_list = []
