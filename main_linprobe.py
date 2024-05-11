@@ -135,7 +135,7 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
                         help='downstream task (default: classification)')
-    eval_criterions = ["loss", "acc", "acc_balanced", "precision", "recall", "f1", "auroc", "auprc", "rmse", "mae", "pcc", "r2"]
+    eval_criterions = ["loss", "acc", "acc_balanced", "precision", "recall", "f1", "auroc", "auprc", "avg", "rmse", "mae", "pcc", "r2"]
     parser.add_argument('--eval_criterion', default='auroc', type=str, choices=eval_criterions,
                         help='downstream task evaluation metric (default: auroc)')
 
@@ -397,15 +397,22 @@ def main(args):
     # freeze all but the head
     for _, p in model.named_parameters():
         p.requires_grad = False
-    for _, p in model.head.named_parameters():
+    for n, p in model.head.named_parameters():
+        print(f"Unfreeze head.{n}")
         p.requires_grad = True
     
+    if not args.freeze_pos_embed_y:
+        print(f"Unfreeze pos_embed_y")
+        model.pos_embed_y.weight.requires_grad = True
+    
     if args.attention_pool:
-        for _, p in model.attention_pool.named_parameters():
+        for n, p in model.attention_pool.named_parameters():
+            print(f"Unfreeze attention_pool.{n}")
             p.requires_grad = True
 
-    if not args.freeze_pos_embed_y:
-        model.pos_embed_y.weight.requires_grad = True
+    if not args.attention_pool and not args.global_pool:
+        print(f"Unfreeze cls_token")
+        model.cls_token.requires_grad = True
     
     if args.eval:
         sub_strings = args.resume.split("/")
@@ -445,7 +452,19 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
 
-    optimizer = LARS(model_without_ddp.head.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    # Train head 
+    model_parameters = [ {'params': model_without_ddp.head.parameters()} ]
+    if not args.freeze_pos_embed_y:
+        # train pos_embed_y
+        model_parameters.append( {'params': model_without_ddp.pos_embed_y.parameters()} )
+    if args.attention_pool:
+        # train attention_pool
+        model_parameters.append( {'params': model_without_ddp.attention_pool.parameters()} )
+    if not args.attention_pool and not args.global_pool:
+        # train cls_token
+        model_parameters.append( {'params': model_without_ddp.cls_token} )
+
+    optimizer = LARS(model_parameters, lr=args.lr, weight_decay=args.weight_decay)
     print(optimizer)
     loss_scaler = NativeScaler()
 
@@ -478,6 +497,9 @@ def main(args):
             misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
             test_stats, test_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
+            if args.eval_criterion == 'avg':
+                test_stats['avg'] = (test_stats['acc'] + test_stats['precision'] + test_stats['recall'] + test_stats['f1']) / 4
+            
             if args.downstream_task == 'classification':
                 print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
                       f"{test_stats['acc']:.2f}% / {test_stats['acc_balanced']:.2f}% / {test_stats['precision']:.2f}% / {test_stats['recall']:.2f}% / ",
@@ -497,7 +519,7 @@ def main(args):
     
     print(f"Start training for {args.epochs} epochs")
 
-    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 
+    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 'avg':0.0,
                   'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
     best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
@@ -529,6 +551,9 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
                     mode="decreasing")
         else:
+            if args.eval_criterion == 'avg':
+                test_stats['avg'] = (test_stats['acc'] + test_stats['precision'] + test_stats['recall'] + test_stats['f1']) / 4
+            
             if early_stop.evaluate_increasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
