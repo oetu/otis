@@ -463,7 +463,7 @@ def main(args):
 
     # partially freeze the model
     skip_list = []
-    if args.freeze_encoder:
+    if args.pretrained_encoder and args.freeze_encoder:
         # freeze patch_embed
         for n, p in model.patch_embed.named_parameters():
             p.requires_grad = False

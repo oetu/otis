@@ -13,7 +13,7 @@ world_size="1"      # number of GPUs
 mem_per_task="200"   # memory per GPU
 port="29420"
 
-batch_size="128"
+batch_size="328"
 accum_iter=(2)
 
 epochs="100"
@@ -26,21 +26,21 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="baseDeep_dec128d2b"
+model_size="baseDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
 input_channels="1"
-time_steps="504"
+time_steps="1008"
 
 patch_height="1"
 patch_width=(24)
 
-domain_agnostic="True"
+domain_agnostic="False"
 separate_pos_embed_y="False"
 
 # Load encoder
 # pretrained_encoder="/home/oturgut/SiT/output/pre/otis/large/dec128d2b/p1x24/pre_896_blr3e-5/checkpoint-98-ncc-0.8688.pth"
-freeze_encoder="True"
+freeze_encoder="False"
 ignore_pos_embed_y="False"
 
 # Loss parameters
@@ -65,18 +65,18 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(3e-4)
+blr_array=(1e-5)
 weight_decay=(0.15)
 
 # Output path
-folder="otis/debug/domain_agnostic"
+folder="otis"
 
 # Data path
-dataset="ticorp_debug"
+dataset="ticorp"
 
 # Log specifications
 save_output="True"
-wandb="False"
+wandb="True"
 wandb_entity="oturgut"
 wandb_project="OTiS_Pretraining"
 wandb_id=""
@@ -128,7 +128,7 @@ fi
 
 # Online evaluation
 input_electrodes="12"
-online_evaluation="False"
+online_evaluation="True"
 online_evaluation_task="classification"
 lower_bnd="0"
 upper_bnd="1"
