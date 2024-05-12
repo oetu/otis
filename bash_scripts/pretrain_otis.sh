@@ -39,7 +39,7 @@ domain_agnostic="False"
 separate_pos_embed_y="False"
 
 # Load encoder
-# pretrained_encoder="/home/oturgut/SiT/output/pre/otis/large/dec128d2b/p1x24/pre_896_blr3e-5/checkpoint-98-ncc-0.8688.pth"
+# pretrained_encoder=""
 freeze_encoder="False"
 ignore_pos_embed_y="False"
 
@@ -52,7 +52,7 @@ ncc_weight=(0.1)
 cos_weight=(0.0)
 
 # Augmentation parameters
-mask_ratio=(0.8)
+mask_ratio=(0.75)
 include_forecasting="True"
 forecasting_probability=(0.33)
 forecasting_mask_ratio=(0.5)
