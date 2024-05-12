@@ -28,7 +28,7 @@ from timm.models.layers import trunc_normal_
 from timm.data.mixup import Mixup
 from timm.loss import SoftTargetCrossEntropy #, LabelSmoothingCrossEntropy
 
-from util.dataset import SignalDataset
+from util.dataset import TimeSeriesDataset
 import util.lr_decay as lrd
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
@@ -274,19 +274,19 @@ def main(args):
 
     cudnn.benchmark = True
     
-    dataset_train = SignalDataset(data_path=args.data_path, 
-                                  labels_path=args.labels_path, 
-                                  labels_mask_path=args.labels_mask_path,
-                                  downstream_task=args.downstream_task, 
-                                  train=True, 
-                                  args=args)
-    dataset_val = SignalDataset(data_path=args.val_data_path, 
-                                labels_path=args.val_labels_path, 
-                                labels_mask_path=args.val_labels_mask_path, 
-                                downstream_task=args.downstream_task, 
-                                train=False, 
-                                domain_offsets=dataset_train.offsets, 
-                                args=args)
+    dataset_train = TimeSeriesDataset(data_path=args.data_path, 
+                                      labels_path=args.labels_path, 
+                                      labels_mask_path=args.labels_mask_path, 
+                                      downstream_task=args.downstream_task, 
+                                      train=True, 
+                                      args=args)
+    dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
+                                    labels_path=args.val_labels_path, 
+                                    labels_mask_path=args.val_labels_mask_path, 
+                                    downstream_task=args.downstream_task, 
+                                    domain_offsets=dataset_train.offsets, 
+                                    train=False, 
+                                    args=args)
 
     # train balanced
     # class_weights = 2.0 / (2.0 * torch.Tensor([1.0, 1.0])) # total_nb_samples / (nb_classes * samples_per_class)

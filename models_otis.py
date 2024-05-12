@@ -59,16 +59,15 @@ class Attention(nn.Module):
 class OTiS(nn.Module):
     """ Open foundation model for Time Series analysis with VisionTransformer backbone
     """
-    def __init__(self, domains:dict, domain_weights:dict, 
+    def __init__(self, domains:dict, domain_weights:dict, domain_agnostic:str=False, 
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  output_projection='decoder',
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
                  head_mlp_ratio=4., head_dropout=0.1, head_activation=nn.GELU,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
-                 norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False,
-                 contrastive_loss=False,
-                 include_forecasting_mask=False,
+                 norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False, contrastive_loss=False,
+                 include_forecasting=False, forecasting_probability=0.33, forecasting_mask_ratio=0.5,
                  downstream=None):
         super().__init__()
 
@@ -88,7 +87,13 @@ class OTiS(nn.Module):
         self.max_num_patches_x = max_num_patches_x
         self.pos_embed_x = nn.Parameter(torch.zeros(1, max_num_patches_x + 1, embed_dim // 2), requires_grad=False) # +1 cls embed
 
-        total_num_embeddings_y = sum([v for k, v in self.grid_height.items()])
+        self.domain_agnostic = domain_agnostic
+        if self.domain_agnostic:
+            # domain-agnostic pos_embed_y (i.e., shared across all domains)
+            total_num_embeddings_y = 256
+        else:
+            # domain-specific pos_embed_y
+            total_num_embeddings_y = sum([v for k, v in self.grid_height.items()])
         self.pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, embed_dim // 2, padding_idx=0) # +1 padding embed
 
         self.blocks = nn.ModuleList([
@@ -182,7 +187,9 @@ class OTiS(nn.Module):
 
         self.contrastive_loss = contrastive_loss
 
-        self.include_forecasting_mask = include_forecasting_mask
+        self.include_forecasting = include_forecasting
+        self.forecasting_probability = forecasting_probability
+        self.forecasting_mask_ratio = forecasting_mask_ratio
 
         self.downstream = downstream
 
@@ -296,10 +303,12 @@ class OTiS(nn.Module):
         N, L, D = x.shape  # batch, length, dim
         len_keep = math.ceil(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
         
-        if self.downstream == "forecasting" or (self.include_forecasting_mask and random.random() < 0.33):
-            if self.include_forecasting_mask:
-                forecasting_ratio = 0.5
+        if self.downstream == "forecasting" or (self.include_forecasting and random.random() < self.forecasting_probability):
+            if self.include_forecasting:
+                # pretraining
+                forecasting_ratio = self.forecasting_mask_ratio
             else:
+                # downstream finetuning
                 forecasting_ratio = mask_ratio
 
             # how much to keep (= 1 - mask out)

@@ -11,9 +11,9 @@ submitit="False"     # only for training on server
 nodes="1"
 world_size="1"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29422"
+port="29420"
 
-batch_size="144"
+batch_size="128"
 accum_iter=(2)
 
 epochs="100"
@@ -26,19 +26,20 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="largeDeep_dec192d6b"
+model_size="baseDeep_dec128d2b"
 model="otis_"$model_size"_patchX"
 
 input_channels="1"
-time_steps="1008"
+time_steps="504"
 
 patch_height="1"
 patch_width=(24)
 
+domain_agnostic="True"
 separate_pos_embed_y="False"
 
 # Load encoder
-pretrained_encoder="/home/oturgut/SiT/output/pre/otis/large/dec128d2b/p1x24/pre_896_blr3e-5/checkpoint-98-ncc-0.8688.pth"
+# pretrained_encoder="/home/oturgut/SiT/output/pre/otis/large/dec128d2b/p1x24/pre_896_blr3e-5/checkpoint-98-ncc-0.8688.pth"
 freeze_encoder="True"
 ignore_pos_embed_y="False"
 
@@ -47,12 +48,14 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=0.1
-cos_weight=0.0
+ncc_weight=(0.1)
+cos_weight=(0.0)
 
 # Augmentation parameters
 mask_ratio=(0.8)
-include_forecasting_mask="False"
+include_forecasting="True"
+forecasting_probability=(0.33)
+forecasting_mask_ratio=(0.5)
 
 crop_lower_bnd="0.5"
 crop_upper_bnd="1.0"
@@ -66,14 +69,15 @@ blr_array=(3e-4)
 weight_decay=(0.15)
 
 # Output path
-folder="otis/ticorp/ft"
+folder="otis/debug/domain_agnostic"
 
 # Data path
-dataset="ticorp_decOnly"
+dataset="ticorp_debug"
 
 # Log specifications
 save_output="True"
-wandb="True"
+wandb="False"
+wandb_entity="oturgut"
 wandb_project="OTiS_Pretraining"
 wandb_id=""
 
@@ -114,6 +118,9 @@ elif [ "$dataset" = "ticorp" ]; then
 elif [ "$dataset" = "ticorp_decOnly" ]; then
     data_path=$data_base"/val_all_new.pt"
     val_data_path=$data_base"/val_wo_mimic_new.pt"
+elif [ "$dataset" = "ticorp_debug" ]; then
+    data_path=$data_base"/val_all_new.pt"
+    val_data_path=$data_base"/val_all_new.pt"
 else
     data_path=$data_base"/train_lite.pt"
     val_data_path=$data_base"/val.pt"
@@ -162,6 +169,14 @@ do
                 cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_pretrain.py --world_size $world_size --dist_eval --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             fi
 
+            if [ "$domain_agnostic" = "True" ]; then
+                cmd=$cmd" --domain_agnostic"
+            fi
+
+            if [ "$separate_pos_embed_y" = "True" ]; then
+                cmd=$cmd" --separate_pos_embed_y"
+            fi
+
             if [ ! -z "$pretrained_encoder" ]; then
                 cmd=$cmd" --pretrained_encoder $pretrained_encoder"
             fi
@@ -198,10 +213,6 @@ do
                 cmd=$cmd" --norm_pix_loss"
             fi
 
-            if [ "$separate_pos_embed_y" = "True" ]; then
-                cmd=$cmd" --separate_pos_embed_y"
-            fi
-
             if [ "$masked_patch_loss" = "True" ]; then
                 cmd=$cmd" --masked_patch_loss"
             fi
@@ -210,12 +221,12 @@ do
                 cmd=$cmd" --domain_weighted_loss"
             fi
 
-            if [ "$include_forecasting_mask" = "True" ]; then
-                cmd=$cmd" --include_forecasting_mask"
+            if [ "$include_forecasting" = "True" ]; then
+                cmd=$cmd" --include_forecasting --forecasting_probability $forecasting_probability --forecasting_mask_ratio $forecasting_mask_ratio"
             fi
 
             if [ "$wandb" = "True" ]; then
-                cmd=$cmd" --wandb --wandb_project $wandb_project"
+                cmd=$cmd" --wandb --wandb_entity $wandb_entity --wandb_project $wandb_project"
                 if [ ! -z "$wandb_id" ]; then
                     cmd=$cmd" --wandb_id $wandb_id"
                 fi

@@ -29,7 +29,7 @@ os.environ["WANDB__SERVICE_WAIT"] = "500"
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
-from util.dataset import SignalDataset
+from util.dataset import TimeSeriesDataset
 import util.misc as misc
 from util.misc import add_weight_decay_unfrozen_modules
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
@@ -220,13 +220,13 @@ def main(args):
     cudnn.benchmark = True
 
     # load data
-    dataset_train = SignalDataset(data_path=args.data_path, 
-                                  train=True, 
-                                  args=args)
-    dataset_val = SignalDataset(data_path=args.val_data_path, 
-                                train=False, 
-                                domain_offsets=dataset_train.offsets, 
-                                args=args)
+    dataset_train = TimeSeriesDataset(data_path=args.data_path, 
+                                      train=True, 
+                                      args=args)
+    dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
+                                    domain_offsets=dataset_train.offsets, 
+                                    train=False, 
+                                    args=args)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))

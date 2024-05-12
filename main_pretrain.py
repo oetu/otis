@@ -26,7 +26,7 @@ os.environ["WANDB__SERVICE_WAIT"] = "500"
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
 
-from util.dataset import SignalDataset
+from util.dataset import TimeSeriesDataset
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.pos_embed import interpolate_pos_embed_x
@@ -69,6 +69,8 @@ def get_args_parser():
     parser.add_argument('--patch_size', default=(1, 100), type=Tuple,
                         help='patch size')
 
+    parser.add_argument('--domain_agnostic', action='store_true', default=False,
+                        help='Use shared position embeddings Y across all domains')
     parser.add_argument('--separate_dec_pos_embed_y', action='store_true', default=False,
                         help='Use separate position embeddings Y for the decoder')
 
@@ -87,8 +89,12 @@ def get_args_parser():
     # Augmentation parameters
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='Masking ratio (percentage of removed patches).')
-    parser.add_argument('--include_forecasting_mask', action='store_true', default=False,
-                        help='Introduce also masking for forecasting (i.e. right-sided masking).')
+    parser.add_argument('--include_forecasting', action='store_true', default=False,
+                        help='Include forecasting during pretraining (i.e. right-sided masking).')
+    parser.add_argument('--forecasting_probability', default=0.33, type=float,
+                        help='Probability for forecasting (i.e. right-sided masking).')
+    parser.add_argument('--forecasting_mask_ratio', default=0.5, type=float,
+                        help='Masking ratio for forecasting (percentage of removed patches).')
 
     parser.add_argument('--crop_lower_bnd', default=0.5, type=float,
                         help='Lower boundary of the cropping ratio (default: 0.5)')
@@ -226,8 +232,15 @@ def main(args):
     cudnn.benchmark = True
 
     # load data
-    dataset_train = SignalDataset(data_path=args.data_path, train=True, args=args)
-    dataset_val = SignalDataset(data_path=args.val_data_path, train=False, domain_offsets=dataset_train.offsets, args=args)
+    # domain_offsets are initialized in dataset_train
+    dataset_train = TimeSeriesDataset(data_path=args.data_path, 
+                                      domain_agnostic=args.domain_agnostic, 
+                                      train=True, 
+                                      args=args)
+    dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
+                                    domain_offsets=dataset_train.offsets, 
+                                    train=False, 
+                                    args=args)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
@@ -295,20 +308,20 @@ def main(args):
 
     # online evaluation
     if args.online_evaluation:
-        dataset_online_train = SignalDataset(data_path=args.data_path_online, 
-                                             labels_path=args.labels_path_online, 
-                                             labels_mask_path=args.labels_mask_path_online, 
-                                             downstream_task=args.online_evaluation_task, 
-                                             train=True, 
-                                             domain_offsets=dataset_train.offsets,
-                                             args=args)
-        dataset_online_val = SignalDataset(data_path=args.val_data_path_online, 
-                                           labels_path=args.val_labels_path_online, 
-                                           labels_mask_path=args.val_labels_mask_path_online, 
-                                           downstream_task=args.online_evaluation_task, 
-                                           train=False, 
-                                           domain_offsets=dataset_train.offsets, 
-                                           args=args)
+        dataset_online_train = TimeSeriesDataset(data_path=args.data_path_online, 
+                                                 labels_path=args.labels_path_online, 
+                                                 labels_mask_path=args.labels_mask_path_online, 
+                                                 downstream_task=args.online_evaluation_task, 
+                                                 domain_offsets=dataset_train.offsets,
+                                                 train=True, 
+                                                 args=args)
+        dataset_online_val = TimeSeriesDataset(data_path=args.val_data_path_online, 
+                                               labels_path=args.val_labels_path_online, 
+                                               labels_mask_path=args.val_labels_mask_path_online, 
+                                               downstream_task=args.online_evaluation_task, 
+                                               domain_offsets=dataset_train.offsets, 
+                                               train=False, 
+                                               args=args)
 
         print("Online training set size: ", len(dataset_online_train))
         print("Online validation set size: ", len(dataset_online_val))
@@ -357,6 +370,7 @@ def main(args):
     model = models_otis.__dict__[args.model](
         domains=dataset_train.domains,
         domain_weights=dataset_train.domain_weights,
+        domain_agnostic=args.domain_agnostic,
         input_channels=args.input_channels,
         time_steps=args.time_steps,
         patch_size=args.patch_size,
@@ -365,7 +379,9 @@ def main(args):
         masked_patch_loss=args.masked_patch_loss,
         domain_weighted_loss=args.domain_weighted_loss,
         contrastive_loss=(args.cos_weight > 0.0),
-        include_forecasting_mask=args.include_forecasting_mask,
+        include_forecasting=args.include_forecasting,
+        forecasting_probability=args.forecasting_probability,
+        forecasting_mask_ratio=args.forecasting_mask_ratio,
     )
 
     new_patch_size = False
