@@ -56,6 +56,9 @@ def get_args_parser():
     parser.add_argument('--compile', action='store_true', default=False,
                         help='Use torch compile')
     
+    parser.add_argument('--univariate', action='store_true', default=False,
+                        help='Univariate time series analysis (i.e. treat each variate independently)')
+    
     output_projections = ["decoder", "mlp"]
     parser.add_argument('--output_projection', default='decoder', type=str, choices=output_projections,
                         help='Projection of the masked tokens (default: decoder)')
@@ -221,10 +224,12 @@ def main(args):
 
     # load data
     dataset_train = TimeSeriesDataset(data_path=args.data_path, 
+                                      univariate=args.univariate,
                                       train=True, 
                                       args=args)
     dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
                                     domain_offsets=dataset_train.offsets, 
+                                    univariate=args.univariate,
                                     train=False, 
                                     args=args)
 
@@ -345,6 +350,11 @@ def main(args):
             if domain == target_domain and shape[1] == target_shape[1]:
                 pos_embed_y_available = True
                 break
+
+        if len(checkpoint["domain_offsets"]) > 1 and sum([v for v in checkpoint["domain_offsets"].values()]) == 0:
+            # domain-angostic pos_embed_y
+            print("INFO: Found domain-agnostic pos_embed_y in checkpoint")
+            pos_embed_y_available = True
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
             print("Loading pos_embed_y from checkpoint")

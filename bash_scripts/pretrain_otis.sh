@@ -29,13 +29,15 @@ compile="False"
 model_size="baseDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
+univariate="False"
+domain_agnostic="False"
+
 input_channels="1"
 time_steps="1008"
 
 patch_height="1"
 patch_width=(24)
 
-domain_agnostic="False"
 separate_pos_embed_y="False"
 
 # Load encoder
@@ -156,6 +158,18 @@ do
 
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
+            if [ "$univariate" = "True" ]; then
+                # domain-agnostic by default
+                subfolder="univariate/"$subfolder
+            else
+                if [ "$domain_agnostic" = "True" ]; then
+                    subfolder="domain_agnostic/"$subfolder
+                else
+                    subfolder="domain_specific/"$subfolder
+                fi
+                subfolder="multivariate/"$subfolder
+            fi
+
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
 
             # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr"/checkpoint-77-ncc-0.7593.pth"
@@ -167,6 +181,10 @@ do
                 cmd="python3 submitit_pretrain.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             else
                 cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_pretrain.py --world_size $world_size --dist_eval --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+            fi
+
+            if [ "$univariate" = "True" ]; then
+                cmd=$cmd" --univariate"
             fi
 
             if [ "$domain_agnostic" = "True" ]; then

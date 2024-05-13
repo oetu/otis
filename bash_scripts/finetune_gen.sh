@@ -29,6 +29,8 @@ compile="False"
 model_size="baseDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
+univariate="True"
+
 output_projection="decoder"
 
 # Pretraining specifications
@@ -157,33 +159,30 @@ do
             # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/"$pre_data"/checkpoint-60-ncc-0.5985.pth"
 
             # OTiS
-            # huge
-            # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec128d2b/p1x24/pre_b1024_blr1e-5/checkpoint-96-ncc-0.8690.pth"
+            # base
+            # finetune="/home/oturgut/SiT/output/pre/otis/ticorp/ft/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.8/pre_b544_blr3e-4/checkpoint-93-ncc-0.7326.pth"
+            finetune="/home/oturgut/SiT/output/pre/otis/base/dec160d4b/p1x24/pre_b1216_blr3e-5/checkpoint-99-ncc-0.8662.pth"
+            # finetune="/home/oturgut/SiT/output/pre/otis/base/dec128d2b/p1x24/pre_b1792_blr3e-5/checkpoint-92-ncc-0.8690.pth"
+            # finetune="/home/oturgut/SiT/output/pre/otis/base/dec128d2b/p1x24/pre_b1792_blr3e-5/checkpoint-98-ncc-0.8632.pth"
 
             # large
             # finetune="/home/oturgut/SiT/output/pre/otis/large/dec128d2b/p1x24/pre_896_blr3e-5/checkpoint-98-ncc-0.8688.pth"
 
-            # base
-            # finetune="/home/oturgut/SiT/output/pre/otis/base/dec128d2b/p1x24/forecasting/pre_b1856_blr3e-5/checkpoint-97-ncc-0.8259.pth"
-            finetune="/home/oturgut/SiT/output/pre/otis/base/dec160d4b/p1x24/pre_b1216_blr3e-5/checkpoint-99-ncc-0.8662.pth"
-            # finetune="/home/oturgut/SiT/output/pre/otis/base/dec128d2b/p1x24/pre_b1792_blr3e-5/checkpoint-92-ncc-0.8690.pth"
-
-            # finetune="/home/oturgut/SiT/output/pre/otis_final/checkpoint-95-ncc-0.7729.pth"
-            # finetune="/home/oturgut/SiT/output/pre/otis_final/checkpoint-96-ncc-0.7561.pth"
-
-            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
-            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
-
-            # SiT
-            # finetune="/home/oturgut/SiT/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
-            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/refactored/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9455.pth"
-        
+            # huge
+            # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec128d2b/p1x24/pre_b1024_blr1e-5/checkpoint-96-ncc-0.8690.pth"
+            # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec160d4b/p1x24/pre_b2912_blr3e-6/checkpoint-99-ncc-0.8705.pth"
+            # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec128d2b/p1x24/pre_b1024_blr1e-5/checkpoint-99-ncc-0.8655.pth"
+            
             if [ "$path" = "tower" ]; then
                 cmd="python3 main_finetune_gen.py --output_projection $output_projection --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             elif [ "$submitit" = "True" ]; then
                 cmd="python3 submitit_finetune_gen.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --output_projection $output_projection --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             else
                 cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune_gen.py --world_size $world_size --dist_eval --output_projection $output_projection --downstream_task $downstream_task --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epoch $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
+            fi
+
+            if [ "$univariate" = "True" ]; then
+                cmd=$cmd" --univariate"
             fi
 
             if [ "$ignore_pos_embed_y" = "True" ]; then

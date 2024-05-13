@@ -53,6 +53,12 @@ def get_args_parser():
     parser.add_argument('--compile', action='store_true', default=False,
                         help='Use torch compile')
 
+    parser.add_argument('--univariate', action='store_true', default=False,
+                        help='Univariate time series analysis (i.e. treat each variate independently)')
+    
+    parser.add_argument('--domain_agnostic', action='store_true', default=False,
+                        help='Share position embedding Y across all domains')
+
     parser.add_argument('--input_channels', type=int, default=1, metavar='N',
                         help='input channels')
     parser.add_argument('--input_electrodes', type=int, default=12, metavar='N',
@@ -69,8 +75,6 @@ def get_args_parser():
     parser.add_argument('--patch_size', default=(1, 100), type=Tuple,
                         help='patch size')
 
-    parser.add_argument('--domain_agnostic', action='store_true', default=False,
-                        help='Use shared position embeddings Y across all domains')
     parser.add_argument('--separate_dec_pos_embed_y', action='store_true', default=False,
                         help='Use separate position embeddings Y for the decoder')
 
@@ -235,10 +239,12 @@ def main(args):
     # domain_offsets are initialized in dataset_train
     dataset_train = TimeSeriesDataset(data_path=args.data_path, 
                                       domain_agnostic=args.domain_agnostic, 
+                                      univariate=args.univariate,
                                       train=True, 
                                       args=args)
     dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
                                     domain_offsets=dataset_train.offsets, 
+                                    univariate=args.univariate,
                                     train=False, 
                                     args=args)
 
@@ -312,7 +318,8 @@ def main(args):
                                                  labels_path=args.labels_path_online, 
                                                  labels_mask_path=args.labels_mask_path_online, 
                                                  downstream_task=args.online_evaluation_task, 
-                                                 domain_offsets=dataset_train.offsets,
+                                                 domain_offsets=dataset_train.offsets, 
+                                                 univariate=args.univariate,
                                                  train=True, 
                                                  args=args)
         dataset_online_val = TimeSeriesDataset(data_path=args.val_data_path_online, 
@@ -320,6 +327,7 @@ def main(args):
                                                labels_mask_path=args.val_labels_mask_path_online, 
                                                downstream_task=args.online_evaluation_task, 
                                                domain_offsets=dataset_train.offsets, 
+                                               univariate=args.univariate,
                                                train=False, 
                                                args=args)
 

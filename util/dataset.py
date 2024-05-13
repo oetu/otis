@@ -1,7 +1,5 @@
 from typing import Any, Tuple, Dict
 
-import random
-
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -16,6 +14,7 @@ class TimeSeriesDataset(Dataset):
     def __init__(self, data_path:str, labels_path:str=None, labels_mask_path:str=None, 
                  downstream_task:str=None, 
                  domain_offsets:Dict=None, domain_agnostic:str=False, 
+                 univariate:bool=False, 
                  train:bool=False, args=None) -> None:
         """
             labels_path: path to labels (finetuning / online evaluation)
@@ -24,6 +23,9 @@ class TimeSeriesDataset(Dataset):
 
             domain_offsets: offsets for pos_embed_y
             domain_agnostic: share pos_embed_y across domains
+
+            univariate: analyse each variate independently 
+                        note - univariate analysis is domain agnostic
         """
         data = torch.load(data_path, map_location=torch.device('cpu')) # load to ram
 
@@ -39,7 +41,8 @@ class TimeSeriesDataset(Dataset):
         #     data = [sample[1][..., 13936:].unsqueeze(0) for sample in data[:1]]
         #     # data = [sample[1][..., 773:].unsqueeze(0) for sample in data[:1]]
 
-        self.domain_agnostic = domain_agnostic
+        self.univariate = univariate
+        self.domain_agnostic = True if self.univariate else domain_agnostic
 
         self.domain = domain
         self.domains = {domain: shape for domain, shape in sorted(list(set(self.domain)))} # unique domains
@@ -91,6 +94,12 @@ class TimeSeriesDataset(Dataset):
         """return a sample from the dataset at index idx"""
         # (1, C, T)
         data = self.data[idx]
+
+        if self.univariate:
+            # transform a multivariate time series with V variates into V univariate time series
+            # (C, 1, T)
+            data = data.permute(1, 0, 2)
+
         if self.train == False:
             transform = transforms.Compose([
                 augmentations.CropResizing(fixed_crop_len=self.args.time_steps, start_idx=0, resize=False)
@@ -135,39 +144,79 @@ class TimeSeriesDataset(Dataset):
         if grid_width.max() * patch_size[-1] < batch[0][6]:
             grid_width = grid_width + 1
 
+        nb_samples = sum([sample[0].shape[0] for sample in batch])
+        univariate = nb_samples > len(batch)
+
         # Zero pad the input data to the largest shape 
-        # (B, 1, C_max, T_max)
-        data = [torch.nn.functional.pad(sample[0], 
-                                        pad=(0, int(max_timesteps - sample[0].shape[-1]), 0, int(max_channels - sample[0].shape[-2])), 
-                                        mode="constant", value=0) for sample in batch]
+        if univariate:
+            # (B*V, 1, 1, T_max)
+            data = [torch.nn.functional.pad(variate.unsqueeze(0), 
+                                            pad=(0, int(max_timesteps - variate.shape[-1]), 0, int(max_channels - variate.shape[-2])), 
+                                            mode="constant", value=0) for sample in batch for variate in sample[0]]
+        else:
+            # (B, 1, C_max, T_max)
+            data = [torch.nn.functional.pad(sample[0], 
+                                            pad=(0, int(max_timesteps - sample[0].shape[-1]), 0, int(max_channels - sample[0].shape[-2])), 
+                                            mode="constant", value=0) for sample in batch]
         data = torch.stack(data, dim=0)
 
         # Create the attention mask 
-        # (B, C'_max, T'_max), with C'_max=C_max/p, T'_max=T_max/p
-        attn_mask = [torch.nn.functional.pad(torch.ones(size=(grid_height[idx], grid_width[idx])), 
-                                             pad=(0, int(grid_width.max() - grid_width[idx]), 0, int(grid_height.max() - grid_height[idx])), 
-                                             mode="constant", value=0) for idx in range(len(batch))]
+        if univariate:
+            # (B*V, C'_max, T'_max), with C'_max=C_max/p, T'_max=T_max/p
+            attn_mask = [torch.nn.functional.pad(torch.ones(size=(grid_height[idx], grid_width[idx])), 
+                                                pad=(0, int(grid_width.max() - grid_width[idx]), 0, int(grid_height.max() - grid_height[idx])), 
+                                                mode="constant", value=0) for idx, sample in enumerate(batch) for variate in sample[0]]
+        else:
+            # (B, C'_max, T'_max), with C'_max=C_max/p, T'_max=T_max/p
+            attn_mask = [torch.nn.functional.pad(torch.ones(size=(grid_height[idx], grid_width[idx])), 
+                                                pad=(0, int(grid_width.max() - grid_width[idx]), 0, int(grid_height.max() - grid_height[idx])), 
+                                                mode="constant", value=0) for idx in range(len(batch))]
         attn_mask = torch.stack(attn_mask, dim=0)
         
         # Create the pos embedding Y
-        # (B, C'_max, T'_max)
-        pos_embed_y = [torch.nn.functional.pad(torch.arange(grid_height[idx]).view(-1, 1).repeat(1, grid_width[idx]) + 1 + sample[4],
-                                               pad=(0, int(grid_width.max() - grid_width[idx]), 0, int(grid_height.max() - grid_height[idx])), 
-                                               mode="constant", value=0) for idx, sample in enumerate(batch)]
+        if univariate:
+            # (B*V, C'_max, T'_max)
+            pos_embed_y = [torch.nn.functional.pad(torch.arange(grid_height[idx]).view(-1, 1).repeat(1, grid_width[idx]) + 1 + sample[4],
+                                                pad=(0, int(grid_width.max() - grid_width[idx]), 0, int(grid_height.max() - grid_height[idx])), 
+                                                mode="constant", value=0) for idx, sample in enumerate(batch) for variate in sample[0]]
+        else:
+            # (B, C'_max, T'_max)
+            pos_embed_y = [torch.nn.functional.pad(torch.arange(grid_height[idx]).view(-1, 1).repeat(1, grid_width[idx]) + 1 + sample[4],
+                                                pad=(0, int(grid_width.max() - grid_width[idx]), 0, int(grid_height.max() - grid_height[idx])), 
+                                                mode="constant", value=0) for idx, sample in enumerate(batch)]
         pos_embed_y = torch.stack(pos_embed_y, dim=0)
 
-        domain = [sample[5] for sample in batch]
+        if univariate:
+            domain = [sample[5] for sample in batch for variate in sample[0]]
+        else:
+            domain = [sample[5] for sample in batch]
     
         return data, attn_mask, torch.LongTensor(pos_embed_y), domain
     
     @staticmethod
     def collate_fn_ft(batch):
-        data = torch.stack([sample[0] for sample in batch], dim=0)
-        label = torch.stack([sample[1] for sample in batch], dim=0)
-        label_mask = torch.stack([sample[2] for sample in batch], dim=0)
+        nb_samples = sum([sample[0].shape[0] for sample in batch])
+        univariate = nb_samples > len(batch)
+
+        if univariate:
+            # (B*V, 1, V, T)
+            data = torch.stack([variate.unsqueeze(0) for sample in batch for variate in sample[0]], dim=0)
+            label = torch.stack([sample[1] for sample in batch for variate in sample[0]], dim=0)
+            label_mask = torch.stack([sample[2] for sample in batch for variate in sample[0]], dim=0)
+        else:
+            # (B, 1, V, T)
+            data = torch.stack([sample[0] for sample in batch], dim=0)
+            # (B, 1)
+            label = torch.stack([sample[1] for sample in batch], dim=0)
+            # (B, 1)
+            label_mask = torch.stack([sample[2] for sample in batch], dim=0)
 
         grid_width = batch[0][0].shape[-1] // batch[0][3][-1]
         grid_height = batch[0][0].shape[-2] // batch[0][3][-2]
+        # (B, V', T'), V'=V/p and T'=T/q
         pos_embed_y = torch.arange(grid_height).view(-1, 1).repeat(len(batch), 1, grid_width) + 1 + batch[0][4]
+
+        if univariate:
+            pos_embed_y = torch.stack([pos_embed_y[idx] for idx, sample in enumerate(batch) for variate in sample[0]], dim=0)
 
         return data, label, label_mask, torch.LongTensor(pos_embed_y)

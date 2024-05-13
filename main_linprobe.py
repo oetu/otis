@@ -52,6 +52,9 @@ def get_args_parser():
     parser.add_argument('--model', default='vit_baseDeep_patchX', type=str, metavar='MODEL',
                         help='Name of model to train (default: vit_baseDeep_patchX)')
     
+    parser.add_argument('--univariate', action='store_true', default=False,
+                        help='Univariate time series analysis (i.e. treat each variate independently)')
+    
     parser.add_argument('--input_channels', type=int, default=1, metavar='N',
                         help='input channels')
     parser.add_argument('--input_electrodes', type=int, default=12, metavar='N',
@@ -243,6 +246,7 @@ def main(args):
                                       labels_path=args.labels_path, 
                                       labels_mask_path=args.labels_mask_path, 
                                       downstream_task=args.downstream_task, 
+                                      univariate=args.univariate,
                                       train=True, 
                                       args=args)
     dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
@@ -250,6 +254,7 @@ def main(args):
                                     labels_mask_path=args.val_labels_mask_path, 
                                     downstream_task=args.downstream_task, 
                                     domain_offsets=dataset_train.offsets, 
+                                    univariate=args.univariate,
                                     train=False, 
                                     args=args)
 
@@ -358,6 +363,11 @@ def main(args):
             if domain == target_domain and shape[1] == target_shape[1]:
                 pos_embed_y_available = True
                 break
+
+        if len(checkpoint["domain_offsets"]) > 1 and sum([v for v in checkpoint["domain_offsets"].values()]) == 0:
+            # domain-angostic pos_embed_y
+            print("INFO: Found domain-agnostic pos_embed_y in checkpoint")
+            pos_embed_y_available = True
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
             print("Loading pos_embed_y from checkpoint")

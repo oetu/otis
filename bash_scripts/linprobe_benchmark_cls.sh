@@ -27,6 +27,8 @@ max_delta="0.25"
 model_size="baseDeep"
 model="vit_"$model_size"_patchX"
 
+univariate="False"
+
 # Pretraining specifications
 from_scratch="False"
 
@@ -39,8 +41,8 @@ patch_height="1"
 patch_width=(24)
 
 # Pooling strategy
-global_pool=(True)
-attention_pool=(False)
+global_pool=(False)
+attention_pool=(True)
 
 # Augmentation parameters
 masking_blockwise="False"
@@ -56,7 +58,7 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
 # Optimizer parameters
-blr=(1e2)
+blr=(3e0)
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -64,20 +66,20 @@ weight_decay=(0.1)
 smoothing=(0.1)
 
 # Output path
-folder="Epilepsy"
-nb_classes="2"
-input_electrodes="1"
-time_steps="168"
+# folder="Epilepsy"
+# nb_classes="2"
+# input_electrodes="1"
+# time_steps="168"
 
 # folder="FD-B"
 # nb_classes="3"
 # input_electrodes="1"
 # time_steps="5112"
 
-# folder="Gesture"
-# nb_classes="8"
-# input_electrodes="3"
-# time_steps="192"
+folder="Gesture"
+nb_classes="8"
+input_electrodes="3"
+time_steps="192"
 
 # folder="EMG"
 # nb_classes="3"
@@ -119,10 +121,10 @@ save_logits="False"
 # EVALUATE
 # As filename: State the checkpoint for the inference of a specific model
 # or state the (final) epoch for the inference of all models up to this epoch
-eval_ckpt="checkpoint-314-avg-90.3914.pth"
-blr=(3e1)
-val_data_path=$data_base"/test.pt"
-val_labels_path=$data_base"/test_labels.pt"
+# eval_ckpt="checkpoint-102-avg-47.7613.pth"
+# blr=(3e0)
+# val_data_path=$data_base"/test.pt"
+# val_labels_path=$data_base"/test_labels.pt"
 
 for sd in "${seed[@]}"
 do
@@ -138,6 +140,13 @@ do
                     do
 
                         subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$wd)
+
+                        if [ "$univariate" = "True" ]; then
+                            subfolder="univariate/"$subfolder
+                        else
+                            subfolder="multivariate/"$subfolder
+                        fi
+
                         if [ "$global_pool" = "True" ]; then
                             subfolder=$subfolder"/gap"
                         elif [ "$attention_pool" = "True" ]; then
@@ -161,6 +170,10 @@ do
                             cmd="python3 submitit_linprobe.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --seed $sd --downstream_task $downstream_task --eval_criterion $eval_criterion --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                         else
                             cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_linprobe.py --world_size $world_size --dist_eval --seed $sd --downstream_task $downstream_task --eval_criterion $eval_criterion --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epoch $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                        fi
+
+                        if [ "$univariate" = "True" ]; then
+                            cmd=$cmd" --univariate"
                         fi
 
                         if [ "$ignore_pos_embed_y" = "True" ]; then
