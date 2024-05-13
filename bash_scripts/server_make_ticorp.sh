@@ -8,11 +8,8 @@
 #SBATCH --gres=gpu:0        # Number of GPUs if needed
 #SBATCH --gpu-bind=none     # NCCL can't deal with task-binding (binding each process to its own GPU), hence allocate the devices manually in the python script
 #SBATCH --cpus-per-task=32  # Number of CPUs (Don't use more than 24 per GPU)
-#SBATCH --mem=350G          # Memory in GB (Don't use more than 128G per GPU)
-#SBATCH --exclude=chameleon,helios,prometheus,atlas,apollo
-
-#SBATCH --mail-type=FAIL
-#SBATCH --mail-user=oezguen.turgut@tum.de
+#SBATCH --mem=256G          # Memory in GB (Don't use more than 128G per GPU)
+#SBATCH --exclude=chameleon,helios,prometheus,atlas
 
 # load python module
 module load python/anaconda3

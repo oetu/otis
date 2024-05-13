@@ -9,13 +9,13 @@ path="server"       # [tower, server]
 submitit="False"     # only for training on server
 
 nodes="1"
-world_size="7"      # number of GPUs
+world_size="4"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29510"
+port="29421"
 
-offset="120"
+offset="192"        # p1x24, 232, p1x48: 592, noForecasting: 416, dec160d4b: 192
 batch_size=$(($offset-$1))
-accum_iter=(2)
+accum_iter=(1)
 
 epochs="100"
 warmup_epochs="10"
@@ -27,7 +27,7 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="hugeDeep_dec160d4b"
+model_size="largeDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
 univariate="False"
@@ -68,7 +68,7 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(1e-5)
+blr_array=(3e-5)
 weight_decay=(0.15)
 
 # Output path
