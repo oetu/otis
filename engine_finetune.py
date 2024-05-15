@@ -257,7 +257,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         idx = 1 if args.batch_size > 1 else 0
         test_history["Attention"] = plot.plot_attention(images, attention_map, idx)
 
-    if args.save_embeddings:
+    if args.save_embeddings and misc.is_main_process():
         embeddings = torch.cat(embeddings, dim=0).to(device="cpu", dtype=torch.float32).detach() # (B, D)
         embeddings_path = os.path.join(args.output_dir, "embeddings")
         if not os.path.exists(embeddings_path):
