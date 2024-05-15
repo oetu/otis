@@ -190,11 +190,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             training_history['pcc'] = training_stats["pcc"]
             training_history['r2'] = training_stats["r2"]
 
-            for i in range(targets.shape[-1]):
-                training_history[f'Train/RMSE/{i}'] = rmse[i]
-                training_history[f'Train/MAE/{i}'] = mae[i]
-                training_history[f'Train/PCC/{i}'] = pcc[i]
-                training_history[f'Train/R2/{i}'] = r2[i]
+            if targets.shape[-1] > 1:
+                for i in range(targets.shape[-1]):
+                    training_history[f'Train/RMSE/{i}'] = rmse[i]
+                    training_history[f'Train/MAE/{i}'] = mae[i]
+                    training_history[f'Train/PCC/{i}'] = pcc[i]
+                    training_history[f'Train/R2/{i}'] = r2[i]
 
     return training_stats, training_history
 
@@ -300,16 +301,16 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
         rmse = np.float64(root_mean_squared_error(logits, labels, multioutput="raw_values"))
-        test_stats["rmse"] = rmse.mean(axis=-1)
+        test_stats["rmse"] = rmse if isinstance(rmse, float) else rmse.mean(axis=-1)
 
         mae = np.float64(mean_absolute_error(logits, labels, multioutput="raw_values"))
-        test_stats["mae"] = mae.mean(axis=-1)
+        test_stats["mae"] = mae if isinstance(mae, float) else mae.mean(axis=-1)
 
         pcc = np.concatenate([r_regression(logits[:, i].view(-1, 1), labels[:, i]) for i in range(labels.shape[-1])], axis=0)
-        test_stats["pcc"] = pcc.mean(axis=-1)
+        test_stats["pcc"] = pcc if isinstance(pcc, float) else pcc.mean(axis=-1)
 
         r2 = np.stack([r2_score(labels[:, i], logits[:, i]) for i in range(labels.shape[-1])], axis=0)
-        test_stats["r2"] = r2.mean(axis=-1)
+        test_stats["r2"] = r2 if isinstance(r2, float) else r2.mean(axis=-1)
 
     if args.downstream_task == 'classification':
         print('* Acc@1 {top1_acc:.2f} Acc@1 (balanced) {acc_balanced:.2f} Precision {precision:.2f} Recall {recall:.2f} F1 {f1:.2f} AUROC {auroc:.2f} AUPRC {auprc:.2f} loss {losses:.3f}'
@@ -352,11 +353,12 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
             test_history['test_pcc'] = test_stats['pcc']
             test_history['test_r2'] = test_stats['r2']
 
-            for i in range(target.shape[-1]):
-                test_history[f'Test/RMSE/{i}'] = rmse[i]
-                test_history[f'Test/MAE/{i}'] = mae[i]
-                test_history[f'Test/PCC/{i}'] = pcc[i]
-                test_history[f'Test/R2/{i}'] = r2[i]
+            if target.shape[-1] > 1:
+                for i in range(target.shape[-1]):
+                    test_history[f'Test/RMSE/{i}'] = rmse[i]
+                    test_history[f'Test/MAE/{i}'] = mae[i]
+                    test_history[f'Test/PCC/{i}'] = pcc[i]
+                    test_history[f'Test/R2/{i}'] = r2[i]
 
         if args.plot_embeddings and epoch % 10 == 0:
             reducer = umap.UMAP(n_components=2, metric='euclidean')
