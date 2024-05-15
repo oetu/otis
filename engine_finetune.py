@@ -273,7 +273,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
     probs = torch.nn.functional.softmax(logits, dim=-1)                                 # (B, num_classes)
     labels = torch.cat(labels, dim=0).to(device="cpu").detach()                         # (B, 1)
     
-    if args.save_logits:
+    if args.save_logits and misc.is_main_process():
         logits_path = os.path.join(args.output_dir, "logits")
         if not os.path.exists(logits_path):
             os.makedirs(logits_path)
