@@ -137,16 +137,16 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         training_stats["auprc"] = auprc
     elif args.downstream_task == 'regression':
         rmse = np.float64(root_mean_squared_error(logits, labels, multioutput="raw_values"))
-        training_stats["rmse"] = rmse.mean(axis=-1)
+        training_stats["rmse"] = rmse if isinstance(rmse, float) else rmse.mean(axis=-1)
 
         mae = np.float64(mean_absolute_error(logits, labels, multioutput="raw_values"))
-        training_stats["mae"] = mae.mean(axis=-1)
+        training_stats["mae"] = mae if isinstance(mae, float) else mae.mean(axis=-1)
 
         pcc = np.concatenate([r_regression(logits[:, i].view(-1, 1), labels[:, i]) for i in range(labels.shape[-1])], axis=0)
-        training_stats["pcc"] = pcc.mean(axis=-1)
+        training_stats["pcc"] = pcc if isinstance(pcc, float) else pcc.mean(axis=-1)
 
         r2 = np.stack([r2_score(labels[:, i], logits[:, i]) for i in range(labels.shape[-1])], axis=0)
-        training_stats["r2"] = r2.mean(axis=-1)
+        training_stats["r2"] = pcc if isinstance(pcc, float) else r2.mean(axis=-1)
 
     # tensorboard
     if log_writer is not None: #and (data_iter_step + 1) % accum_iter == 0:
