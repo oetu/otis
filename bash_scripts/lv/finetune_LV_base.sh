@@ -3,17 +3,17 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-num_workers="24"    # number of CPUs
+num_workers="32"    # number of CPUs
 
 path="server"       # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
-world_size="4"      # number of GPUs
+world_size="2"      # number of GPUs
 mem_per_task="96"   # memory per GPU
 port="29420"
 
-batch_size=(64)
+batch_size=(992)    # 744: 992
 accum_iter=(1)
 
 epochs="100"
@@ -21,7 +21,7 @@ warmup_epochs="5"
 
 # Callback parameters
 patience="15"
-max_delta="0.25" # for AUROC
+max_delta="0.1" # for AUROC
 
 eval_criterion="r2"
 
@@ -39,7 +39,7 @@ freeze_pos_embed_y="False"
 
 input_channels="1"
 input_electrodes="12"
-time_steps="1008"
+time_steps="744"
 
 patch_height="1"
 patch_width=(24)
@@ -62,10 +62,10 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
 drop_path=(0.1)
-layer_decay=(0.75)
+layer_decay=(0.9)
 
 # Optimizer parameters
-blr=(3e-6) # 3e-5 if from scratch
+blr=(1e-6 3e-6 1e-5 3e-5 1e-4) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -79,7 +79,7 @@ folder="LV"
 save_output="True"
 wandb="True"
 wandb_entity="oturgut"
-wandb_project="OTiS_LV"
+wandb_project="OTiS_LV_Regression"
 wandb_id=""
 
 plot_attention_map="False"
@@ -188,7 +188,7 @@ do
 
                             if [ "$univariate" = "True" ]; then
                                 cmd=$cmd" --univariate $univariate"
-                            else
+                            fi
 
                             if [ ! -z "$eval_criterion" ]; then
                                 cmd=$cmd" --eval_criterion $eval_criterion"

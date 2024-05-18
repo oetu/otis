@@ -7,7 +7,7 @@
 #SBATCH --time=6-23:59:59   # Limit on the total run time (format: days-hours:minutes:seconds)
 #SBATCH --gres=gpu:4        # Number of GPUs if needed
 #SBATCH --gpu-bind=none     # NCCL can't deal with task-binding (binding each process to its own GPU), hence allocate the devices manually in the python script
-#SBATCH --cpus-per-gpu=24   # Number of CPUs (Don't use more than 24 per GPU)
+#SBATCH --cpus-per-gpu=32   # Number of CPUs (Don't use more than 24 per GPU)
 #SBATCH --mem-per-gpu=64G   # Memory in GB (Don't use more than 128G per GPU)
 #SBATCH --exclude=chameleon,helios,prometheus,atlas
 
