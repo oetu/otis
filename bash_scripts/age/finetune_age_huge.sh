@@ -11,20 +11,22 @@ submitit="False"    # only for training on server
 nodes="1"
 world_size="1"      # number of GPUs
 mem_per_task="96"   # memory per GPU
-port="29450"
+port="29441"
 
-batch_size=(64)
+batch_size=(256)
 accum_iter=(1)
 
-epochs="100"
-warmup_epochs="10"
+epochs="300"
+warmup_epochs="5"
 
 # Callback parameters
-patience="15"
-max_delta="0.05" # for RMSE
+patience="-1"
+max_delta="0.0"     # for RMSE
+
+eval_criterion="pcc"
 
 # Model parameters
-model_size="baseDeep"
+model_size="hugeDeep"
 model="vit_"$model_size"_patchX"
 
 univariate="False"
@@ -37,14 +39,14 @@ freeze_pos_embed_y="False"
 
 input_channels="1"
 input_electrodes="32"
-time_steps="1008"
+time_steps="216"
 
 patch_height="1"
 patch_width=(24)
 
 # Pooling strategy
-global_pool=(False)
-attention_pool=(True)
+global_pool=(True)
+attention_pool=(False)
 
 # Augmentation parameters
 masking_blockwise="False"
@@ -59,15 +61,16 @@ jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
+drop_path=(0.1)
+layer_decay=(0.75)
+
 # Optimizer parameters
-blr=(1e-5) # 3e-5 if from scratch
+blr=(1e-3) # 1e-5 3e-5) # 1e-4 3e-4 1e-3) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
 # Criterion parameters
 smoothing=(0.1)
-
-eval_criterion="rmse"
 
 # Output path
 folder="Age"
@@ -76,7 +79,7 @@ folder="Age"
 save_output="False"
 wandb="True"
 wandb_entity="oturgut"
-wandb_project="OTIS_Age_Regression"
+wandb_project="MAE_EEG_Age"
 wandb_id=""
 
 plot_attention_map="False"
@@ -89,7 +92,6 @@ for fold in "${folds[@]}"
 do
 
     # Data path
-    path="server"
     if [ "$path" = "tower" ]; then
         data_base="/home/oturgut/data/processed/LEMON/kfold/fold"$fold
         checkpoint_base="/home/oturgut/SiT"
@@ -122,21 +124,43 @@ do
 
     for sd in "${seed[@]}"
     do
+
         for bs in "${batch_size[@]}"
         do
+            for ld in "${layer_decay[@]}"
+            do
                 for lr in "${blr[@]}"
                 do
+
+                    for dp in "${drop_path[@]}"
+                    do 
                         for wd in "${weight_decay[@]}"
                         do
                             for smth in "${smoothing[@]}"
                             do
 
                                 folder=$folder"/fold"$fold
-                                subfolder="seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/smth"$smth"/wd"$wd
+                                subfolder="seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$wd
+
+                                if [ "$univariate" = "True" ]; then
+                                    subfolder="univariate/"$subfolder
+                                else
+                                    subfolder="multivariate/"$subfolder
+                                fi
+
+                                if [ "$global_pool" = "True" ]; then
+                                    subfolder=$subfolder"/gap"
+                                elif [ "$attention_pool" = "True" ]; then
+                                    subfolder=$subfolder"/ap"
+                                else
+                                    subfolder=$subfolder"/cls"
+                                fi
                                 
                                 # OTiS 
                                 if [ "$model_size" = "baseDeep" ]; then
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                    # finetune="/vol/aimspace/users/tuo/SiT/output/gen/otis/single/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1_blr1e0/checkpoint-96-mse-0.1988.pth"
+                                    # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr1e-5/checkpoint-99-ncc-0.8662.pth"
                                 elif [ "$model_size" = "largeDeep" ]; then
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                 else
@@ -144,26 +168,14 @@ do
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                                 fi
 
-                                # finetune=$checkpoint_base"/output/pre/tuh/eeg/all/15ch/ncc_weight0.1/seed0/tiny/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-196-ncc-0.78.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/TempEncoder/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-173-ncc-0.8602.pth"
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/TempEncoder/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-198-ncc-0.8919.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/posEncX60/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8828.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8803.pth"
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.9177.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/NewRandomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8799.pth"
-
                                 output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 
                                 # resume=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$bs"_blr"$lr"/checkpoint-4-pcc-0.54.pth"
 
                                 if [ "$path" = "tower" ]; then
-                                    cmd="python3 main_linprobe.py --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epochs $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                                    cmd="python3 main_finetune.py --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $dp --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epochs $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                                 else
-                                    cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_linprobe.py --world_size $world_size --dist_eval --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --weight_decay $wd --min_lr $min_lr --blr $lr --warmup_epochs $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                                    cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune.py --world_size $world_size --dist_eval --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $dp --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epochs $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                                 fi
 
                                 if [ "$univariate" = "True" ]; then
@@ -260,4 +272,5 @@ do
         done
 
     done
+
 done

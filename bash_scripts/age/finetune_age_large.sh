@@ -3,7 +3,7 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-num_workers="24"
+num_workers="16"
 
 path="server"       # [tower, server]
 submitit="False"    # only for training on server
@@ -11,20 +11,22 @@ submitit="False"    # only for training on server
 nodes="1"
 world_size="4"      # number of GPUs
 mem_per_task="96"   # memory per GPU
-port="29450"
+port="29430"
 
-batch_size=(32)
+batch_size=(256)
 accum_iter=(1)
 
-epochs="100"
-warmup_epochs="10"
+epochs="300"
+warmup_epochs="5"
 
 # Callback parameters
-patience="15"
-max_delta="0.15" # for AUROC
+patience="-1"
+max_delta="0.0"     # for PCC
+
+eval_criterion="pcc"
 
 # Model parameters
-model_size="baseDeep"
+model_size="largeDeep"
 model="vit_"$model_size"_patchX"
 
 univariate="False"
@@ -36,8 +38,8 @@ ignore_pos_embed_y="False"
 freeze_pos_embed_y="False"
 
 input_channels="1"
-input_electrodes="30"
-time_steps="1008"
+input_electrodes="32"
+time_steps="504"
 
 patch_height="1"
 patch_width=(24)
@@ -60,39 +62,36 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
 drop_path=(0.1)
-layer_decay=(0.5)
+layer_decay=(0.75)
 
 # Optimizer parameters
-blr=(3e-5) # 3e-5 if from scratch
+blr=(1e-5 3e-5 1e-4 3e-4 1e-3) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
 # Criterion parameters
 smoothing=(0.1)
 
-eval_criterion="rmse"
-
 # Output path
 folder="Age"
 
 # Log specifications
-save_output="True"
+save_output="False"
 wandb="True"
 wandb_entity="oturgut"
-wandb_project="OTIS_Age_Regression"
+wandb_project="MAE_EEG_Age"
 wandb_id=""
 
 plot_attention_map="False"
 plot_embeddings="False"
 save_embeddings="False"
-save_logits="True"
+save_logits="False"
 
 folds=(0) # 1 2 3 4 5 6 7 8 9)
 for fold in "${folds[@]}"
 do
 
     # Data path
-    path="server"
     if [ "$path" = "tower" ]; then
         data_base="/home/oturgut/data/processed/LEMON/kfold/fold"$fold
         checkpoint_base="/home/oturgut/SiT"
@@ -143,27 +142,31 @@ do
                                 folder=$folder"/fold"$fold
                                 subfolder="seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$wd
                                 
+                                if [ "$univariate" = "True" ]; then
+                                    subfolder="univariate/"$subfolder
+                                else
+                                    subfolder="multivariate/"$subfolder
+                                fi
+
+                                if [ "$global_pool" = "True" ]; then
+                                    subfolder=$subfolder"/gap"
+                                elif [ "$attention_pool" = "True" ]; then
+                                    subfolder=$subfolder"/ap"
+                                else
+                                    subfolder=$subfolder"/cls"
+                                fi
+                                
                                 # OTiS 
                                 if [ "$model_size" = "baseDeep" ]; then
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                    # finetune="/vol/aimspace/users/tuo/SiT/output/gen/otis/single/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1_blr1e0/checkpoint-96-mse-0.1988.pth"
+                                    # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr1e-5/checkpoint-99-ncc-0.8662.pth"
                                 elif [ "$model_size" = "largeDeep" ]; then
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                 else
                                     # huge
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                                 fi
-
-                                # finetune=$checkpoint_base"/output/pre/tuh/eeg/all/15ch/ncc_weight0.1/seed0/tiny/t3000/p1x100/wd0.15/m0.8/pre_b256_blr1e-5/checkpoint-196-ncc-0.78.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/TempEncoder/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-173-ncc-0.8602.pth"
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/TempEncoder/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-198-ncc-0.8919.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/posEncX60/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8828.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/WLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.8803.pth"
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/noTempEncoder/noWLoss/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b768_blr1e-5/checkpoint-198-ncc-0.9177.pth"
-
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/fresh/WLoss/NewRandomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8799.pth"
 
                                 output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 

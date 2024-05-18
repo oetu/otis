@@ -5,27 +5,31 @@
 seed=(0)
 num_workers="24"    # number of CPUs
 
-path="server"       # [tower, server]
+path="tower"       # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
-world_size="4"      # number of GPUs
+world_size="1"      # number of GPUs
 mem_per_task="96"   # memory per GPU
-port="29425"
+port="29416"
 
-batch_size=(48)
+batch_size=(128)
 accum_iter=(1)
 
-epochs="100"
-warmup_epochs="10"
+epochs="400"
+warmup_epochs="40"
 
 # Callback parameters
-patience="15"
-max_delta="0.25" # for AUROC
+patience="20"
+max_delta="0.1"
+
+eval_criterion="acc"
 
 # Model parameters
-model_size="largeDeep"
+model_size="baseDeep"
 model="vit_"$model_size"_patchX"
+
+univariate="False"
 
 # Pretraining specifications
 from_scratch="False"
@@ -34,15 +38,13 @@ ignore_pos_embed_y="False"
 freeze_pos_embed_y="False"
 
 input_channels="1"
-input_electrodes="12"
-time_steps="2520"
 
 patch_height="1"
 patch_width=(24)
 
 # Pooling strategy
-global_pool=(True)
-attention_pool=(False)
+global_pool=(False)
+attention_pool=(True)
 
 # Augmentation parameters
 masking_blockwise="False"
@@ -58,10 +60,10 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
 drop_path=(0.1)
-layer_decay=(0.5)
+layer_decay=(0.25)
 
 # Optimizer parameters
-blr=(3e-4) # 3e-5 if from scratch
+blr=(3e-1) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1)
 
@@ -69,86 +71,69 @@ weight_decay=(0.1)
 smoothing=(0.1)
 
 # Output path
-folder="LV"
+folder="Epilepsy"
+nb_classes="2"
+input_electrodes="1"
+time_steps="168"
+
+# folder="FD-B"
+# nb_classes="3"
+# input_electrodes="1"
+# time_steps="5112"
+
+# folder="Gesture"
+# nb_classes="8"
+# input_electrodes="3"
+# time_steps="192"
+
+# folder="EMG"
+# nb_classes="3"
+# input_electrodes="1"
+# time_steps="1488"
 
 # Log specifications
 save_output="True"
 wandb="True"
-wandb_project="MAE_ECG_LV"
+wandb_entity="oturgut"
+wandb_project="OTiS_"$folder"_Classification"
 wandb_id=""
-
-# Data path
-if [ "$path" = "tower" ]; then
-    data_base="/home/oturgut/data/processed/UKBB"
-    checkpoint_base="/home/oturgut/SiT"
-else
-    data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
-    checkpoint_base="/vol/aimspace/users/tuo/SiT"
-fi
-
-# Dataset parameters
-# Training balanced
-# data_path=$data_base"/otis/ecgs_train_flutter_all_balanced__float32.pt"
-# labels_path=$data_base"/labelsOneHot/labels_train_flutter_all_balanced.pt"
-# downstream_task="classification"
-# nb_classes="2"
-# data_path=$data_base"/otis/ecgs_train_diabetes_all_balanced_float32.pt"
-# labels_path=$data_base"/labelsOneHot/labels_train_diabetes_all_balanced.pt"
-# downstream_task="classification"
-# nb_classes="2"
-# data_path=$data_base"/otis/ecgs_train_CAD_all_balanced_float32.pt"
-# labels_path=$data_base"/labelsOneHot/labels_train_CAD_all_balanced.pt"
-# downstream_task="classification"
-# nb_classes="2"
-# data_path=$data_base"/ecgs_train_CAD_hundredth_balanced_noBase_gn.pt"
-# labels_path=$data_base"/labelsOneHot/labels_train_CAD_hundredth_balanced.pt"
-# downstream_task="classification"
-# nb_classes="2"
-data_path=$data_base"/otis/ecgs_train_Regression_float32.pt"
-labels_path=$data_base"/labelsOneHot/labels_train_Regression_stdNormed.pt"
-labels_mask_path=$data_base"/labels_train_Regression_mask.pt"
-downstream_task="regression"
-# LV
-lower_bnd="0"
-upper_bnd="6"
-nb_classes="6"
-# # RV
-# lower_bnd="6"
-# upper_bnd="10"
-# nb_classes="4"
-# # WT
-# lower_bnd="24"
-# upper_bnd="41"
-# nb_classes="17"
-# # Ecc
-# lower_bnd="41"
-# upper_bnd="58"
-# nb_classes="17"
-# # Err
-# lower_bnd="58"
-# upper_bnd="75"
-# nb_classes="17"
-
-# Validation unbalanced
-# val_data_path=$data_base"/otis/ecgs_val_ecg_imaging_float32.pt"
-# val_labels_path=$data_base"/labelsOneHot/labels_val_CAD_all.pt"
-# val_labels_path=$data_base"/labelsOneHot/labels_val_diabetes_all.pt"
-# val_labels_path=$data_base"/labelsOneHot/labels_val_flutter_all.pt"
-# pos_label="1"
-val_data_path=$data_base"/otis/ecgs_val_Regression_float32.pt"
-val_labels_path=$data_base"/labelsOneHot/labels_val_Regression_stdNormed.pt"
-val_labels_mask_path=$data_base"/labels_val_Regression_mask.pt"
 
 plot_attention_map="False"
 plot_embeddings="False"
 save_embeddings="False"
 save_logits="False"
 
+# Data path
+if [ "$path" = "tower" ]; then
+    data_base="/home/oturgut/data/processed/benchmarks/classification/"$folder
+    checkpoint_base="/home/oturgut/SiT"
+else
+    data_base="/vol/aimspace/users/tuo/data/processed/benchmarks/classification/"$folder
+    checkpoint_base="/vol/aimspace/users/tuo/SiT"
+fi
+
+# Dataset parameters
+# Training
+data_path=$data_base"/train.pt"
+labels_path=$data_base"/train_labels.pt"
+downstream_task="classification"
+
+# Validation
+val_data_path=$data_base"/val.pt"
+val_labels_path=$data_base"/val_labels.pt"
+
+# Test
+test="True"
+test_data_path=$data_base"/test.pt"
+test_labels_path=$data_base"/test_labels.pt"
+
 # EVALUATE
-eval="False"
 # As filename: State the checkpoint for the inference of a specific model
 # or state the (final) epoch for the inference of all models up to this epoch
-#resume=$checkpoint_base"/output/fin/"$folder"/id/"$subfolder"/fin_b"$(($batch_size*$accum_iter))"_blr"$blr"/checkpoint-89.pth"
+# eval_ckpt="checkpoint-253-avg-100.0000.pth"
+# blr=(3e-3)
+# val_data_path=$data_base"/test.pt"
+# val_labels_path=$data_base"/test_labels.pt"
 
 for sd in "${seed[@]}"
 do
@@ -167,48 +152,33 @@ do
                         for smth in "${smoothing[@]}"
                         do
 
-                            subfolder=("seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$weight_decay"/m0.8")
+                            subfolder=("seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$wd)
+
+                            if [ "$univariate" = "True" ]; then
+                                subfolder="univariate/"$subfolder
+                            else
+                                subfolder="multivariate/"$subfolder
+                            fi
+
+                            if [ "$global_pool" = "True" ]; then
+                                subfolder=$subfolder"/gap"
+                            elif [ "$attention_pool" = "True" ]; then
+                                subfolder=$subfolder"/ap"
+                            else
+                                subfolder=$subfolder"/cls"
+                            fi
 
                             # OTiS
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2432_blr3e-5/checkpoint-94-ncc-0.7729.pth"
-                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b3328_blr1e-5/checkpoint-97-ncc-0.7665.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
-
-                            # SiT
-                            # finetune="/home/oturgut/SiT/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/refactored/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9455.pth"
-                            
-                            # SiT-like UKBB
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/test2/checkpoint-34-ncc-0.5850.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-299-ncc-0.9626.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-5/checkpoint-298-ncc-0.9575.pth"
-
-                            # # MAE + MMCL
-                            # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"
-                            
-                            # # MMCL only
-                            # finetune=$checkpoint_base"/checkpoints/mm_v283_mae_checkpoint.pth"
-
-                            # # MAE only
-                            # finetune=$checkpoint_base"/checkpoints/tiny/v1/checkpoint-399.pth"
-                            # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/cl/ncc_weight0.1/seed0/tiny/t2500/p1x100/wd0.15/m0.8/pre_b1536_blr3e-6/checkpoint-398-ncc-0.9573.pth"
-                            # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/cos/ncc_weight0.1/seed0/tiny/t2500/p1x100/wd0.15/m0.8/pre_b1024_blr3e-6/checkpoint-396-ncc-0.9567.pth"
-                            # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/ncc_weight0.1/seed0/tiny/t2500/p1x100/wd0.15/m0.8/pre_b1536_blr3e-6/checkpoint-399-ncc-0.96.pth"
-                            # finetune="/home/oturgut/mae/output/pre/ukbb/ecg/ncc_weight0.1/seed0/tinyDeep/t2500/p1x100/wd0.15/m0.8/pre_b1536_blr3e-6/checkpoint-394-ncc-0.9590.pth"
-
-                            # # BYOL 
-                            # finetune=$checkpoint_base"/checkpoints/ecg/ecg_v204_um_checkpoint.pth"
-
-                            # # BarlowTwins
-                            # finetune=$checkpoint_base"/checkpoints/ecg/ecg_v305_um_checkpoint.pth"
-
-                            # # SimCLR
-                            # finetune=$checkpoint_base"/checkpoints/ecg/ecg_v404_um_checkpoint.pth"
-
-                            # # CLOCS
-                            # finetune=$checkpoint_base"/checkpoints/ecg/ecg_v150_mae_checkpoint.pth"
+                            if [ "$model_size" = "baseDeep" ]; then
+                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/gen/otis/single/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1_blr1e0/checkpoint-96-mse-0.1988.pth"
+                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr1e-5/checkpoint-99-ncc-0.8662.pth"
+                            elif [ "$model_size" = "largeDeep" ]; then
+                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                            else
+                                # huge
+                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                            fi
 
                             output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 
@@ -220,6 +190,18 @@ do
                                 cmd="python3 submitit_finetune.py --mem_per_task $mem_per_task --ngpus $world_size --nodes $nodes --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $dp --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epochs $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
                             else
                                 cmd="torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune.py --world_size $world_size --dist_eval --seed $sd --downstream_task $downstream_task --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $dp --weight_decay $wd --layer_decay $ld --min_lr $min_lr --blr $lr --warmup_epochs $warmup_epochs --smoothing $smth --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+                            fi
+                            
+                            if [ "$test" = "True" ]; then
+                                cmd=$cmd" --test --test_data_path $test_data_path --test_labels_path $test_labels_path"
+                            fi
+
+                            if [ "$univariate" = "True" ]; then
+                                cmd=$cmd" --univariate"
+                            fi
+
+                            if [ ! -z "$eval_criterion" ]; then
+                                cmd=$cmd" --eval_criterion $eval_criterion"
                             fi
 
                             if [ "$ignore_pos_embed_y" = "True" ]; then
@@ -263,7 +245,7 @@ do
                             fi
 
                             if [ "$wandb" = "True" ]; then
-                                cmd=$cmd" --wandb --wandb_project $wandb_project"
+                                cmd=$cmd" --wandb --wandb_entity $wandb_entity --wandb_project $wandb_project"
                                 if [ ! -z "$wandb_id" ]; then
                                     cmd=$cmd" --wandb_id $wandb_id"
                                 fi
@@ -289,8 +271,8 @@ do
                                 cmd=$cmd" --save_logits"
                             fi
 
-                            if [ "$eval" = "True" ]; then
-                                cmd=$cmd" --eval --resume $resume"
+                            if [ ! -z "$eval_ckpt" ]; then
+                                cmd=$cmd" --eval --resume $output_dir"/"$eval_ckpt"
                             fi
 
                             if [ ! -z "$resume" ]; then
