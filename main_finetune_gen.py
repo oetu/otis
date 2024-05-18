@@ -150,6 +150,10 @@ def get_args_parser():
     parser.add_argument('--downstream_task', default='forecasting', type=str, choices=downstream_tasks,
                         help='downstream task (default: forecasting)')
     
+    eval_criterions = ["total_loss", "loss", "ncc", "mse", "mae"]
+    parser.add_argument('--eval_criterion', default='mse', type=str, choices=eval_criterions,
+                        help='downstream task evaluation metric (default: mse)')
+    
     parser.add_argument('--data_path', default='_.pt', type=str,
                         help='dataset path')
     parser.add_argument('--val_data_path', default='', type=str,
@@ -160,6 +164,8 @@ def get_args_parser():
     parser.add_argument('--log_dir', default='',
                         help='path where to tensorboard log (default: ./logs)')
     parser.add_argument('--wandb', action='store_true', default=False)
+    parser.add_argument('--wandb_entity', default='', type=str,
+                        help='entity of the current run')
     parser.add_argument('--wandb_project', default='',
                         help='project where to wandb log')
     parser.add_argument('--wandb_id', default='', type=str,
@@ -193,6 +199,8 @@ def get_args_parser():
 
 
 def main(args):
+    args.patch_size = (args.patch_height, args.patch_width)
+
     print(f"cuda devices: {torch.cuda.device_count()}")
     misc.init_distributed_mode(args)
     # args.distributed = False
@@ -201,13 +209,11 @@ def main(args):
     if args.wandb == True and misc.is_main_process():
         config = vars(args)
         if args.wandb_id:
-            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity="oturgut")
+            wandb.init(project=args.wandb_project, id=args.wandb_id, config=config, entity=args.wandb_entity)
         else:
-            wandb.init(project=args.wandb_project, config=config, entity="oturgut")
+            wandb.init(project=args.wandb_project, config=config, entity=args.wandb_entity)
 
         args.__dict__ = wandb.config.as_dict()
-
-    args.patch_size = (args.patch_height, args.patch_width)
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
@@ -313,7 +319,10 @@ def main(args):
 
         # check if new and old patch_size match
         checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
-        if checkpoint_patch_size != args.patch_size:
+        patch_height_ckpt, patch_width_ckpt = checkpoint_patch_size[0], checkpoint_patch_size[1]
+        patch_height_model, patch_width_model = args.patch_size[0], args.patch_size[1]
+
+        if patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
             new_patch_size = True
             # initialize new patch_embed
             for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
@@ -560,27 +569,25 @@ def main(args):
     early_stop = EarlyStop(patience=args.patience, max_delta=args.max_delta)
 
     print(f"Start training for {args.epochs} epochs")
-
-    eval_criterion = "mse"
     
     best_stats = {'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
-    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[eval_criterion]]}
+    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
         if epoch == args.warmup_epochs*10:
-            n_parameters_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
             print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
 
             print("Unfreezing the decoder")
-            for _, p in model.decoder_embed.named_parameters():
+            for _, p in model_without_ddp.decoder_embed.named_parameters():
                 p.requires_grad = True
-            for n, p in model.decoder_pos_embed_y.named_parameters():
+            for n, p in model_without_ddp.decoder_pos_embed_y.named_parameters():
                 p.requires_grad = True
-            for _, p in model.decoder_blocks[:].named_parameters():
+            for _, p in model_without_ddp.decoder_blocks[:].named_parameters():
                 p.requires_grad = True
 
-            n_parameters_model = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
             print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
 
             # adding all (new) parameters to the optimizer except for the ones in skip_list
@@ -603,39 +610,39 @@ def main(args):
         val_stats, val_history = evaluate(data_loader_val, model, device, epoch,
                                           log_writer=log_writer, args=args)
 
-        if eval_criterion in ["total_loss", "loss", "mse", "mae"]:
-            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+        if args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
+            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
-            if args.output_dir and val_stats[eval_criterion] <= max(best_eval_scores['eval_criterion']):
+            if args.output_dir and val_stats[args.eval_criterion] <= max(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'])
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(val_stats[eval_criterion])
+                best_eval_scores['eval_criterion'].append(val_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=args.eval_criterion, 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
-            if early_stop.evaluate_increasing_metric(val_metric=val_stats[eval_criterion]) and misc.is_main_process():
+            if early_stop.evaluate_increasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
-            if args.output_dir and val_stats[eval_criterion] >= min(best_eval_scores['eval_criterion']):
+            if args.output_dir and val_stats[args.eval_criterion] >= min(best_eval_scores['eval_criterion']):
                 # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'], reverse=True)
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(val_stats[eval_criterion])
+                best_eval_scores['eval_criterion'].append(val_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=args.eval_criterion, 
                     mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
 
         best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
