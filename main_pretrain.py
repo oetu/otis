@@ -21,7 +21,7 @@ import torch
 import torch.backends.cudnn as cudnn
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
-os.environ["WANDB__SERVICE_WAIT"] = "500"
+# os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
@@ -401,7 +401,10 @@ def main(args):
 
         # check if new and old patch_size match
         checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
-        if checkpoint_patch_size != args.patch_size:
+        patch_height_ckpt, patch_width_ckpt = checkpoint_patch_size[0], checkpoint_patch_size[1]
+        patch_height_model, patch_width_model = args.patch_size[0], args.patch_size[1]
+
+        if patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
             new_patch_size = True
             # initialize new patch_embed module
             for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
