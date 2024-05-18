@@ -120,12 +120,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     training_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
         labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)             # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
-        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
-        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")
+        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")   # macro
+        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")         # macro
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
-        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")
+        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")                   # macro
         auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="weighted")
 
         training_stats["f1"] = f1
@@ -267,7 +267,8 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         torch.save(embeddings, os.path.join(embeddings_path, file_name))
 
     # gather the stats from all processes
-    metric_logger.synchronize_between_processes()
+    if epoch != -1:
+        metric_logger.synchronize_between_processes()
 
     logits = torch.cat(logits, dim=0).to(device="cpu", dtype=torch.float32).detach()    # (B, num_classes)
     probs = torch.nn.functional.softmax(logits, dim=-1)                                 # (B, num_classes)
@@ -284,12 +285,12 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
     test_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
         labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)                 # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
-        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
-        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")
+        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")    # macro
+        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")          # macro
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
-        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")
+        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")                    # macro
         auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="weighted")
         
         test_stats["f1"] = f1

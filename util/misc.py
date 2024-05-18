@@ -385,6 +385,45 @@ def load_model(args, model_without_ddp, optimizer, loss_scaler):
             print("With optim & sched!")
 
 
+def get_best_ckpt(data_path, eval_criterion):
+    print(f"Searching for the checkpoint file with the best evaluation score in: {data_path}")
+
+    # Regex pattern to match the filenames and extract the scores
+    pattern = re.compile(r'checkpoint-\d+'+f'-{eval_criterion}-'+r'(\d+\.\d+)\.pth')
+
+    # Variables to keep track of the best score and corresponding filename
+
+    incr_criterions = ["acc", "acc_balanced", "precision", "recall", "f1", 
+                       "auroc", "auprc", "avg", "pcc", "r2"]
+
+    incr_metric = eval_criterion in incr_criterions
+
+    best_score = -1 if incr_metric else 1e9
+    best_file = None
+
+    # Iterate through all files in the directory
+    for filename in os.listdir(data_path):
+        print(f"Is it this one?: {filename}")
+        # Check if the filename matches the pattern
+        match = pattern.match(filename)
+        if match:
+            # Extract the score from the filename
+            score = float(match.group(1))
+            # Update the best score and filename if current score is better
+            if incr_metric and score > best_score:
+                best_score = score
+                best_file = filename
+            
+            if not incr_metric and score < best_score:
+                best_score = score
+                best_file = filename
+
+    # Print the filename with the highest score
+    print(f"The checkpoint file with the best evaluation score is: {best_file}")
+
+    return os.path.join(data_path, best_file)
+
+
 def all_reduce_mean(x):
     world_size = get_world_size()
     if world_size > 1:

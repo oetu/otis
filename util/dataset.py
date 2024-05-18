@@ -32,14 +32,9 @@ class TimeSeriesDataset(Dataset):
         # .unsqueeze(0) to add auxiliary channel (similar to rgb in imgs)
         domain = [(sample[0], sample[1].unsqueeze(0).shape) for sample in data]
         data = [sample[1].unsqueeze(0) for sample in data]
-        # if train:
-        #     data = [sample[1][..., :10452].unsqueeze(0) for sample in data[:1]]
-        #     # data = [sample[1][..., :676].unsqueeze(0) for sample in data[:1]]
-        # if not train:
-        #     # data = [sample[1][..., :10452].unsqueeze(0) for sample in data[:1]]
-        #     # data = [sample[1][..., 10452:13936].unsqueeze(0) for sample in data[:1]]
-        #     data = [sample[1][..., 13936:].unsqueeze(0) for sample in data[:1]]
-        #     # data = [sample[1][..., 773:].unsqueeze(0) for sample in data[:1]]
+        
+        # print(f"DATA DOMAIN: {sorted(list(set(domain)))}")
+        # print(f"DATA SHAPE: {data[0].shape}")
 
         self.univariate = univariate
         self.domain_agnostic = True if self.univariate else domain_agnostic

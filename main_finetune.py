@@ -11,6 +11,8 @@
 import os
 import argparse
 
+import re
+
 import json
 from typing import Tuple
 import numpy as np
@@ -19,9 +21,12 @@ from pathlib import Path
 
 import torch
 import torch.backends.cudnn as cudnn
+
+import torch.distributed as dist
+
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
-os.environ["WANDB__SERVICE_WAIT"] = "500"
+# os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 # assert timm.__version__ == "0.3.2" # version check
 from timm.models.layers import trunc_normal_
@@ -191,6 +196,14 @@ def get_args_parser():
     parser.add_argument('--val_labels_mask_path', default='', type=str,
                         help='validation labels path (default: None)')
 
+    parser.add_argument('--test', action='store_true', default=False)
+    parser.add_argument('--test_data_path', default='', type=str,
+                        help='test dataset path (default: None)')
+    parser.add_argument('--test_labels_path', default='', type=str,
+                        help='test labels path (default: None)')
+    parser.add_argument('--test_labels_mask_path', default='', type=str,
+                        help='test labels path (default: None)')
+
     parser.add_argument('--lower_bnd', type=int, default=0, metavar='N',
                         help='lower_bnd')
     parser.add_argument('--upper_bnd', type=int, default=0, metavar='N',
@@ -247,6 +260,9 @@ def get_args_parser():
     return parser
 
 def main(args):
+    args.input_size = (args.input_channels, args.input_electrodes, args.time_steps)
+    args.patch_size = (args.patch_height, args.patch_width)
+
     print(f"cuda devices: {torch.cuda.device_count()}")
     misc.init_distributed_mode(args)
     # args.distributed = False
@@ -260,9 +276,6 @@ def main(args):
             wandb.init(project=args.wandb_project, config=config, entity=args.wandb_entity)
 
         args.__dict__ = wandb.config.as_dict()
-
-    args.input_size = (args.input_channels, args.input_electrodes, args.time_steps)
-    args.patch_size = (args.patch_height, args.patch_width)
 
     print('job dir: {}'.format(os.path.dirname(os.path.realpath(__file__))))
     print("{}".format(args).replace(', ', ',\n'))
@@ -292,12 +305,23 @@ def main(args):
                                     univariate=args.univariate,
                                     train=False, 
                                     args=args)
+    dataset_test = TimeSeriesDataset(data_path=args.test_data_path, 
+                                    labels_path=args.test_labels_path, 
+                                    labels_mask_path=args.test_labels_mask_path, 
+                                    downstream_task=args.downstream_task, 
+                                    domain_offsets=dataset_train.offsets, 
+                                    univariate=args.univariate,
+                                    train=False, 
+                                    args=args)
 
     # train balanced
     # class_weights = 2.0 / (2.0 * torch.Tensor([1.0, 1.0])) # total_nb_samples / (nb_classes * samples_per_class)
+    # class_weights = torch.tensor([18.5858,  1.3027,  2.0465, 12.1734,  1.2699,  0.2618])
+    # class_weights = torch.ones(6)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
+    print("Test set size: ", len(dataset_test))
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -319,9 +343,20 @@ def main(args):
         else:
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
         # print("Sampler_val = %s" % str(sampler_val))
+
+        if args.dist_eval:
+            if len(dataset_test) % num_tasks != 0:
+                print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
+                      'This will slightly alter validation results as extra duplicate entries are added to achieve '
+                      'equal num of samples per-process.')
+            sampler_test = torch.utils.data.DistributedSampler(
+                dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=True)  # shuffle=True to reduce monitor bias
+        else:
+            sampler_test = torch.utils.data.SequentialSampler(dataset_test)
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+        sampler_test = torch.utils.data.SequentialSampler(dataset_test)
 
     # tensorboard logging
     if False: #global_rank == 0 and args.log_dir and not args.eval:
@@ -354,6 +389,17 @@ def main(args):
         drop_last=False
     )
 
+    data_loader_test = torch.utils.data.DataLoader(
+        dataset_test, 
+        sampler=sampler_test,
+        # shuffle=False,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        collate_fn=dataset_test.collate_fn_ft,
+        pin_memory=args.pin_mem,
+        drop_last=False
+    )
+
     mixup_fn = None
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
     if mixup_active:
@@ -377,6 +423,7 @@ def main(args):
         mask_t_ratio=args.mask_t_ratio
     )
 
+    new_patch_size = False
     if args.finetune and not args.eval:
         checkpoint = torch.load(args.finetune, map_location='cpu')
 
@@ -388,6 +435,21 @@ def main(args):
                 print(f"Removing key {k} from pretrained checkpoint")
                 del checkpoint_model[k]
 
+        # check if new and old patch_size match
+        checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
+        patch_height_ckpt, patch_width_ckpt = checkpoint_patch_size[0], checkpoint_patch_size[1]
+        patch_height_model, patch_width_model = args.patch_size[0], args.patch_size[1]
+
+        if patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
+            new_patch_size = True
+            # initialize new patch_embed
+            for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
+                        "patch_embed.norm.weight", "patch_embed.norm.bias"]:
+                if key in checkpoint_model:
+                    print(f"Removing key {key} from pretrained checkpoint")
+                    del checkpoint_model[key]
+            print("Initializing new patch_embed")
+
         # load pos_embed_x
         interpolate_pos_embed_x(model, checkpoint_model)
 
@@ -397,6 +459,7 @@ def main(args):
             del checkpoint_model[key]
 
         # load pos_embed_y together with domain_offsets
+        print(f"Identified domain: {dataset_train.domains}")
         assert len(dataset_train.domains) == 1, "There is more than one domain in the target dataset"
         target_domain = list(dataset_train.domains.keys())[0]
         target_shape = list(dataset_train.domains.values())[0]
@@ -416,11 +479,15 @@ def main(args):
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
             print("Loading pos_embed_y from checkpoint")
+            print(f"Current pos_embed_y shape: {model.pos_embed_y.weight.shape}")
+            model.pos_embed_y = None
             model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
+            print(f"New pos_embed_y shape: {model.pos_embed_y.weight.shape}")
 
             # load domain_offsets
             dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
             dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
+            dataset_test.set_domain_offsets(checkpoint["domain_offsets"])
         else:
             print("Initializing new pos_embed_y")
 
@@ -434,14 +501,14 @@ def main(args):
         print(msg)
 
         if args.global_pool:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias', 
-                                             'pos_embed_x', 'pos_embed_y.weight'}
+            assert {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias', 
+                    'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
         elif args.attention_pool:
             assert {'head.weight', 'head.bias', 'fc_norm.weight', 'fc_norm.bias', 
                     'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
         else:
-            assert set(msg.missing_keys) == {'head.weight', 'head.bias', 
-                                             'pos_embed_x', 'pos_embed_y.weight'}
+            assert {'head.weight', 'head.bias', 
+                    'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
 
         # manually initialize fc layer
         trunc_normal_(model.head.weight, std=0.01)#2e-5)
@@ -463,6 +530,18 @@ def main(args):
         checkpoint = torch.load(args.resume, map_location='cpu')
         checkpoint_model = checkpoint['model']
         interpolate_pos_embed_x(model, checkpoint_model)
+
+        # load pos_embed_y from checkpoint
+        print(f"Current pos_embed_y shape: {model.pos_embed_y.weight.shape}")
+        model.pos_embed_y = None
+        model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
+        print(f"New pos_embed_y shape: {model.pos_embed_y.weight.shape}")
+
+        # load domain_offsets
+        print(f"Current domain_offsets: {dataset_train.offsets}")
+        dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
+        dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
+        print(f"New domain_offsets: {dataset_train.offsets}")
     
     model.to(device, non_blocking=True)
 
@@ -495,6 +574,7 @@ def main(args):
     loss_scaler = NativeScaler()
 
     # class_weights = class_weights.to(device=device, non_blocking=True)
+    class_weights = None
     if args.downstream_task == 'regression':
         criterion = torch.nn.MSELoss()
     elif mixup_fn is not None:
@@ -502,11 +582,11 @@ def main(args):
         criterion = SoftTargetCrossEntropy()
     elif args.smoothing > 0.:
         # criterion = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
-        # criterion = torch.nn.CrossEntropyLoss(weight=class_weights, label_smoothing=args.smoothing)
-        criterion = torch.nn.CrossEntropyLoss(label_smoothing=args.smoothing)
+        criterion = torch.nn.CrossEntropyLoss(weight=class_weights, label_smoothing=args.smoothing)
+        # criterion = torch.nn.CrossEntropyLoss(label_smoothing=args.smoothing)
     else:
-        # criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
-        criterion = torch.nn.CrossEntropyLoss()
+        criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+        # criterion = torch.nn.CrossEntropyLoss()
 
     print("criterion = %s" % str(criterion))
 
@@ -526,7 +606,7 @@ def main(args):
 
             misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
-            test_stats, test_history = evaluate(data_loader_val, model, device, epoch, log_writer=log_writer, args=args)
+            test_stats, test_history = evaluate(data_loader_val, model_without_ddp, device, epoch, log_writer=log_writer, args=args)
             if args.downstream_task == 'classification':
                 print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
                       f"{test_stats['acc']:.2f}% / {test_stats['acc_balanced']:.2f}% / {test_stats['precision']:.2f}% / {test_stats['recall']:.2f}% / ",
@@ -546,8 +626,8 @@ def main(args):
     
     print(f"Start training for {args.epochs} epochs")
     
-    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 'avg':0.0,
-                  'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
+    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 
+                  'avg':0.0, 'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
     best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
@@ -561,6 +641,8 @@ def main(args):
         test_stats, test_history = evaluate(data_loader_val, model_without_ddp, device, epoch, log_writer=log_writer, args=args)
 
         if args.eval_criterion in ["loss", "rmse", "mae"]:
+            test_stats['avg'] = (test_stats['rmse'] + test_stats['mae']) / 2
+
             if early_stop.evaluate_decreasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
@@ -576,10 +658,12 @@ def main(args):
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
-                    mode="decreasing")
+                    mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
-            if args.eval_criterion == 'avg':
-                test_stats['avg'] = (test_stats['acc'] + test_stats['precision'] + test_stats['recall'] + test_stats['f1']) / 4
+            if args.downstream_task == 'classification':
+                test_stats['avg'] = (test_stats['acc_balanced'] + test_stats['precision'] + test_stats['recall'] + test_stats['f1']) / 4
+            elif args.downstream_task == 'regression':
+                test_stats['avg'] = (test_stats['pcc'] + test_stats['r2']) / 2
             
             if early_stop.evaluate_increasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
@@ -596,7 +680,7 @@ def main(args):
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
-                    mode="increasing")
+                    mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
 
         best_stats['loss'] = min(best_stats['loss'], test_stats['loss'])
         
@@ -609,6 +693,8 @@ def main(args):
             best_stats['acc_balanced'] = max(best_stats['acc_balanced'], test_stats["acc_balanced"])
             best_stats['auroc'] = max(best_stats['auroc'], test_stats['auroc'])
             best_stats['auprc'] = max(best_stats['auprc'], test_stats['auprc'])
+
+            best_stats['avg'] = max(best_stats['avg'], test_stats['avg'])
 
             print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
                   f"{test_stats['acc']:.2f}% / {test_stats['acc_balanced']:.2f}% / {test_stats['precision']:.2f}% / {test_stats['recall']:.2f}% / ",
@@ -623,6 +709,11 @@ def main(args):
             best_stats['mae'] = min(best_stats['mae'], test_stats['mae'])
             best_stats['pcc'] = max(best_stats['pcc'], test_stats['pcc'])
             best_stats['r2'] = max(best_stats['r2'], test_stats['r2'])
+
+            if args.eval_criterion in ["loss", "rmse", "mae"]:
+                best_stats['avg'] = min(best_stats['avg'], test_stats['avg'])
+            else:
+                best_stats['avg'] = max(best_stats['avg'], test_stats['avg'])
 
             print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2) ",
                   f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} / ",
@@ -645,10 +736,34 @@ def main(args):
         if args.wandb and misc.is_main_process():
             wandb.log(train_history | test_history | {"Time per epoch [sec]": total_time})
 
+
+    if args.test and misc.is_main_process():
+        args.resume = misc.get_best_ckpt(args.output_dir, eval_criterion=args.eval_criterion)
+        
+        checkpoint = torch.load(args.resume)
+        model_without_ddp.load_state_dict(checkpoint['model'])
+        print("Run test data on checkpoint model %s" % args.resume)
+        
+        test_stats, test_history = evaluate(data_loader_test, model_without_ddp, device, epoch=-1, log_writer=log_writer, args=args)
+        
+        actual_test_history = {}
+        for k,v in test_history.items():
+            key = k
+            if 'est' in k:
+                key = 'actual_' + key
+                actual_test_history[key] = v 
+
+        print(actual_test_history)
+
+        if args.wandb and misc.is_main_process():
+            wandb.log(actual_test_history)
+
+
     if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
         wandb.finish()
-        exit(0)
+
+    exit(0)
 
 
 if __name__ == '__main__':
