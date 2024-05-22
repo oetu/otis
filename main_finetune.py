@@ -627,7 +627,7 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     
     best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 
-                  'avg':0.0, 'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
+                  'avg':0.0, 'epoch':0, 'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
     best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
@@ -682,6 +682,8 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
                     mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
 
+        test_history['test_avg'] = test_stats['avg']
+
         best_stats['loss'] = min(best_stats['loss'], test_stats['loss'])
         
         if args.downstream_task == 'classification':
@@ -694,6 +696,8 @@ def main(args):
             best_stats['auroc'] = max(best_stats['auroc'], test_stats['auroc'])
             best_stats['auprc'] = max(best_stats['auprc'], test_stats['auprc'])
 
+            if test_stats['avg'] >= best_stats['avg']:
+                best_stats['epoch'] = epoch
             best_stats['avg'] = max(best_stats['avg'], test_stats['avg'])
 
             print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
@@ -711,8 +715,12 @@ def main(args):
             best_stats['r2'] = max(best_stats['r2'], test_stats['r2'])
 
             if args.eval_criterion in ["loss", "rmse", "mae"]:
+                if test_stats['avg'] <= best_stats['avg']:
+                    best_stats['epoch'] = epoch
                 best_stats['avg'] = min(best_stats['avg'], test_stats['avg'])
             else:
+                if test_stats['avg'] >= best_stats['avg']:
+                    best_stats['epoch'] = epoch
                 best_stats['avg'] = max(best_stats['avg'], test_stats['avg'])
 
             print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2) ",
