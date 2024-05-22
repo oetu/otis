@@ -120,13 +120,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     training_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
         labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)             # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")
-        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")   # macro
-        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")         # macro
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")   # macro
+        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")         # macro
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
-        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")                   # macro
-        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="weighted")
+        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="macro")                   # macro
+        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="macro")
 
         training_stats["f1"] = f1
         training_stats["precision"] = precision
@@ -285,13 +285,13 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
     test_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
         labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)                 # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")
-        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")    # macro
-        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")          # macro
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")
+        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")    # macro
+        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")          # macro
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
-        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="weighted")                    # macro
-        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="weighted")
+        auc = 100*roc_auc_score(y_true=labels_onehot, y_score=probs, average="macro")                    # macro
+        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="macro")
         
         test_stats["f1"] = f1
         test_stats["precision"] = precision
