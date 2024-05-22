@@ -21,10 +21,7 @@ import torch
 import torch.backends.cudnn as cudnn
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
-os.environ["WANDB__SERVICE_WAIT"] = "500"
-
-# import torch.multiprocessing
-# torch.multiprocessing.set_sharing_strategy('file_system')
+# os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 # assert timm.__version__ == "0.3.2"  # version check
 import timm.optim.optim_factory as optim_factory
@@ -159,6 +156,10 @@ def get_args_parser():
     parser.add_argument('--val_data_path', default='', type=str,
                         help='validation dataset path')
 
+    parser.add_argument('--test', action='store_true', default=False)
+    parser.add_argument('--test_data_path', default='', type=str,
+                        help='test dataset path (default: None)')
+
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
     parser.add_argument('--log_dir', default='',
@@ -238,9 +239,15 @@ def main(args):
                                     univariate=args.univariate,
                                     train=False, 
                                     args=args)
+    dataset_test = TimeSeriesDataset(data_path=args.test_data_path, 
+                                     domain_offsets=dataset_train.offsets, 
+                                     univariate=args.univariate,
+                                     train=False, 
+                                     args=args)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
+    print("Test set size: ", len(dataset_test))
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -263,6 +270,18 @@ def main(args):
         else:
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
         # print("Sampler_val = %s" % str(sampler_train))
+
+        if args.dist_eval:
+            if len(dataset_test) % num_tasks != 0:
+                print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
+                      'This will slightly alter validation results as extra duplicate entries are added to achieve '
+                      'equal num of samples per-process.')
+            sampler_test = torch.utils.data.DistributedSampler(
+                dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=True # shuffle=True to reduce monitor bias
+            )
+        else:
+            sampler_test = torch.utils.data.SequentialSampler(dataset_test)
+
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
@@ -291,6 +310,17 @@ def main(args):
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         collate_fn=dataset_val.collate_fn,
+        pin_memory=args.pin_mem,
+        drop_last=False,
+    )
+
+    data_loader_test = torch.utils.data.DataLoader(
+        dataset_test, 
+        sampler=sampler_test,
+        # shuffle=False,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        collate_fn=dataset_test.collate_fn,
         pin_memory=args.pin_mem,
         drop_last=False,
     )
@@ -367,11 +397,15 @@ def main(args):
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
             print("Loading pos_embed_y from checkpoint")
+            print(f"Current pos_embed_y shape: {model.pos_embed_y.weight.shape}")
+            model.pos_embed_y = None
             model.pos_embed_y = torch.nn.Embedding.from_pretrained(checkpoint_model["pos_embed_y.weight"])
+            print(f"New pos_embed_y shape: {model.pos_embed_y.weight.shape}")
 
             # load domain_offsets
             dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
             dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
+            dataset_test.set_domain_offsets(checkpoint["domain_offsets"])
         else:
             print("Initializing new pos_embed_y")
 
@@ -674,6 +708,27 @@ def main(args):
         total_time = time.time() - start_time
         if args.wandb and misc.is_main_process():
             wandb.log(train_history | val_history | {"Time per epoch [sec]": total_time})
+
+    if args.test and misc.is_main_process():
+        args.resume = misc.get_best_ckpt(args.output_dir, eval_criterion=args.eval_criterion)
+        
+        checkpoint = torch.load(args.resume)
+        model_without_ddp.load_state_dict(checkpoint['model'])
+        print("Run test data on checkpoint model %s" % args.resume)
+        
+        test_stats, test_history = evaluate(data_loader_test, model_without_ddp, device, epoch=-1, log_writer=log_writer, args=args)
+        
+        actual_test_history = {}
+        for k,v in test_history.items():
+            key = k
+            if 'val' in k:
+                key = 'actual_' + key
+                actual_test_history[key] = v 
+
+        print(actual_test_history)
+
+        if args.wandb and misc.is_main_process():
+            wandb.log(actual_test_history)
 
     if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
