@@ -337,7 +337,7 @@ def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scale
     file_names = [file for file in file_names if file not in exceptions and evaluation_criterion in file]
 
     # save the 5 best performing models
-    if len(file_names) >= 5 and is_main_process():
+    if len(file_names) >= 1 and is_main_process():
         # file_names = sorted(file_names, key=lambda str: int(re.search(r'\d+', str).group()))
         if mode == "increasing":
             file_names = sorted(file_names, key=lambda x: float(x.split(".pth")[0].split("-")[-1]), reverse=True)
