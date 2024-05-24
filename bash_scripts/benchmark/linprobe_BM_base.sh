@@ -3,7 +3,7 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-num_workers="24"    # number of CPUs
+num_workers="16"    # number of CPUs
 
 path="tower"       # [tower, server]
 submitit="False"    # only for training on server

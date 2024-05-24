@@ -3,9 +3,9 @@
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
 seed=(0)
-num_workers="24"    # number of CPUs
+num_workers="8"    # number of CPUs
 
-path="tower"       # [tower, server]
+path="tower"        # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
@@ -13,17 +13,17 @@ world_size="1"      # number of GPUs
 mem_per_task="96"   # memory per GPU
 port="29416"
 
-batch_size=(128)
+batch_size=(32)
 accum_iter=(1)
 
-epochs="400"
-warmup_epochs="40"
+epochs="75"
+warmup_epochs="10"
 
 # Callback parameters
-patience="20"
-max_delta="0.1"
+patience="-1"
+max_delta="0.0"
 
-eval_criterion="acc"
+eval_criterion="avg"
 
 # Model parameters
 model_size="baseDeep"
@@ -43,8 +43,8 @@ patch_height="1"
 patch_width=(24)
 
 # Pooling strategy
-global_pool=(False)
-attention_pool=(True)
+global_pool=(True)
+attention_pool=(False)
 
 # Augmentation parameters
 masking_blockwise="False"
@@ -59,22 +59,22 @@ jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
-drop_path=(0.1)
-layer_decay=(0.25)
+drop_path=(0.1 0.2)
+layer_decay=(0.25 0.5 0.75)
 
 # Optimizer parameters
-blr=(3e-1) # 3e-5 if from scratch
+blr=(1e-4 3e-4 1e-3 3e-3 1e-2) # 3e-5 if from scratch
 min_lr="0.0"
-weight_decay=(0.1)
+weight_decay=(0.1 0.2)
 
 # Criterion parameters
-smoothing=(0.1)
+smoothing=(0.1 0.2)
 
 # Output path
-folder="Epilepsy"
-nb_classes="2"
-input_electrodes="1"
-time_steps="168"
+# folder="Epilepsy"
+# nb_classes="2"
+# input_electrodes="1"
+# time_steps="168"
 
 # folder="FD-B"
 # nb_classes="3"
@@ -86,10 +86,10 @@ time_steps="168"
 # input_electrodes="3"
 # time_steps="192"
 
-# folder="EMG"
-# nb_classes="3"
-# input_electrodes="1"
-# time_steps="1488"
+folder="EMG"
+nb_classes="3"
+input_electrodes="1"
+time_steps="1488"
 
 # Log specifications
 save_output="True"
@@ -140,9 +140,9 @@ do
 
     for bs in "${batch_size[@]}"
     do
-        for ld in "${layer_decay[@]}"
+        for lr in "${blr[@]}"
         do
-            for lr in "${blr[@]}"
+            for ld in "${layer_decay[@]}"
             do
 
                 for dp in "${drop_path[@]}"
@@ -170,14 +170,26 @@ do
 
                             # OTiS
                             if [ "$model_size" = "baseDeep" ]; then
-                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/gen/otis/single/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1_blr1e0/checkpoint-96-mse-0.1988.pth"
-                                # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr1e-5/checkpoint-99-ncc-0.8662.pth"
+                                if [ "$path" = "tower" ]; then
+                                    finetune="/home/oturgut/SiT/output/pre/otis/base/dec160d4b/p1x24/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                else
+                                    finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                    # finetune="/vol/aimspace/users/tuo/SiT/output/gen/otis/single/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1_blr1e0/checkpoint-96-mse-0.1988.pth"
+                                    # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr1e-5/checkpoint-99-ncc-0.8662.pth"
+                                fi
                             elif [ "$model_size" = "largeDeep" ]; then
-                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                                if [ "$path" = "tower" ]; then
+                                    finetune="/home/oturgut/SiT/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                                else
+                                    finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                                fi
                             else
                                 # huge
-                                finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                                if [ "$path" = "tower" ]; then
+                                    finetune="/home/oturgut/SiT/output/pre/otis/huge/dec160d4b/p1x24/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                                else
+                                    finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                                fi
                             fi
 
                             output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
@@ -279,7 +291,10 @@ do
                                 cmd=$cmd" --resume $resume"
                             fi
                             
-                            echo $cmd && $cmd
+                            echo $cmd && $cmd 
+                            
+                            remove_cmd="rm -r "$output_dir
+                            echo $remove_cmd && $remove_cmd
 
                         done
                     done
