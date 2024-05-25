@@ -5,7 +5,7 @@
 seed="0"
 num_workers="32"    # number of CPUs
 
-path="server"       # [tower, server]
+path="tower"       # [tower, server]
 submitit="False"     # only for training on server
 
 nodes="1"
@@ -13,7 +13,7 @@ world_size="2"      # number of GPUs
 mem_per_task="200"   # memory per GPU
 port="29403"
 
-offset="1312"        # dec160d4b: 328, dec128d2b: 464, p1x48: 1280
+offset="128"        # dec160d4b: 328, dec128d2b: 464, p1x48: 1280
 batch_size=$(($offset-$1))
 accum_iter=(1)
 
@@ -30,7 +30,7 @@ compile="False"
 model_size="baseDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
-univariate="True"
+univariate="False"
 domain_agnostic="False"
 
 input_channels="1"
@@ -71,11 +71,11 @@ ft_surr_phase_noise="0.1"
 blr_array=(3e-5)
 weight_decay=(0.15)
 
-# Output path
-folder="otis/ticorp"
-
 # Data path
-dataset="ticorp"
+dataset="ticorp_debug"
+
+# Output path
+folder="otis/"$dataset
 
 # Log specifications
 save_output="True"
