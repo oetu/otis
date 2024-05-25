@@ -246,6 +246,7 @@ def main(args):
                                     domain_offsets=dataset_train.offsets, 
                                     univariate=args.univariate,
                                     train=False, 
+                                    N_val=2,
                                     args=args)
 
     print("Training set size: ", len(dataset_train))
@@ -329,6 +330,7 @@ def main(args):
                                                domain_offsets=dataset_train.offsets, 
                                                univariate=args.univariate,
                                                train=False, 
+                                               N_val=10,
                                                args=args)
 
         print("Online training set size: ", len(dataset_online_train))
@@ -356,7 +358,7 @@ def main(args):
             dataset_online_train, 
             sampler=sampler_online_train,
             shuffle=False,
-            batch_size=256,
+            batch_size=32,
             num_workers=args.num_workers,
             collate_fn=dataset_online_train.collate_fn_ft,
             pin_memory=args.pin_mem,
@@ -367,7 +369,7 @@ def main(args):
             dataset_online_val, 
             sampler=sampler_online_val,
             shuffle=False,
-            batch_size=256,
+            batch_size=32,
             num_workers=args.num_workers,
             collate_fn=dataset_online_val.collate_fn_ft,
             pin_memory=args.pin_mem,
