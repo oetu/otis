@@ -5,7 +5,7 @@
 seed=(0)
 num_workers="32"    # number of CPUs
 
-path="tower"       # [tower, server]
+path="server"       # [tower, server]
 submitit="False"    # only for training on server
 
 nodes="1"
@@ -165,7 +165,6 @@ do
                             else
                                 # tiny
                                 finetune="/vol/aimspace/users/tuo/sigX/model_weights/signal_encoder_mmcl_imgViT.pth"
-                                finetune="/home/oturgut/SiT/checkpoints/signal_encoder_mmcl_imgViT.pth"
                                 # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                             fi
 
