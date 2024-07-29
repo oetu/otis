@@ -9,16 +9,16 @@ path="server"       # [tower, server]
 submitit="False"     # only for training on server
 
 nodes="1"
-world_size="2"      # number of GPUs
+world_size="4"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29421"
+port="29432"
+port=$(($port+$1))
 
-offset="768"        # p1x24, 232, p1x48: 592, noForecasting: 416, dec160d4b: 192
-batch_size=$(($offset-$1))
-accum_iter=(1)
+batch_size="184"        # p1x24, 232, p1x48: 592, noForecasting: 416, dec160d4b: 192
+accum_iter=(5)
 
-epochs="100"
-warmup_epochs="10"
+epochs="200"
+warmup_epochs="20"
 
 # Callback parameters
 patience="-1"
@@ -30,7 +30,7 @@ compile="False"
 model_size="largeDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
-univariate="True"
+univariate="False"
 domain_agnostic="False"
 
 input_channels="1"
@@ -69,13 +69,14 @@ ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
 blr_array=(3e-5)
-weight_decay=(0.15)
-
-# Output path
-folder="otis/ticorp"
+weight_decay="0.15"
+weight_decay=`echo|awk -v y1=$weight_decay -v y2=$1 '{print y1+y2*0.01}'`
 
 # Data path
 dataset="ticorp"
+
+# Output path
+folder="otis/"$dataset
 
 # Log specifications
 save_output="True"
@@ -133,8 +134,8 @@ fi
 input_electrodes="12"
 online_evaluation="True"
 online_evaluation_task="classification"
-lower_bnd="0"
-upper_bnd="1"
+# lower_bnd="0"
+# upper_bnd="1"
 online_num_classes=2
 
 if [ "$path" = "tower" ]; then # ukbb data for online eval
@@ -143,7 +144,7 @@ else
     online_data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
 fi
 
-target="CAD"
+target="flutter"
 data_path_online=$online_data_base"/otis/ecgs_train_"$target"_all_balanced_float32.pt"
 labels_path_online=$online_data_base"/labelsOneHot/labels_train_"$target"_all_balanced.pt"
 
