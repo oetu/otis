@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.2)
+ncc_weight=(0.3)
 cos_weight=0.0
 
 # Augmentation parameters
@@ -67,8 +67,8 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(3e-2)
-weight_decay=(0.15)
+blr_array=(3e-2 1e-1 3e-1 1e-0)
+weight_decay=(0.05)
 
 downstream_task="imputation"
 
@@ -76,7 +76,7 @@ downstream_task="imputation"
 folder="etth1"
 input_channels="1"
 input_electrodes="7"
-time_steps="96" # 384, 192
+time_steps=528 #"96" # 384, 192
 
 # folder="ettm1"
 # input_channels="1"
@@ -156,12 +156,12 @@ do
                         for ncc in "${ncc_weight[@]}"
                         do
 
-                            subfolder="cos_weight$cos_weight/ncc_weight$ncc/seed$sd/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$wd/m$mr"
+                            subfolder="512ts/cos_weight$cos_weight/ncc_weight$ncc/seed$sd/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$wd/m$mr"
 
                             if [ "$univariate" = "True" ]; then
                                 subfolder="imputation/univariate/"$subfolder
                             else
-                                subfolder="imputation/multivariate/2/"$subfolder
+                                subfolder="imputation/multivariate/"$subfolder
                             fi
 
                             if [ "$model_size" = "baseDeep" ]; then
@@ -173,14 +173,16 @@ do
                                 fi
                             elif [ "$model_size" = "largeDeep" ]; then
                                 if [ "$path" = "tower" ]; then
-                                    finetune="/home/oturgut/SiT/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                                    # finetune="/home/oturgut/SiT/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                                    finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b3680_blr1e-5/checkpoint-188-ncc-0.8919.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                 fi
                             else
                                 # huge
                                 if [ "$path" = "tower" ]; then
-                                    finetune="/home/oturgut/SiT/output/pre/otis/huge/dec160d4b/p1x24/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                                    # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec160d4b/p1x24/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                                    finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b4320_blr3e-6/checkpoint-196-ncc-0.8827.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                                 fi

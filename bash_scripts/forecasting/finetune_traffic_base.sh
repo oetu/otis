@@ -13,11 +13,11 @@ world_size="1"      # number of GPUs
 mem_per_task="69"   # memory per GPU
 port="29420"
 
-batch_size=(1)
+batch_size=(64)
 accum_iter=(1)
 
-epochs="1000"
-warmup_epochs="100"
+epochs="100"
+warmup_epochs="10"
 
 # Callback parameters
 patience="-1"
@@ -67,8 +67,8 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(3e-1) # 3e-1, 1e-2
-weight_decay=(0.25)
+blr_array=(1e-3)
+weight_decay=(0.05)
 
 downstream_task="forecasting"
 
@@ -78,10 +78,10 @@ downstream_task="forecasting"
 # input_electrodes="7"
 # time_steps="432" # 384, 192
 
-folder="ettm1"
-input_channels="1"
-input_electrodes="7"
-time_steps="432" # 384, 192
+# folder="ettm1"
+# input_channels="1"
+# input_electrodes="7"
+# time_steps="432" # 384, 192
 
 # folder="etth2"
 # input_channels="1"
@@ -100,8 +100,18 @@ time_steps="432" # 384, 192
 
 # folder="electricity"
 # input_channels="1"
-# input_electrodes="321"
+# input_electrodes="1"
 # time_steps="432" # 384, 192
+
+# folder="ili"
+# input_channels="1"
+# input_electrodes="7"
+# time_steps="96" # 384, 192
+
+folder="traffic"
+input_channels="1"
+input_electrodes="832"
+time_steps="432" # 384, 192
 
 
 # Log specifications

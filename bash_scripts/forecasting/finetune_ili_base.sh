@@ -53,11 +53,11 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.2)
+ncc_weight=(0.0)
 cos_weight=0.0
 
 # Augmentation parameters
-mask_ratio=(0.2223) # 0.125, 0.25
+mask_ratio=(0.25) # 0.125, 0.25
 
 crop_lower_bnd="1.0"
 crop_upper_bnd="1.0"
@@ -67,8 +67,8 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(3e-1) # 3e-1, 1e-2
-weight_decay=(0.25)
+blr_array=(3e-2 1e-1 3e-1 1e-0)
+weight_decay=(0.05 0.15 0.25)
 
 downstream_task="forecasting"
 
@@ -78,10 +78,10 @@ downstream_task="forecasting"
 # input_electrodes="7"
 # time_steps="432" # 384, 192
 
-folder="ettm1"
-input_channels="1"
-input_electrodes="7"
-time_steps="432" # 384, 192
+# folder="ettm1"
+# input_channels="1"
+# input_electrodes="7"
+# time_steps="432" # 384, 192
 
 # folder="etth2"
 # input_channels="1"
@@ -100,7 +100,17 @@ time_steps="432" # 384, 192
 
 # folder="electricity"
 # input_channels="1"
-# input_electrodes="321"
+# input_electrodes="1"
+# time_steps="432" # 384, 192
+
+folder="ili"
+input_channels="1"
+input_electrodes="7"
+time_steps="96" # 384, 192
+
+# folder="traffic"
+# input_channels="1"
+# input_electrodes="832"
 # time_steps="432" # 384, 192
 
 

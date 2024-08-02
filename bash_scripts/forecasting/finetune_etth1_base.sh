@@ -57,7 +57,7 @@ ncc_weight=(0.1)
 cos_weight=0.0
 
 # Augmentation parameters
-mask_ratio=(0.2222) # 0.125, 0.25
+mask_ratio=(0.2223) # 0.125, 0.25
 
 crop_lower_bnd="1.0"
 crop_upper_bnd="1.0"
@@ -74,7 +74,7 @@ ft_surr_phase_noise="0.0"
 # ft_surr_phase_noise="0.05"
 
 # Optimizer parameters
-blr_array=(3e-2)
+blr_array=(1e-0)
 weight_decay=(0.15)
 
 downstream_task="forecasting"
@@ -128,14 +128,14 @@ fi
 
 # Dataset parameters
 # Training
-data_path=$data_base"/train.pt"
+data_path=$data_base"/train_correct_norm.pt"
 
 # Validation
-val_data_path=$data_base"/val.pt"
+val_data_path=$data_base"/val_correct_norm.pt"
 
 # Test
 test="True"
-test_data_path=$data_base"/test.pt"
+test_data_path=$data_base"/test_correct_norm.pt"
 
 # EVALUATE
 # As filename: State the checkpoint for the inference of a specific model
@@ -163,7 +163,7 @@ do
                         for ncc in "${ncc_weight[@]}"
                         do
 
-                            subfolder="1cos_weight$cos_weight/ncc_weight$ncc/seed$sd/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$wd/m$mr"
+                            subfolder="cos_weight$cos_weight/ncc_weight$ncc/seed$sd/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$wd/m$mr"
 
                             if [ "$univariate" = "True" ]; then
                                 subfolder="univariate/"$subfolder
