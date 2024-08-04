@@ -13,7 +13,7 @@ world_size="1"      # number of GPUs
 mem_per_task="69"   # memory per GPU
 port="29420"
 
-batch_size=(32)
+batch_size=(64)
 accum_iter=(1)
 
 epochs="100"
@@ -67,7 +67,7 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(1e-3)
+blr_array=(3e-3)
 weight_decay=(0.05)
 
 downstream_task="forecasting"

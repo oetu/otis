@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=0.1
+ncc_weight=(0.1)
 cos_weight=0.0
 
 # Augmentation parameters
@@ -67,7 +67,7 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(1e-1 3e-1 1e0 3e0) # 3e-1, 1e-2
+blr_array=(1e-0) # 3e-1, 1e-2
 weight_decay=(0.15)
 
 downstream_task="forecasting"

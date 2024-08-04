@@ -28,7 +28,7 @@ eval_criterion="mse"
 # Model parameters
 compile="False"
 
-model_size="baseDeep"
+model_size="largeDeep"
 model="otis_"$model_size"_dec160d4b_patchX"
 
 univariate="False"
@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.1)
+ncc_weight=(0.0)
 cos_weight=0.0
 
 # Augmentation parameters
