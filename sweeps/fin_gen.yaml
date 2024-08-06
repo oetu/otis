@@ -1,5 +1,5 @@
 name: fin-gen
-project: OTiS_Generative_Tasks
+project: OTiS_Forecasting
 
 program: ./../main_finetune_gen.py
 method: grid
@@ -9,7 +9,7 @@ metric:
 
 parameters:
   wandb_project:
-    value: "OTiS_Generative_Tasks"
+    value: "OTiS_Forecasting"
   seed:
     value: 0
   num_workers:
