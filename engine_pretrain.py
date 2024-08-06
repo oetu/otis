@@ -1,10 +1,11 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
+# Copyright (c) Oezguen Turgut.
 # All rights reserved.
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # --------------------------------------------------------
 # References:
+# MAE:  https://github.com/facebookresearch/mae?tab=readme-ov-file
 # DeiT: https://github.com/facebookresearch/deit
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------
@@ -170,7 +171,7 @@ def train_one_epoch(model: torch.nn.Module,
         training_history['train_mse'] = train_stats["mse"]
         training_history['train_mae'] = train_stats["mae"]
 
-        if (epoch % 199) == 0:
+        if (epoch % 99) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
 
@@ -212,19 +213,25 @@ def train_one_epoch(model: torch.nn.Module,
             plt.title(f"Input vs Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, 0, :].min(), y2=x_hat[0, 0, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=min(x[0, 0, :].min(), x_hat[0, 0, :].min()), 
+                             y2=max(x[0, 0, :].max(), x_hat[0, 0, :].max()), 
                              where=mask_0, color='gray', alpha=0.15)
             
             plt.subplot(813)
             plt.title(f"Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, 0, :].min(), y2=x_hat[0, 0, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat[0, 0, :].min(), 
+                             y2=x_hat[0, 0, :].max(), 
                              where=mask_0, color='gray', alpha=0.15)
 
             plt.subplot(814)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_0_maskedOnly.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, 0, :].min(), y2=x_hat_masked[0, 0, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat_masked[0, 0, :].min(), 
+                             y2=x_hat_masked[0, 0, :].max(), 
                              where=mask_0, color='gray', alpha=0.15)
 
             plt.subplot(815)
@@ -235,19 +242,25 @@ def train_one_epoch(model: torch.nn.Module,
             plt.title(f"Input vs Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, ch_idx, :].min(), y2=x_hat[0, ch_idx, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=min(x[0, ch_idx, :].min(), x_hat[0, ch_idx, :].min()), 
+                             y2=max(x[0, ch_idx, :].max(), x_hat[0, ch_idx, :].max()), 
                              where=mask_1, color='gray', alpha=0.15)
 
             plt.subplot(817)
             plt.title(f"Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, ch_idx, :].min(), y2=x_hat[0, ch_idx, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat[0, ch_idx, :].min(), 
+                             y2=x_hat[0, ch_idx, :].max(), 
                              where=mask_1, color='gray', alpha=0.15)
 
             plt.subplot(818)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_1_maskedOnly.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, ch_idx, :].min(), y2=x_hat_masked[0, ch_idx, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat_masked[0, ch_idx, :].min(), 
+                             y2=x_hat_masked[0, ch_idx, :].max(), 
                              where=mask_1, color='gray', alpha=0.15)
 
             plt.tight_layout()
@@ -471,7 +484,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_history['val_mse'] = test_stats["mse"]
         test_history['val_mae'] = test_stats["mae"]
 
-        if (epoch % 199) == 0:
+        if (epoch % 99) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
 
@@ -513,19 +526,25 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
             plt.title(f"Input vs Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, 0, :].min(), y2=x_hat[0, 0, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=min(x[0, 0, :].min(), x_hat[0, 0, :].min()), 
+                             y2=max(x[0, 0, :].max(), x_hat[0, 0, :].max()), 
                              where=mask_0, color='gray', alpha=0.15)
             
             plt.subplot(813)
             plt.title(f"Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, 0, :].min(), y2=x_hat[0, 0, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat[0, 0, :].min(), 
+                             y2=x_hat[0, 0, :].max(), 
                              where=mask_0, color='gray', alpha=0.15)
 
             plt.subplot(814)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_0_maskedOnly.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, 0, :].min(), y2=x_hat_masked[0, 0, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat_masked[0, 0, :].min(), 
+                             y2=x_hat_masked[0, 0, :].max(), 
                              where=mask_0, color='gray', alpha=0.15)
 
             plt.subplot(815)
@@ -536,19 +555,25 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
             plt.title(f"Input vs Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, ch_idx, :].min(), y2=x_hat[0, ch_idx, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=min(x[0, ch_idx, :].min(), x_hat[0, ch_idx, :].min()), 
+                             y2=max(x[0, ch_idx, :].max(), x_hat[0, ch_idx, :].max()), 
                              where=mask_1, color='gray', alpha=0.15)
 
             plt.subplot(817)
             plt.title(f"Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat[0, ch_idx, :].min(), y2=x_hat[0, ch_idx, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat[0, ch_idx, :].min(), 
+                             y2=x_hat[0, ch_idx, :].max(), 
                              where=mask_1, color='gray', alpha=0.15)
 
             plt.subplot(818)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_1_maskedOnly.item():.2f}, masked patches in gray)")
             plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :])
-            plt.fill_between(range(0, x.shape[-1], 1), y1=x_hat_masked[0, ch_idx, :].min(), y2=x_hat_masked[0, ch_idx, :].max(), 
+            plt.fill_between(range(0, x.shape[-1], 1), 
+                             y1=x_hat_masked[0, ch_idx, :].min(), 
+                             y2=x_hat_masked[0, ch_idx, :].max(), 
                              where=mask_1, color='gray', alpha=0.15)
 
             plt.tight_layout()
