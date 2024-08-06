@@ -1,10 +1,11 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
+# Copyright (c) Oezguen Turgut.
 # All rights reserved.
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # --------------------------------------------------------
 # References:
+# MAE:  https://github.com/facebookresearch/mae?tab=readme-ov-file
 # DeiT: https://github.com/facebookresearch/deit
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------
@@ -296,6 +297,7 @@ def main(args):
                                       downstream_task=args.downstream_task, 
                                       univariate=args.univariate,
                                       train=True, 
+                                      N_val=1,
                                       args=args)
     dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
                                     labels_path=args.val_labels_path, 
@@ -304,6 +306,7 @@ def main(args):
                                     domain_offsets=dataset_train.offsets, 
                                     univariate=args.univariate,
                                     train=False, 
+                                    N_val=1,
                                     args=args)
     dataset_test = TimeSeriesDataset(data_path=args.test_data_path, 
                                     labels_path=args.test_labels_path, 
@@ -312,6 +315,8 @@ def main(args):
                                     domain_offsets=dataset_train.offsets, 
                                     univariate=args.univariate,
                                     train=False, 
+                                    test=True,
+                                    N_val=1,
                                     args=args)
 
     # train balanced
@@ -473,9 +478,13 @@ def main(args):
                 break
 
         if len(checkpoint["domain_offsets"]) > 1 and sum([v for v in checkpoint["domain_offsets"].values()]) == 0:
-            # domain-angostic pos_embed_y
+            # domain-agnostic pos_embed_y
             print("INFO: Found domain-agnostic pos_embed_y in checkpoint")
             pos_embed_y_available = True
+
+            # sett offset to zero
+            print(dataset_train.domain)
+            checkpoint["domain_offsets"][dataset_train.domain[0][0]] = 0
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
             print("Loading pos_embed_y from checkpoint")

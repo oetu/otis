@@ -1,10 +1,18 @@
+# Copyright (c) Oezguen Turgut.
+# All rights reserved.
+
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+# --------------------------------------------------------
 from typing import Any, Tuple, Dict
+import random
 
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
 import util.augmentations as augmentations
+import util.transformations as transformations
 
 
 class TimeSeriesDataset(Dataset):
@@ -15,7 +23,9 @@ class TimeSeriesDataset(Dataset):
                  downstream_task:str=None, 
                  domain_offsets:Dict=None, domain_agnostic:str=False, 
                  univariate:bool=False, 
-                 train:bool=False, N_val:int=1, 
+                 train:bool=False, 
+                 test:bool=False,
+                 N_val:int=1, 
                  args=None) -> None:
         """
             labels_path: path to labels (finetuning / online evaluation)
@@ -36,9 +46,6 @@ class TimeSeriesDataset(Dataset):
         # .unsqueeze(0) to add auxiliary channel (similar to rgb in imgs)
         domain = [(sample[0], sample[1].unsqueeze(0).shape) for sample in data]
         data = [sample[1].unsqueeze(0) for sample in data]
-        
-        # print(f"DATA DOMAIN: {sorted(list(set(domain)))}")
-        # print(f"DATA SHAPE: {data[0].shape}")
 
         self.univariate = univariate
         self.domain_agnostic = True if self.univariate else domain_agnostic
@@ -79,6 +86,7 @@ class TimeSeriesDataset(Dataset):
 
         self.downstream_task = downstream_task
         self.train = train 
+        self.test = test
         self.N_val = N_val
         self.args = args
 
@@ -106,16 +114,27 @@ class TimeSeriesDataset(Dataset):
         # (N*V, 1, T) else
         if self.train == False:
             # validate / test on more than one chunk per sample
-            N_val = data.shape[-1] // self.args.time_steps
-            if N_val == 0:
-                N_val = self.N_val
-            else:
-                N_val = N_val if N_val < self.N_val else self.N_val
+            # Calculate number of overlapping chunks
+            stride=32 
+            if self.test == True:
+                stride = 1
+            
+            N_val = max(int(((data.shape[-1] - self.args.time_steps) / stride) + 1), 1)
+            if self.N_val != -1:
+                N_val = min(N_val, self.N_val)
             N *= N_val
-            data_chunks = torch.split(data, split_size_or_sections=self.args.time_steps, dim=-1)[:N_val]
-            data = torch.cat([chunk for idx, chunk in enumerate(data_chunks) if chunk.shape[-1] == self.args.time_steps or idx == 0], # drop last if T_last < time_steps
-                             dim=0)
+
+            # Create overlapping chunks
+            data_chunks = [ data[..., i*stride:(i*stride+self.args.time_steps)] for i in range(N_val) ]
+
+            # Concatenate chunks
+            data = torch.cat(data_chunks, dim=0)
         else:
+            N_val = max(data.shape[-1] - self.args.time_steps + 1, 1)
+            if self.N_val != -1:
+                N_val = min(N_val, self.N_val)
+            N *= N_val
+
             transform = transforms.Compose([
                 augmentations.CropResizing(fixed_resize_len=self.args.time_steps, 
                                            lower_bnd=self.args.crop_lower_bnd, 
@@ -125,7 +144,12 @@ class TimeSeriesDataset(Dataset):
                 augmentations.Jitter(sigma=self.args.jitter_sigma),
                 augmentations.Rescaling(sigma=self.args.rescaling_sigma),
             ])
-            data = transform(data)
+            
+            # Create random chunks
+            data_chunks = [ transform(data) for i in range(N_val) ]
+
+            # Concatenate chunks
+            data = torch.cat(data_chunks, dim=0)
 
         if self.downstream_task == 'regression':
             label = self.labels[idx][..., self.args.lower_bnd:self.args.upper_bnd]

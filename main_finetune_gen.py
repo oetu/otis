@@ -1,10 +1,11 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
+# Copyright (c) Oezguen Turgut.
 # All rights reserved.
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # --------------------------------------------------------
 # References:
+# MAE:  https://github.com/facebookresearch/mae?tab=readme-ov-file
 # DeiT: https://github.com/facebookresearch/deit
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------
@@ -233,16 +234,20 @@ def main(args):
     dataset_train = TimeSeriesDataset(data_path=args.data_path, 
                                       univariate=args.univariate,
                                       train=True, 
+                                      N_val=args.batch_size,
                                       args=args)
     dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
                                     domain_offsets=dataset_train.offsets, 
                                     univariate=args.univariate,
                                     train=False, 
+                                    N_val=-1,
                                     args=args)
     dataset_test = TimeSeriesDataset(data_path=args.test_data_path, 
                                      domain_offsets=dataset_train.offsets, 
                                      univariate=args.univariate,
                                      train=False, 
+                                     test=True,
+                                     N_val=-1,
                                      args=args)
 
     print("Training set size: ", len(dataset_train))
@@ -391,9 +396,13 @@ def main(args):
                 break
 
         if len(checkpoint["domain_offsets"]) > 1 and sum([v for v in checkpoint["domain_offsets"].values()]) == 0:
-            # domain-angostic pos_embed_y
+            # domain-agnostic pos_embed_y
             print("INFO: Found domain-agnostic pos_embed_y in checkpoint")
             pos_embed_y_available = True
+
+            # sett offset to zero
+            print(dataset_train.domain)
+            checkpoint["domain_offsets"][dataset_train.domain[0][0]] = 0
 
         if not args.ignore_pos_embed_y and pos_embed_y_available:
             print("Loading pos_embed_y from checkpoint")
@@ -461,15 +470,43 @@ def main(args):
     model.mask_token.requires_grad = True
     skip_list.append(f"mask_token")
 
-    # make decoder_norm trainable
-    for n, p in model.decoder_norm.named_parameters():
-        p.requires_grad = True
-        skip_list.append(f"decoder_norm.{n}")
+    # # make encoder attn + norm trainable
+    # for n, p in model.blocks[:].named_parameters():
+    #     if "norm1" in n or "attn" in n:
+    #         p.requires_grad = True
+    #         skip_list.append(f"blocks.{n}")
 
-    # make decoder_pred trainable
-    for n, p in model.decoder_pred.named_parameters():
-        p.requires_grad = True
-        skip_list.append(f"decoder_pred.{n}")
+    # # make decoder attn + norm trainable
+    # for n, p in model.decoder_blocks[:].named_parameters():
+    #     if "norm1" in n or "attn" in n:
+    #         p.requires_grad = True
+    #         skip_list.append(f"decoder_blocks.{n}")
+
+    # # make encoder ffn + norm trainable
+    # for n, p in model.blocks[:].named_parameters():
+    #     if "norm2" in n or "mlp" in n:
+    #         p.requires_grad = True
+    #         skip_list.append(f"blocks.{n}")
+ 
+    # # make decoder ffn + norm trainable
+    # for n, p in model.decoder_blocks[:].named_parameters():
+    #     if "norm2" in n or "mlp" in n:
+    #         p.requires_grad = True
+    #         skip_list.append(f"decoder_blocks.{n}")
+
+    # for n, p in model.named_parameters():
+    #     if p.requires_grad == True:
+    #         print(n)
+
+    # # make decoder_norm trainable
+    # for n, p in model.decoder_norm.named_parameters():
+    #     p.requires_grad = True
+    #     skip_list.append(f"decoder_norm.{n}")
+
+    # # make decoder_pred trainable
+    # for n, p in model.decoder_pred.named_parameters():
+    #     p.requires_grad = True
+    #     skip_list.append(f"decoder_pred.{n}")
 
     if args.ignore_decoder:
         # mask_token, decoder_norm, decoder_pred already trainable
@@ -534,7 +571,7 @@ def main(args):
         for n, p in model.decoder_pos_embed_y.named_parameters():
             p.requires_grad = False
     
-    print(skip_list)
+    # print(f"Trainable parameters:\n{skip_list}")
 
     if args.compile:
         model = torch.compile(model)
@@ -609,7 +646,37 @@ def main(args):
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
-        if epoch == args.warmup_epochs*10:
+        if epoch == args.warmup_epochs*0:
+            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
+            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
+
+            print("Unfreezing the encoder and decoder attention layers")
+            # make encoder attn + norm trainable
+            for n, p in model_without_ddp.blocks[:].named_parameters():
+                if "norm1" in n or "attn" in n:
+                    p.requires_grad = True
+
+            # make decoder attn + norm trainable
+            for n, p in model_without_ddp.decoder_blocks[:].named_parameters():
+                if "norm1" in n or "attn" in n:
+                    p.requires_grad = True
+
+            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
+            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
+
+            # adding all (new) parameters to the optimizer except for the ones in skip_list
+            # hence, the ones in skip_list are not updated even though requires_grad=True
+            # following timm: set wd as 0 for bias and norm layers
+            param_groups_new, skip_list = add_weight_decay_unfrozen_modules(model_without_ddp, 
+                                                                            args.weight_decay, 
+                                                                            lr_scale=0.033, 
+                                                                            skip_list=skip_list)
+            for params in param_groups_new:
+                optimizer.add_param_group(params)
+            print(optimizer)
+            print(f"Trainable parameters:\n{skip_list}")
+
+        if epoch == args.warmup_epochs*0:
             n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
             print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
 
@@ -634,6 +701,7 @@ def main(args):
             for params in param_groups_new:
                 optimizer.add_param_group(params)
             print(optimizer)
+            # print(f"Trainable parameters:\n{skip_list}")
 
         if True: #args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
