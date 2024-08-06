@@ -1,10 +1,11 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
+# Copyright (c) Oezguen Turgut.
 # All rights reserved.
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # --------------------------------------------------------
 # References:
+# MAE:  https://github.com/facebookresearch/mae?tab=readme-ov-file
 # DeiT: https://github.com/facebookresearch/deit
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------

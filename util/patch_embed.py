@@ -1,11 +1,14 @@
-""" Image to Patch Embedding using Conv2d
+# Copyright (c) Oezguen Turgut.
+# All rights reserved.
 
-A convolution based approach to patchifying a 2D image w/ embedding projection.
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+# --------------------------------------------------------
+# References:
+# timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
+# ViT:  https://github.com/google-research/vision_transformer
+# --------------------------------------------------------
 
-Based on the impl in https://github.com/google-research/vision_transformer
-
-Hacked together by / Copyright 2020 Ross Wightman
-"""
 from torch import nn as nn
 
 
