@@ -59,16 +59,16 @@ jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
-drop_path=(0.1 0.2)
-layer_decay=(0.25 0.5 0.75)
+drop_path=(0.0 0.1 0.2)
+layer_decay=(0.5)
 
 # Optimizer parameters
-blr=(1e-3 3e-3 1e-2 3e-2) # 3e-5 if from scratch
+blr=(1e-2) # 3e-5 if from scratch
 min_lr="0.0"
 weight_decay=(0.1 0.2)
 
 # Criterion parameters
-smoothing=(0.1 0.2)
+smoothing=(0.0 0.1 0.2)
 
 # Output path
 # folder="Epilepsy"
@@ -182,6 +182,12 @@ do
                                 if [ "$path" = "tower" ]; then
                                     # finetune="/home/oturgut/SiT/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                     finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b3680_blr1e-5/checkpoint-188-ncc-0.8919.pth"
+
+                                    # 1%
+                                    # finetune="/home/oturgut/SiT/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b256_blr3e-5/checkpoint-197-ncc-0.7532.pth"
+
+                                    # 10%
+                                    # finetune="/home/oturgut/SiT/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1840_blr1e-5/checkpoint-194-ncc-0.8581.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                 fi
@@ -195,7 +201,7 @@ do
                                 fi
                             fi
 
-                            output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
+                            output_dir=$checkpoint_base"/output/fin/"$folder"/"$finetune"/"$jitter_sigma"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 
                             # resume=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$bs"_blr"$lr"/checkpoint-4-pcc-0.54.pth"
 

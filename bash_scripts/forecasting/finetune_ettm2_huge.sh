@@ -182,13 +182,19 @@ do
                                 # huge
                                 if [ "$path" = "tower" ]; then
                                     # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec160d4b/p1x24/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
-                                    finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b4320_blr3e-6/checkpoint-196-ncc-0.8827.pth"
+                                    # finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b4320_blr3e-6/checkpoint-196-ncc-0.8827.pth"
+
+                                    # 1%
+                                    # finetune="/home/oturgut/SiT/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b144_blr3e-5/checkpoint-199-ncc-0.7478.pth"
+
+                                    # 10%
+                                    finetune="/home/oturgut/SiT/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b216_blr3e-5/checkpoint-199-ncc-0.8516.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                                 fi
                             fi
 
-                            output_dir=$checkpoint_base"/output/gen/"$folder"/"$subfolder"/pre_b"$(($bs*$acc_it*$world_size))"_blr"$blr
+                            output_dir=$checkpoint_base"/output/gen/"$folder"/"$finetune"/"$subfolder"/pre_b"$(($bs*$acc_it*$world_size))"_blr"$blr
 
                             if [ "$path" = "tower" ]; then
                                 cmd="python3 main_finetune_gen.py --output_projection $output_projection --downstream_task $downstream_task --seed $sd --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc --cos_weight $cos_weight --model $model --batch_size $bs --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $wd --blr $blr --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
