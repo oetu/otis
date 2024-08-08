@@ -1,4 +1,4 @@
-name: mae4
+name: otis
 channels:
   - pytorch
   - nvidia

@@ -1,2 +1,2 @@
 # OTiS
-An open foundation model for time series analysis at scale
+An open model for general time series analysis across domains.
