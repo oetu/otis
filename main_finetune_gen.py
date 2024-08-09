@@ -650,35 +650,11 @@ def main(args):
             n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
             print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
 
-            print("Unfreezing the encoder and decoder attention layers")
+            print("Unfreezing the encoder attention layers")
             # make encoder attn + norm trainable
             for n, p in model_without_ddp.blocks[:].named_parameters():
                 if "norm1" in n or "attn" in n:
                     p.requires_grad = True
-
-            # make decoder attn + norm trainable
-            for n, p in model_without_ddp.decoder_blocks[:].named_parameters():
-                if "norm1" in n or "attn" in n:
-                    p.requires_grad = True
-
-            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
-            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
-
-            # adding all (new) parameters to the optimizer except for the ones in skip_list
-            # hence, the ones in skip_list are not updated even though requires_grad=True
-            # following timm: set wd as 0 for bias and norm layers
-            param_groups_new, skip_list = add_weight_decay_unfrozen_modules(model_without_ddp, 
-                                                                            args.weight_decay, 
-                                                                            lr_scale=0.033, 
-                                                                            skip_list=skip_list)
-            for params in param_groups_new:
-                optimizer.add_param_group(params)
-            print(optimizer)
-            print(f"Trainable parameters:\n{skip_list}")
-
-        if epoch == args.warmup_epochs*0:
-            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
-            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
 
             print("Unfreezing the decoder")
             for _, p in model_without_ddp.decoder_embed.named_parameters():
