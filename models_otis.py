@@ -58,7 +58,8 @@ class Attention(nn.Module):
 
 
 class OTiS(nn.Module):
-    """ Open foundation model for Time Series analysis with VisionTransformer backbone
+    """ 
+        Open model for general time series analysis 
     """
     def __init__(self, domains:dict, domain_weights:dict, domain_agnostic:str=False, 
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
