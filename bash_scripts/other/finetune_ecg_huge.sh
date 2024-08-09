@@ -80,10 +80,10 @@ wandb_id=""
 # Data path
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/UKBB"
-    checkpoint_base="/home/oturgut/SiT"
+    checkpoint_base="/home/oturgut/otis"
 else
     data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
-    checkpoint_base="/vol/aimspace/users/tuo/SiT"
+    checkpoint_base="/vol/aimspace/users/tuo/otis"
 fi
 
 # Dataset parameters
@@ -170,18 +170,18 @@ do
                             subfolder=("seed$sd/"$model_size"/t"$time_steps"/p"$patch_height"x"$patch_width"/ld"$ld"/dp"$dp"/smth"$smth"/wd"$weight_decay"/m0.8")
 
                             # OTiS
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
-                            finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
+                            # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
+                            finetune="/vol/aimspace/users/tuo/otis/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
 
-                            # SiT
-                            # finetune="/home/oturgut/SiT/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/refactored/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9455.pth"
+                            # otis
+                            # finetune="/home/oturgut/otis/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
+                            # finetune="/vol/aimspace/users/tuo/otis/output/pre/refactored/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9455.pth"
                             
-                            # SiT-like UKBB
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/test2/checkpoint-34-ncc-0.5850.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-299-ncc-0.9626.pth"
-                            # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-5/checkpoint-298-ncc-0.9575.pth"
+                            # otis-like UKBB
+                            # finetune="/vol/aimspace/users/tuo/otis/output/pre/test2/checkpoint-34-ncc-0.5850.pth"
+                            # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
+                            # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-299-ncc-0.9626.pth"
+                            # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-5/checkpoint-298-ncc-0.9575.pth"
 
                             # # MAE + MMCL
                             # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"

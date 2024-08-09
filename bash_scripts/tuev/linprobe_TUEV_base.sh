@@ -100,10 +100,10 @@ wandb_id=""
 # Data path
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/benchmarks/classification/"$folder
-    checkpoint_base="/home/oturgut/SiT"
+    checkpoint_base="/home/oturgut/otis"
 else
     data_base="/vol/aimspace/users/tuo/data/processed/benchmarks/classification/"$folder
-    checkpoint_base="/vol/aimspace/users/tuo/SiT"
+    checkpoint_base="/vol/aimspace/users/tuo/otis"
 fi
 
 # Dataset parameters
@@ -160,9 +160,9 @@ do
                         fi
 
                         # OTiS
-                        finetune="/home/oturgut/SiT/output/pre/otis/base/dec160d4b/p1x24/pre_b1216_blr3e-5/checkpoint-99-ncc-0.8662.pth"
-                        # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
-                        # finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
+                        finetune="/home/oturgut/otis/output/pre/otis/base/dec160d4b/p1x24/pre_b1216_blr3e-5/checkpoint-99-ncc-0.8662.pth"
+                        # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-5/checkpoint-95-ncc-0.7729.pth"
+                        # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis_refactored/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.0/seed0/hugeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b2048_blr3e-6/checkpoint-95-ncc-0.6628.pth"
 
                         output_dir=$checkpoint_base"/output/lin/"$folder"/"$subfolder"/lin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 

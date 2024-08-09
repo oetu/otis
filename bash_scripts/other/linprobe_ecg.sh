@@ -60,10 +60,10 @@ smoothing=(0.1)
 # Data path
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/UKBB"
-    checkpoint_base="/home/oturgut/SiT"
+    checkpoint_base="/home/oturgut/otis"
 else
     data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
-    checkpoint_base="/vol/aimspace/users/tuo/SiT"
+    checkpoint_base="/vol/aimspace/users/tuo/otis"
 fi
 
 # Dataset parameters
@@ -163,12 +163,12 @@ do
                         folder="test2"
                         subfolder=("seed$sd/"$model_size"/t2500/p"$patch_height"x"$patch_width"/smth"$smth"/wd"$wd"/m0.8/atp")
 
-                        # SiT
-                        # finetune="/home/oturgut/SiT/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
-                        finetune="/vol/aimspace/users/tuo/SiT/output/pre/refactored/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9455.pth"
+                        # otis
+                        # finetune="/home/oturgut/otis/output/pre/test/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9484.pth"
+                        finetune="/vol/aimspace/users/tuo/otis/output/pre/refactored/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec128d2b/t2500/p1x100/wd0.15/m0.8/pre_b512_blr1e-5/checkpoint-199-ncc-0.9455.pth"
                             
-                        # finetune="/home/oturgut/SiT/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
-                        # finetune="/vol/aimspace/users/tuo/SiT/output/pre/SiT/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
+                        # finetune="/home/oturgut/otis/output/pre/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t5000/p1x100/wd0.15/m0.8/pre_b128_blr3e-5/checkpoint-293-ncc-0.6461.pth"
+                        # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ukbb/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t2500/p1x100/wd0.15/m0.8/pre_b128_blr1e-4/checkpoint-299-ncc-0.9606.pth"
                         # finetune=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_"$pre_data"/checkpoint-399.pth"
                         # finetune=$checkpoint_base"/checkpoints/mm_v230_mae_checkpoint.pth"
                         # finetune=$checkpoint_base"/checkpoints/mm_v283_mae_checkpoint.pth"

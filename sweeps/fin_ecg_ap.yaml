@@ -51,7 +51,7 @@ parameters:
     value: 2500
 
   finetune:
-    value: "/home/oturgut/SiT/output/pre/server/WLoss/NewRandomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8799.pth"
+    value: "/home/oturgut/otis/output/pre/server/WLoss/NewRandomResizedCrop/cos_weight0.0/ncc_weight0.1/seed0/tinyDeep2/t6000/p1x100/wd0.15/m0.8/pre_b320_blr1e-5/checkpoint-199-ncc-0.8799.pth"
 
   patience:
     value: 15

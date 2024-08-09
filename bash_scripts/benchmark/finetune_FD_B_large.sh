@@ -106,10 +106,10 @@ save_logits="False"
 # Data path
 if [ "$path" = "tower" ]; then
     data_base="/home/oturgut/data/processed/benchmarks/classification/"$folder
-    checkpoint_base="/home/oturgut/SiT"
+    checkpoint_base="/home/oturgut/otis"
 else
     data_base="/vol/aimspace/users/tuo/data/processed/benchmarks/classification/"$folder
-    checkpoint_base="/vol/aimspace/users/tuo/SiT"
+    checkpoint_base="/vol/aimspace/users/tuo/otis"
 fi
 
 # Dataset parameters
@@ -171,31 +171,31 @@ do
                             # OTiS
                             if [ "$model_size" = "baseDeep" ]; then
                                 if [ "$path" = "tower" ]; then
-                                    # finetune="/home/oturgut/SiT/output/pre/otis/base/dec160d4b/p1x24/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
-                                    finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
+                                    # finetune="/home/oturgut/otis/output/pre/otis/base/dec160d4b/p1x24/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                    finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
                                 else
-                                    finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                    finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
                                 fi
                             elif [ "$model_size" = "largeDeep" ]; then
                                 if [ "$path" = "tower" ]; then
-                                    # finetune="/home/oturgut/SiT/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
-                                    finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b3680_blr1e-5/checkpoint-188-ncc-0.8919.pth"
+                                    # finetune="/home/oturgut/otis/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                                    finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b3680_blr1e-5/checkpoint-188-ncc-0.8919.pth"
 
                                     # 1%
-                                    # finetune="/home/oturgut/SiT/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b256_blr3e-5/checkpoint-197-ncc-0.7532.pth"
+                                    # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b256_blr3e-5/checkpoint-197-ncc-0.7532.pth"
 
                                     # 10%
-                                    # finetune="/home/oturgut/SiT/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1840_blr1e-5/checkpoint-194-ncc-0.8581.pth"
+                                    # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1840_blr1e-5/checkpoint-194-ncc-0.8581.pth"
                                 else
-                                    finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
+                                    finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                 fi
                             else
                                 # huge
                                 if [ "$path" = "tower" ]; then
-                                    # finetune="/home/oturgut/SiT/output/pre/otis/huge/dec160d4b/p1x24/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
-                                    finetune="/home/oturgut/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b4320_blr3e-6/checkpoint-196-ncc-0.8827.pth"
+                                    # finetune="/home/oturgut/otis/output/pre/otis/huge/dec160d4b/p1x24/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                                    finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b4320_blr3e-6/checkpoint-196-ncc-0.8827.pth"
                                 else
-                                    finetune="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
+                                    finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                                 fi
                             fi
 

@@ -94,7 +94,7 @@ if [ "$path" = "tower" ]; then
     else 
         data_base="/home/oturgut/data/processed/TiCorp"
     fi
-    checkpoint_base="/home/oturgut/SiT"
+    checkpoint_base="/home/oturgut/otis"
 else
     if [ "$dataset" = "ukbb" ]; then
         data_base="/vol/aimspace/projects/ukbb/data/cardiac/cardiac_segmentations/projects/ecg"
@@ -105,7 +105,7 @@ else
     else
         data_base="/vol/aimspace/users/tuo/data/processed/TiCorp"
     fi
-    checkpoint_base="/vol/aimspace/users/tuo/SiT"
+    checkpoint_base="/vol/aimspace/users/tuo/otis"
 fi
 
 # Dataset parameters
@@ -174,8 +174,8 @@ do
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
 
             # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr"/checkpoint-135-ncc-0.8845.pth"
-            # resume="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b3936_blr1e-5/checkpoint-148-ncc-0.8793.pth"
-            resume="/vol/aimspace/users/tuo/SiT/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.10/m0.75/pre_b3936_blr3e-5/checkpoint-163-ncc-0.8798.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b3936_blr1e-5/checkpoint-148-ncc-0.8793.pth"
+            resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.10/m0.75/pre_b3936_blr3e-5/checkpoint-163-ncc-0.8798.pth"
         
             if [ "$path" = "tower" ]; then
                 cmd="python3 main_pretrain.py --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"

@@ -68,7 +68,7 @@ parameters:
     value: "forecasting"
 
   # finetune:
-  #   value: "/home/oturgut/SiT/output/pre/otis_final/checkpoint-96-ncc-0.7561.pth"
+  #   value: "/home/oturgut/otis/output/pre/otis_final/checkpoint-96-ncc-0.7561.pth"
 
   patience:
     value: -1
