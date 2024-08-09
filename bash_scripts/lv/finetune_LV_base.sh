@@ -2,7 +2,7 @@
 # Fine tuning 
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
-seed=(0)
+seed=(1)
 num_workers="32"    # number of CPUs
 
 path="server"       # [tower, server]
@@ -11,12 +11,13 @@ submitit="False"    # only for training on server
 nodes="1"
 world_size="2"      # number of GPUs
 mem_per_task="96"   # memory per GPU
-port="29420"
+port="29412"
+port=`echo|awk -v y1=$port -v y2=$1 '{print y1+y2}'`
 
-batch_size=(992)    # 744: 992
+batch_size=(96)    # 744: 992
 accum_iter=(1)
 
-epochs="100"
+epochs="50"
 warmup_epochs="5"
 
 # Callback parameters
@@ -39,7 +40,7 @@ freeze_pos_embed_y="False"
 
 input_channels="1"
 input_electrodes="12"
-time_steps="744"
+time_steps="1992"
 
 patch_height="1"
 patch_width=(24)
@@ -54,23 +55,24 @@ mask_ratio="0.00"
 mask_c_ratio="0.00"
 mask_t_ratio="0.00"
 
-crop_lower_bnd="0.8"
+crop_lower_bnd="1.0"
 crop_upper_bnd="1.0"
 
-jitter_sigma="0.2"
-rescaling_sigma="0.5"
-ft_surr_phase_noise="0.075"
+jitter_sigma="0.0"
+rescaling_sigma="0.0"
+ft_surr_phase_noise="0.0"
 
-drop_path=(0.1)
-layer_decay=(0.9)
+drop_path=(0.2)
+layer_decay=(0.75)
 
 # Optimizer parameters
-blr=(1e-6 3e-6 1e-5 3e-5 1e-4) # 3e-5 if from scratch
+blr=(1e-5) # 3e-5 if from scratch
+blr=`echo|awk -v y1=$blr -v y2=$1 '{print y1*y2}'`
 min_lr="0.0"
 weight_decay=(0.1)
 
 # Criterion parameters
-smoothing=(0.1)
+smoothing=(0.1) # NOT REQUIRED FOR REGRESSION TASKS !
 
 # Output path
 folder="LV"
@@ -160,9 +162,23 @@ do
 
                             # OTiS
                             if [ "$model_size" = "baseDeep" ]; then
-                                finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
-                                # finetune="/vol/aimspace/users/tuo/otis/output/gen/otis/single/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1_blr1e0/checkpoint-96-mse-0.1988.pth"
-                                # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr1e-5/checkpoint-99-ncc-0.8662.pth"
+                                # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
+                                # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
+
+                                # # 1 %
+                                # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b768_blr3e-5/checkpoint-199-ncc-0.7514.pth"
+
+                                # # 10%
+                                # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b768_blr3e-5/checkpoint-199-ncc-0.8629.pth"
+
+                                # # domain-agnostic
+                                # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_agnostic/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-196-ncc-0.8848.pth"
+
+                                # # ncc0.0
+                                finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-193-ncc-0.8860.pth"
+
+                                # # random masking
+                                # finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/random_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-199-ncc-0.9079.pth"
                             elif [ "$model_size" = "largeDeep" ]; then
                                 finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                             else
@@ -170,7 +186,7 @@ do
                                 finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                             fi
 
-                            output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
+                            output_dir=$checkpoint_base"/output/fin/"$folder"/"$finetune"/"$subfolder"/fin_b"$(($bs*$accum_iter*$world_size))"_blr"$lr
 
                             # resume=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$bs"_blr"$lr"/checkpoint-4-pcc-0.54.pth"
 
@@ -270,6 +286,9 @@ do
                             fi
                             
                             echo $cmd && $cmd
+                            
+                            remove_cmd="rm -r "$output_dir
+                            echo $remove_cmd && $remove_cmd
 
                         done
                     done

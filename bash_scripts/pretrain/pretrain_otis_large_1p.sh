@@ -11,11 +11,11 @@ submitit="False"     # only for training on server
 nodes="1"
 world_size="4"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29527"
+port="29432"
 port=$(($port+$1))
 
-batch_size="120"
-accum_iter=(9)      # * world_size
+batch_size="184"        # p1x24, 232, p1x48: 592, noForecasting: 416, dec160d4b: 192
+accum_iter=(1)
 
 epochs="200"
 warmup_epochs="20"
@@ -27,7 +27,7 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="hugeDeep_dec160d4b"
+model_size="largeDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
 univariate="False"
@@ -68,12 +68,11 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(1e-5)
-weight_decay="0.05"
-weight_decay=`echo|awk -v y1=$weight_decay -v y2=$1 '{print y1+y2*0.01}'`
+blr_array=(1e-4)
+weight_decay="0.15"
 
 # Data path
-dataset="ticorp"
+dataset="ticorp_1percent"
 
 # Output path
 folder="otis/"$dataset
@@ -119,6 +118,12 @@ elif [ "$dataset" = "mimic" ]; then
 elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train_all_new.pt"
     val_data_path=$data_base"/val_all_new.pt"
+elif [ "$dataset" = "ticorp_1percent" ]; then
+    data_path=$data_base"/train_all_new_1percent.pt"
+    val_data_path=$data_base"/val_all_new.pt"
+elif [ "$dataset" = "ticorp_10percent" ]; then
+    data_path=$data_base"/train_all_new_10percent.pt"
+    val_data_path=$data_base"/val_all_new.pt"
 elif [ "$dataset" = "ticorp_decOnly" ]; then
     data_path=$data_base"/val_all_new.pt"
     val_data_path=$data_base"/val_wo_mimic_new.pt"
@@ -159,6 +164,12 @@ do
         do
 
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
+
+            if [ "$include_forecasting" = "True" ]; then
+                subfolder="dual_masking/"$subfolder
+            else
+                subfolder="random_masking/"$subfolder
+            fi
 
             if [ "$univariate" = "True" ]; then
                 # domain-agnostic by default

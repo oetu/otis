@@ -9,13 +9,13 @@ path="server"       # [tower, server]
 submitit="False"     # only for training on server
 
 nodes="1"
-world_size="4"      # number of GPUs
+world_size="2"      # number of GPUs
 mem_per_task="200"   # memory per GPU
-port="29527"
+port="29400"
 port=$(($port+$1))
 
-batch_size="120"
-accum_iter=(9)      # * world_size
+batch_size="128"    # dec160d4b: 328, dec128d2b: 464, p1x48: 1280
+accum_iter=(3)      # * world_size
 
 epochs="200"
 warmup_epochs="20"
@@ -27,7 +27,7 @@ max_delta="0.00"
 # Model parameters
 compile="False"
 
-model_size="hugeDeep_dec160d4b"
+model_size="baseDeep_dec160d4b"
 model="otis_"$model_size"_patchX"
 
 univariate="False"
@@ -68,12 +68,11 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(1e-5)
-weight_decay="0.05"
-weight_decay=`echo|awk -v y1=$weight_decay -v y2=$1 '{print y1+y2*0.01}'`
+blr_array=(3e-5)
+weight_decay=(0.1)
 
 # Data path
-dataset="ticorp"
+dataset="ticorp_1percent"
 
 # Output path
 folder="otis/"$dataset
@@ -119,6 +118,12 @@ elif [ "$dataset" = "mimic" ]; then
 elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train_all_new.pt"
     val_data_path=$data_base"/val_all_new.pt"
+elif [ "$dataset" = "ticorp_1percent" ]; then
+    data_path=$data_base"/train_all_new_1percent.pt"
+    val_data_path=$data_base"/val_all_new.pt"
+elif [ "$dataset" = "ticorp_10percent" ]; then
+    data_path=$data_base"/train_all_new_10percent.pt"
+    val_data_path=$data_base"/val_all_new.pt"
 elif [ "$dataset" = "ticorp_decOnly" ]; then
     data_path=$data_base"/val_all_new.pt"
     val_data_path=$data_base"/val_wo_mimic_new.pt"
@@ -160,6 +165,12 @@ do
 
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
+            if [ "$include_forecasting" = "True" ]; then
+                subfolder="dual_masking/"$subfolder
+            else
+                subfolder="random_masking/"$subfolder
+            fi
+
             if [ "$univariate" = "True" ]; then
                 # domain-agnostic by default
                 subfolder="univariate/"$subfolder
@@ -174,9 +185,15 @@ do
 
             output_dir=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr
 
-            # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr"/checkpoint-77-ncc-0.7593.pth"
-            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis_final/noDomainLoss/fm0.1/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec128d2b/t1008/p1x24/wd0.15/m0.75/pre_b3072_blr3e-6/checkpoint-53-ncc-0.7449.pth"
-        
+            # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr"/checkpoint-135-ncc-0.8845.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b3936_blr1e-5/checkpoint-148-ncc-0.8793.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.10/m0.75/pre_b3936_blr3e-5/checkpoint-163-ncc-0.8798.pth"
+
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-77-ncc-0.8632.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_agnostic/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-69-ncc-0.8688.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/random_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-103-ncc-0.8983.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-65-ncc-0.8629.pth"
+
             if [ "$path" = "tower" ]; then
                 cmd="python3 main_pretrain.py --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             elif [ "$submitit" = "True" ]; then

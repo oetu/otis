@@ -51,7 +51,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.1)
+ncc_weight=(0.0)
 cos_weight=(0.0)
 
 # Augmentation parameters
@@ -118,6 +118,12 @@ elif [ "$dataset" = "mimic" ]; then
 elif [ "$dataset" = "ticorp" ]; then
     data_path=$data_base"/train_all_new.pt"
     val_data_path=$data_base"/val_all_new.pt"
+elif [ "$dataset" = "ticorp_1percent" ]; then
+    data_path=$data_base"/train_all_new_1percent.pt"
+    val_data_path=$data_base"/val_all_new.pt"
+elif [ "$dataset" = "ticorp_10percent" ]; then
+    data_path=$data_base"/train_all_new_10percent.pt"
+    val_data_path=$data_base"/val_all_new.pt"
 elif [ "$dataset" = "ticorp_decOnly" ]; then
     data_path=$data_base"/val_all_new.pt"
     val_data_path=$data_base"/val_wo_mimic_new.pt"
@@ -159,6 +165,12 @@ do
 
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
+            if [ "$include_forecasting" = "True" ]; then
+                subfolder="dual_masking/"$subfolder
+            else
+                subfolder="random_masking/"$subfolder
+            fi
+
             if [ "$univariate" = "True" ]; then
                 # domain-agnostic by default
                 subfolder="univariate/"$subfolder
@@ -175,8 +187,13 @@ do
 
             # resume=$checkpoint_base"/output/pre/"$folder"/"$subfolder"/pre_b"$(($batch_size*$acc_it*$world_size))"_blr"$blr"/checkpoint-135-ncc-0.8845.pth"
             # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b3936_blr1e-5/checkpoint-148-ncc-0.8793.pth"
-            resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.10/m0.75/pre_b3936_blr3e-5/checkpoint-163-ncc-0.8798.pth"
-        
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.10/m0.75/pre_b3936_blr3e-5/checkpoint-163-ncc-0.8798.pth"
+
+            resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-177-ncc-0.8802.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_agnostic/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-153-ncc-0.8761.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/random_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-103-ncc-0.8983.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-65-ncc-0.8629.pth"
+
             if [ "$path" = "tower" ]; then
                 cmd="python3 main_pretrain.py --seed $seed --patience $patience --crop_lower_bnd $crop_lower_bnd --crop_upper_bnd $crop_upper_bnd --max_delta $max_delta --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc_weight --cos_weight $cos_weight --model $model --batch_size $batch_size --epochs $epochs --accum_iter $acc_it --mask_ratio $mr --weight_decay $weight_decay --blr $blr --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --num_workers $num_workers"
             elif [ "$submitit" = "True" ]; then
