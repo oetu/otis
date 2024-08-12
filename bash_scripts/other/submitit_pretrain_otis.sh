@@ -16,7 +16,7 @@ source /opt/anaconda3/etc/profile.d/conda.sh
 
 # activate corresponding environment
 conda deactivate            # If you launch your script from a terminal where your environment is already loaded, conda won't activate the environment. This guards against that. Not necessary if you always run this script from a clean terminal
-conda activate mae4
+conda activate otis
 
 cmd="./bash_scripts/pretrain_otis.sh"
 echo $cmd && $cmd
