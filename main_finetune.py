@@ -308,16 +308,17 @@ def main(args):
                                     train=False, 
                                     N_val=1,
                                     args=args)
-    dataset_test = TimeSeriesDataset(data_path=args.test_data_path, 
-                                    labels_path=args.test_labels_path, 
-                                    labels_mask_path=args.test_labels_mask_path, 
-                                    downstream_task=args.downstream_task, 
-                                    domain_offsets=dataset_train.offsets, 
-                                    univariate=args.univariate,
-                                    train=False, 
-                                    test=True,
-                                    N_val=1,
-                                    args=args)
+    if args.test:
+        dataset_test = TimeSeriesDataset(data_path=args.test_data_path, 
+                                        labels_path=args.test_labels_path, 
+                                        labels_mask_path=args.test_labels_mask_path, 
+                                        downstream_task=args.downstream_task, 
+                                        domain_offsets=dataset_train.offsets, 
+                                        univariate=args.univariate,
+                                        train=False, 
+                                        test=True,
+                                        N_val=1,
+                                        args=args)
 
     # train balanced
     # class_weights = 2.0 / (2.0 * torch.Tensor([1.0, 1.0])) # total_nb_samples / (nb_classes * samples_per_class)
@@ -326,7 +327,8 @@ def main(args):
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
-    print("Test set size: ", len(dataset_test))
+    if args.test:
+        print("Test set size: ", len(dataset_test))
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -349,19 +351,21 @@ def main(args):
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
         # print("Sampler_val = %s" % str(sampler_val))
 
-        if args.dist_eval:
-            if len(dataset_test) % num_tasks != 0:
-                print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
-                      'This will slightly alter validation results as extra duplicate entries are added to achieve '
-                      'equal num of samples per-process.')
-            sampler_test = torch.utils.data.DistributedSampler(
-                dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=True)  # shuffle=True to reduce monitor bias
-        else:
-            sampler_test = torch.utils.data.SequentialSampler(dataset_test)
+        if args.test:
+            if args.dist_eval:
+                if len(dataset_test) % num_tasks != 0:
+                    print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
+                        'This will slightly alter validation results as extra duplicate entries are added to achieve '
+                        'equal num of samples per-process.')
+                sampler_test = torch.utils.data.DistributedSampler(
+                    dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=True)  # shuffle=True to reduce monitor bias
+            else:
+                sampler_test = torch.utils.data.SequentialSampler(dataset_test)
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
-        sampler_test = torch.utils.data.SequentialSampler(dataset_test)
+        if args.test:
+            sampler_test = torch.utils.data.SequentialSampler(dataset_test)
 
     # tensorboard logging
     if False: #global_rank == 0 and args.log_dir and not args.eval:
@@ -394,16 +398,17 @@ def main(args):
         drop_last=False
     )
 
-    data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, 
-        sampler=sampler_test,
-        # shuffle=False,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        collate_fn=dataset_test.collate_fn_ft,
-        pin_memory=args.pin_mem,
-        drop_last=False
-    )
+    if args.test:
+        data_loader_test = torch.utils.data.DataLoader(
+            dataset_test, 
+            sampler=sampler_test,
+            # shuffle=False,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            collate_fn=dataset_test.collate_fn_ft,
+            pin_memory=args.pin_mem,
+            drop_last=False
+        )
 
     mixup_fn = None
     mixup_active = args.mixup > 0 or args.cutmix > 0. or args.cutmix_minmax is not None
@@ -467,22 +472,21 @@ def main(args):
         print(f"Identified domain: {dataset_train.domains}")
         assert len(dataset_train.domains) == 1, "There is more than one domain in the target dataset"
         target_domain = list(dataset_train.domains.keys())[0]
-        target_shape = list(dataset_train.domains.values())[0]
+        # target_shape = list(dataset_train.domains.values())[0]
 
         pos_embed_y_available = False
-
         checkpoint_domains = checkpoint["domains"]
         for domain, shape in checkpoint_domains.items():
-            if domain == target_domain and shape[1] == target_shape[1]:
+            if domain == target_domain: # and shape[1] == target_shape[1]:
                 pos_embed_y_available = True
                 break
 
         if len(checkpoint["domain_offsets"]) > 1 and sum([v for v in checkpoint["domain_offsets"].values()]) == 0:
             # domain-agnostic pos_embed_y
             print("INFO: Found domain-agnostic pos_embed_y in checkpoint")
-            pos_embed_y_available = True
+            pos_embed_y_available = True # if pos_embed_y_available = False before
 
-            # sett offset to zero
+            # set offset to zero
             print(dataset_train.domain)
             checkpoint["domain_offsets"][dataset_train.domain[0][0]] = 0
 
@@ -496,7 +500,8 @@ def main(args):
             # load domain_offsets
             dataset_train.set_domain_offsets(checkpoint["domain_offsets"])
             dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
-            dataset_test.set_domain_offsets(checkpoint["domain_offsets"])
+            if args.test:
+                dataset_test.set_domain_offsets(checkpoint["domain_offsets"])
         else:
             print("Initializing new pos_embed_y")
 
@@ -637,7 +642,7 @@ def main(args):
     
     best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 
                   'avg':0.0, 'epoch':0, 'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
-    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
+    best_eval_scores = {'count':1, 'nb_ckpts_max':1, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
@@ -655,8 +660,9 @@ def main(args):
             if early_stop.evaluate_decreasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
+
             if args.output_dir and test_stats[args.eval_criterion] <= max(best_eval_scores['eval_criterion']):
-                # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
+                # save the best nb_ckpts_max checkpoints
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
@@ -666,7 +672,8 @@ def main(args):
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, 
+                    evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
             if args.downstream_task == 'classification':
@@ -677,8 +684,9 @@ def main(args):
             if early_stop.evaluate_increasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
+
             if args.output_dir and test_stats[args.eval_criterion] >= min(best_eval_scores['eval_criterion']):
-                # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
+                # save the best nb_ckpts_max checkpoints
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
@@ -688,7 +696,8 @@ def main(args):
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, evaluation_criterion=args.eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=test_stats, 
+                    evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
 
         test_history['test_avg'] = test_stats['avg']

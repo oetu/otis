@@ -325,8 +325,8 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
         model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-%s" % epoch_name, client_state=client_state)
 
 
-def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, test_stats, evaluation_criterion, 
-                    mode="increasing", domains:Dict=None, domain_offsets:Dict=None):
+def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, test_stats, 
+                    evaluation_criterion, nb_ckpts_max:int=1, mode="increasing", domains:Dict=None, domain_offsets:Dict=None):
     output_dir = Path(args.output_dir)
     epoch_name = str(epoch)
 
@@ -337,8 +337,8 @@ def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scale
     exceptions = ["log.txt"]
     file_names = [file for file in file_names if file not in exceptions and evaluation_criterion in file]
 
-    # save the 5 best performing models
-    if len(file_names) >= 1 and is_main_process():
+    # save the best nb_ckpts_max performing models
+    if len(file_names) >= nb_ckpts_max and is_main_process():
         # file_names = sorted(file_names, key=lambda str: int(re.search(r'\d+', str).group()))
         if mode == "increasing":
             file_names = sorted(file_names, key=lambda x: float(x.split(".pth")[0].split("-")[-1]), reverse=True)

@@ -546,7 +546,7 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     
     best_stats = {'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
-    best_eval_scores = {'count':0, 'nb_ckpts_max':5, 'eval_criterion':[best_stats[args.eval_criterion]]}
+    best_eval_scores = {'count':1, 'nb_ckpts_max':3, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
@@ -575,8 +575,9 @@ def main(args):
             if early_stop.evaluate_decreasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
+
             if args.output_dir and val_stats[args.eval_criterion] <= max(best_eval_scores['eval_criterion']):
-                # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
+                # save the best nb_ckpts_max checkpoints
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
@@ -586,14 +587,16 @@ def main(args):
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=args.eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, 
+                    evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
             if early_stop.evaluate_increasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
+
             if args.output_dir and val_stats[args.eval_criterion] >= min(best_eval_scores['eval_criterion']):
-                # save the best 5 (nb_ckpts_max) checkpoints, even if they appear after the best checkpoint wrt time
+                # save the best nb_ckpts_max checkpoints
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
@@ -603,7 +606,8 @@ def main(args):
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, evaluation_criterion=args.eval_criterion, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, 
+                    evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         
         best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])

@@ -115,9 +115,9 @@ class TimeSeriesDataset(Dataset):
         if self.train == False:
             # validate / test on more than one chunk per sample
             # Calculate number of overlapping chunks
-            stride=24
+            stride=32
             if self.test == True:
-                stride = 1
+                stride = 2
             
             N_val = max(int(((data.shape[-1] - self.args.time_steps) / stride) + 1), 1)
             if self.N_val != -1:
