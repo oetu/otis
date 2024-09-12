@@ -114,17 +114,17 @@ fi
 
 # Dataset parameters
 # Training
-data_path=$data_base"/train.pt"
+data_path=$data_base"/train_eeg.pt"
 labels_path=$data_base"/train_labels.pt"
 downstream_task="classification"
 
 # Validation
-val_data_path=$data_base"/val.pt"
+val_data_path=$data_base"/val_eeg.pt"
 val_labels_path=$data_base"/val_labels.pt"
 
 # Test
 test="True"
-test_data_path=$data_base"/test.pt"
+test_data_path=$data_base"/test_eeg.pt"
 test_labels_path=$data_base"/test_labels.pt"
 
 # EVALUATE
@@ -171,13 +171,19 @@ do
                             # OTiS
                             if [ "$model_size" = "baseDeep" ]; then
                                 if [ "$path" = "tower" ]; then
+                                    # [95.096, 94.238, 94.150] -> 94.49 ; domain "eeg_10-20"
+                                    # [95.350, 94.124, 94.133] -> 94.54 ; domain "epilepsy"
                                     # finetune="/home/oturgut/otis/output/pre/otis/base/dec160d4b/p1x24/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
                                     finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
 
                                     # # 1%
+                                    # [92.653, 91.620, 91.077] -> 91.78 ; domain "eeg_10-20"
+                                    # [90.692, 93.222, 91.235] -> 91.72 ; domain "epilepsy"
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b768_blr3e-5/checkpoint-199-ncc-0.7514.pth"
 
                                     # # 10%
+                                    # [94.203, 94.316, 91.585] -> 93.37 ; domain "eeg_10-20"
+                                    # [94.711, 87.084, 83.099] -> 88.30 ; domain "epilepsy"
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b768_blr3e-5/checkpoint-199-ncc-0.8629.pth"
 
                                     # # domain-agnostic

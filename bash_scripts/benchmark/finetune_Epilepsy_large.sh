@@ -114,17 +114,17 @@ fi
 
 # Dataset parameters
 # Training
-data_path=$data_base"/train.pt"
+data_path=$data_base"/train_eeg.pt"
 labels_path=$data_base"/train_labels.pt"
 downstream_task="classification"
 
 # Validation
-val_data_path=$data_base"/val.pt"
+val_data_path=$data_base"/val_eeg.pt"
 val_labels_path=$data_base"/val_labels.pt"
 
 # Test
 test="True"
-test_data_path=$data_base"/test.pt"
+test_data_path=$data_base"/test_eeg.pt"
 test_labels_path=$data_base"/test_labels.pt"
 
 # EVALUATE
@@ -180,13 +180,19 @@ do
                                 fi
                             elif [ "$model_size" = "largeDeep" ]; then
                                 if [ "$path" = "tower" ]; then
+                                    # [94.536, 93.905, 93.643] --> 94.03% "eeg_10-20"
+                                    # [94.965, 93.634, 92.164] --> 93.59% "epilepsy" 
                                     # finetune="/home/oturgut/otis/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                     finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b3680_blr1e-5/checkpoint-188-ncc-0.8919.pth"
 
                                     # 1%
+                                    # [94.352, 93.879, 93.879] --> 94.04% "eeg_10-20"
+                                    # [94.037, 94.921, 94.827] --> 94.60% "epilepsy"
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b256_blr3e-5/checkpoint-197-ncc-0.7532.pth"
 
                                     # 10%
+                                    # [93.371, 92.828, 92.198] --> 92.80% "eeg_10-20"
+                                    # [93.861, 94.212, 90.236] --> 92.77% "epilepsy"
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1840_blr1e-5/checkpoint-194-ncc-0.8581.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"

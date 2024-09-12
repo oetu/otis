@@ -68,7 +68,7 @@ ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
 blr_array=(3e-1)
-weight_decay=(0.15)
+weight_decay=(0.25)
 
 downstream_task="forecasting"
 

@@ -2,7 +2,7 @@
 # Pre-training
 
 # Basic parameters
-seed="0"
+seed=(0)
 num_workers="4"    # number of CPUs
 
 path="tower"       # [tower, server]
@@ -182,13 +182,13 @@ do
                                 # huge
                                 if [ "$path" = "tower" ]; then
                                     # finetune="/home/oturgut/otis/output/pre/otis/huge/dec160d4b/p1x24/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
-                                    # finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b4320_blr3e-6/checkpoint-196-ncc-0.8827.pth"
+                                    finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b4320_blr3e-6/checkpoint-196-ncc-0.8827.pth"
 
                                     # 1%
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b144_blr3e-5/checkpoint-199-ncc-0.7478.pth"
 
                                     # 10%
-                                    finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b216_blr3e-5/checkpoint-199-ncc-0.8516.pth"
+                                    # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b216_blr3e-5/checkpoint-199-ncc-0.8516.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/hugeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1680_blr1e-5/checkpoint-98-ncc-0.8661.pth"
                                 fi

@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.0)
+ncc_weight=(0.0 0.1 0.2)
 cos_weight=0.0
 
 # Augmentation parameters
@@ -67,8 +67,8 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(3e-2 1e-1 3e-1 1e-0)
-weight_decay=(0.15)
+blr_array=(3e-2 1e-1 3e-1 1e-0) # 3e-1, 1e-2
+weight_decay=(0.05 0.15 0.25)
 
 downstream_task="imputation"
 
@@ -81,7 +81,7 @@ downstream_task="imputation"
 folder="ettm1"
 input_channels="1"
 input_electrodes="7"
-time_steps="96" # 384, 192
+time_steps="96" # 504, 384, 192
 
 # folder="etth2"
 # input_channels="1"
@@ -121,14 +121,14 @@ fi
 
 # Dataset parameters
 # Training
-data_path=$data_base"/train.pt"
+data_path=$data_base"/train_correct_norm.pt"
 
 # Validation
-val_data_path=$data_base"/val.pt"
+val_data_path=$data_base"/val_correct_norm.pt"
 
 # Test
 test="True"
-test_data_path=$data_base"/test.pt"
+test_data_path=$data_base"/test_correct_norm.pt"
 
 # EVALUATE
 # As filename: State the checkpoint for the inference of a specific model

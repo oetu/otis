@@ -2,7 +2,7 @@
 # Pre-training
 
 # Basic parameters
-seed="0"
+seed=(0)
 num_workers="4"    # number of CPUs
 
 path="tower"       # [tower, server]
@@ -174,13 +174,13 @@ do
                             elif [ "$model_size" = "largeDeep" ]; then
                                 if [ "$path" = "tower" ]; then
                                     # finetune="/home/oturgut/otis/output/pre/otis/large/dec160d4b/p1x24/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
-                                    # finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b3680_blr1e-5/checkpoint-188-ncc-0.8919.pth"
+                                    finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b3680_blr1e-5/checkpoint-188-ncc-0.8919.pth"
 
                                     # 1%
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b256_blr3e-5/checkpoint-197-ncc-0.7532.pth"
 
                                     # 10%
-                                    finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1840_blr1e-5/checkpoint-194-ncc-0.8581.pth"
+                                    # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b1840_blr1e-5/checkpoint-194-ncc-0.8581.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/largeDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b768_blr3e-5/checkpoint-96-ncc-0.8667.pth"
                                 fi
