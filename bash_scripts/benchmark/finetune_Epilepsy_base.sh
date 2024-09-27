@@ -171,7 +171,7 @@ do
                             # OTiS
                             if [ "$model_size" = "baseDeep" ]; then
                                 if [ "$path" = "tower" ]; then
-                                    # [95.096, 94.238, 94.150] -> 94.49 ; domain "eeg_10-20"
+                                    # [95.096, 94.238, 94.150] [93.699, 94.072] -> 94.49 ; domain "eeg_10-20"
                                     # [95.350, 94.124, 94.133] -> 94.54 ; domain "epilepsy"
                                     # finetune="/home/oturgut/otis/output/pre/otis/base/dec160d4b/p1x24/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
                                     finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
@@ -187,12 +187,15 @@ do
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_10percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b768_blr3e-5/checkpoint-199-ncc-0.8629.pth"
 
                                     # # domain-agnostic
+                                    # [95.403, 92.697, 92.968] [91.848, 92.000] ->
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp/multivariate/domain_agnostic/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-196-ncc-0.8848.pth"
 
                                     # # ncc0.0
+                                    # [94.895, 93.853, 92.329] [91.200, 90.411] -> 
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-193-ncc-0.8860.pth"
 
                                     # # random masking
+                                    # [94.142, 93.573, 92.049] [88.205, 84.982] ->
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp/multivariate/domain_specific/random_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-199-ncc-0.9079.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"

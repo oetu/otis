@@ -60,7 +60,7 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 drop_path=(0.0 0.1 0.2)
-layer_decay=(0.75)
+layer_decay=(0.5 0.75)
 
 # Optimizer parameters
 blr=(3e-4 1e-3 3e-3 1e-2) # 3e-5 if from scratch

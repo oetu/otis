@@ -2,7 +2,7 @@
 # Pre-training
 
 # Basic parameters
-seed="0"
+seed=(0)
 num_workers="4"    # number of CPUs
 
 path="tower"       # [tower, server]
@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.1 0.2)
+ncc_weight=(0.1 0.2 0.3)
 cos_weight=0.0
 
 # Augmentation parameters

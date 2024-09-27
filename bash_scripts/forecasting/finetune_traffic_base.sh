@@ -13,7 +13,7 @@ world_size="1"      # number of GPUs
 mem_per_task="69"   # memory per GPU
 port="29420"
 
-batch_size=(64)
+batch_size=(128)
 accum_iter=(1)
 
 epochs="100"
@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.2)
+ncc_weight=(0.1 0.2)
 cos_weight=0.0
 
 # Augmentation parameters
@@ -67,8 +67,8 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(1e-3)
-weight_decay=(0.05)
+blr_array=(3e-3 1e-2 3e-2 1e-1 3e-1)
+weight_decay=(0.15 0.25)
 
 downstream_task="forecasting"
 
@@ -110,7 +110,7 @@ downstream_task="forecasting"
 
 folder="traffic"
 input_channels="1"
-input_electrodes="832"
+input_electrodes="1"
 time_steps="432" # 384, 192
 
 

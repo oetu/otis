@@ -59,16 +59,16 @@ jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
-drop_path=(0.1)
-layer_decay=(0.25)
+drop_path=(0.0 0.1 0.2)
+layer_decay=(0.5 0.75)
 
 # Optimizer parameters
-blr=(1e-2) # 3e-5 if from scratch
+blr=(3e-4 1e-3 3e-3 1e-2) # 3e-5 if from scratch
 min_lr="0.0"
-weight_decay=(0.0)
+weight_decay=(0.1 0.2)
 
 # Criterion parameters
-smoothing=(0.0)
+smoothing=(0.1 0.2)
 
 # Output path
 # folder="Epilepsy"
@@ -172,7 +172,7 @@ do
                             if [ "$model_size" = "baseDeep" ]; then
                                 if [ "$path" = "tower" ]; then
                                     # finetune="/home/oturgut/otis/output/pre/otis/base/dec160d4b/p1x24/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
-                                    # finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
+                                    finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
 
                                     # # 1%
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp_1percent/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b768_blr3e-5/checkpoint-199-ncc-0.7514.pth"
@@ -184,7 +184,7 @@ do
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp/multivariate/domain_agnostic/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-196-ncc-0.8848.pth"
 
                                     # # ncc0.0
-                                    finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-193-ncc-0.8860.pth"
+                                    # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-193-ncc-0.8860.pth"
 
                                     # # random masking
                                     # finetune="/home/oturgut/otis/checkpoints/rebuttal/ticorp/multivariate/domain_specific/random_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-199-ncc-0.9079.pth"

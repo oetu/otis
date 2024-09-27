@@ -2,7 +2,7 @@
 # Pre-training
 
 # Basic parameters
-seed="0"
+seed=(0)
 num_workers="4"    # number of CPUs
 
 path="tower"       # [tower, server]
@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.1)
+ncc_weight=(0.1 0.2)
 cos_weight=0.0
 
 # Augmentation parameters
@@ -66,16 +66,9 @@ jitter_sigma="0.0"
 rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
-# crop_lower_bnd="0.8"
-# crop_upper_bnd="1.0"
-
-# jitter_sigma="0.1"
-# rescaling_sigma="0.25"
-# ft_surr_phase_noise="0.05"
-
 # Optimizer parameters
-blr_array=(1e-0)
-weight_decay=(0.15)
+blr_array=(3e-2 1e-1 3e-1 1e-0 3e-0) # 3e-1, 1e-2
+weight_decay=(0.15 0.25)
 
 downstream_task="forecasting"
 
@@ -175,6 +168,7 @@ do
                                 if [ "$path" = "tower" ]; then
                                     # finetune="/home/oturgut/otis/output/pre/otis/base/dec160d4b/p1x24/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
                                     finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-197-ncc-0.8818.pth"
+                                    # finetune="/home/oturgut/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/1-attn/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-190-ncc-0.8840.pth"
                                 else
                                     finetune="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.15/m0.75/pre_b2624_blr3e-5/checkpoint-99-ncc-0.8685.pth"
                                 fi

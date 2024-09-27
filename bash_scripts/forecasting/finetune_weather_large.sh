@@ -2,7 +2,7 @@
 # Pre-training
 
 # Basic parameters
-seed="0"
+seed=(0)
 num_workers="4"    # number of CPUs
 
 path="tower"       # [tower, server]
@@ -53,7 +53,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.1 0.2)
+ncc_weight=(0.1 0.2 0.3)
 cos_weight=0.0
 
 # Augmentation parameters
@@ -67,7 +67,7 @@ rescaling_sigma="0.0"
 ft_surr_phase_noise="0.0"
 
 # Optimizer parameters
-blr_array=(1e-0)
+blr_array=(3e-2 1e-1 3e-1 1e-0 3e-0)
 weight_decay=(0.15 0.25)
 
 downstream_task="forecasting"

@@ -2,7 +2,7 @@
 # Fine tuning 
 
 # Basic parameters seed = [0, 101, 202, 303, 404]
-seed=(303)
+seed=(0)
 num_workers="8"    # number of CPUs
 
 path="tower"        # [tower, server]
@@ -59,16 +59,16 @@ jitter_sigma="0.2"
 rescaling_sigma="0.5"
 ft_surr_phase_noise="0.075"
 
-drop_path=(0.0)
-layer_decay=(0.75)
+drop_path=(0.0 0.1 0.2)
+layer_decay=(0.5 0.75)
 
 # Optimizer parameters
-blr=(1e-2) # 3e-5 if from scratch
+blr=(3e-4 1e-3 3e-3 1e-2) # 3e-5 if from scratch
 min_lr="0.0"
-weight_decay=(0.1)
+weight_decay=(0.1 0.2)
 
 # Criterion parameters
-smoothing=(0.1)
+smoothing=(0.1 0.2)
 
 # Output path
 # folder="Epilepsy"
