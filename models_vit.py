@@ -46,6 +46,8 @@ class Attention(nn.Module):
         qkv = self.qkv(x).reshape(B, N, 3, C).permute(2, 0, 1, 3) # (QKV, B, Heads, N, head_dim)
         q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple) (B, Heads, N, head_dim)
 
+        if attn_mask is not None:
+            attn_mask = 1 - attn_mask
         attn, attn_weights = self.mha(q, k, v, key_padding_mask=attn_mask)
         self.attn_map = attn_weights
 
