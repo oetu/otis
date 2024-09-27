@@ -19,8 +19,10 @@ Activate the conda environment before running OTiS.
 conda activate otis
 ```
 
-## Training
+## Model weights
+Download pre-trained weights from this [google drive](https://drive.google.com/drive/folders/1sMxJwvyZY7M2Z_gykcjLgIXa13iYDCEf?hl=de).
 
+## Training
 ### Classification
 Run the following command.
 ```
