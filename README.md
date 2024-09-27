@@ -22,10 +22,26 @@ conda activate otis
 ## Training
 
 ### Classification
-Run `main_finetune.py`.
+Run the following command.
+```
+python3 main_finetune.py --num_workers $num_workers --seed $sd --downstream_task classification --nb_classes $nb_classes --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --epochs $epochs --blr $lr --warmup_epochs $warmup_epochs --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path
+```
+
+For slurm, run the following command.
+```
+torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune.py --world_size $world_size --dist_eval --num_workers $num_workers --seed $sd --downstream_task classification --nb_classes $nb_classes --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --blr $lr --epochs $epochs --warmup_epochs $warmup_epochs --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path
+```
 
 ### Regression
-Run `main_finetune.py`.
+Run the following command for a multi-output regression with N variables.
+```
+python3 main_finetune.py --num_workers $num_workers --seed $sd --downstream_task regression --nb_classes N --lower_bnd 0 --upper_bnd N --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --blr $lr --epochs $epochs --warmup_epochs $warmup_epochs --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path
+```
+
+For slurm, run the following command.
+```
+torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune.py --world_size $world_size --dist_eval --num_workers $num_workers --seed $sd --downstream_task regression --nb_classes N --lower_bnd 0 --upper_bnd N --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $bs --blr $lr --epochs $epochs --warmup_epochs $warmup_epochs --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path
+```
 
 ### Forecasting
 Run `main_finetune_gen.py`.
