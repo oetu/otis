@@ -20,7 +20,7 @@ conda activate otis
 ```
 
 ## Model weights
-Download pre-trained weights from this [google drive](https://drive.google.com/drive/folders/1sMxJwvyZY7M2Z_gykcjLgIXa13iYDCEf?hl=de).
+Download pre-trained weights from this [google drive](https://drive.google.com/drive/folders/1sMxJwvyZY7M2Z_gykcjLgIXa13iYDCEf?usp=sharing).
 
 ## Training
 ### Classification
