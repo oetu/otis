@@ -68,7 +68,7 @@ rescaling_sigma="0.5"
 ft_surr_phase_noise="0.1"
 
 # Optimizer parameters
-blr_array=(3e-5)
+blr_array=(1e-5)
 weight_decay="0.15"
 weight_decay=`echo|awk -v y1=$weight_decay -v y2=$1 '{print y1+y2*0.01}'`
 
@@ -160,6 +160,12 @@ do
 
             subfolder="cos_weight$cos_weight/ncc_weight$ncc_weight/seed$seed/$model_size/t$time_steps/p$patch_height"x"$patch_width/wd$weight_decay/m$mr"
 
+            if [ "$include_forecasting" = "True" ]; then
+                subfolder="dual_masking/"$subfolder
+            else
+                subfolder="random_masking/"$subfolder
+            fi
+            
             if [ "$univariate" = "True" ]; then
                 # domain-agnostic by default
                 subfolder="univariate/"$subfolder

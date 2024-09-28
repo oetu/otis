@@ -51,7 +51,7 @@ norm_pix_loss="False"
 masked_patch_loss="False"
 domain_weighted_loss="False"
 
-ncc_weight=(0.0)
+ncc_weight=(0.1)
 cos_weight=(0.0)
 
 # Augmentation parameters
@@ -189,7 +189,7 @@ do
             # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.05/m0.75/pre_b3936_blr1e-5/checkpoint-148-ncc-0.8793.pth"
             # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.10/m0.75/pre_b3936_blr3e-5/checkpoint-163-ncc-0.8798.pth"
 
-            resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-177-ncc-0.8802.pth"
+            # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.0/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-177-ncc-0.8802.pth"
             # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_agnostic/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-153-ncc-0.8761.pth"
             # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/random_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-103-ncc-0.8983.pth"
             # resume="/vol/aimspace/users/tuo/otis/output/pre/otis/ticorp/multivariate/domain_specific/dual_masking/cos_weight0.0/ncc_weight0.1/seed0/baseDeep_dec160d4b/t1008/p1x24/wd0.1/m0.75/pre_b3744_blr3e-5/checkpoint-65-ncc-0.8629.pth"
