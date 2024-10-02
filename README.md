@@ -75,9 +75,9 @@ python3 main_finetune.py --eval --resume $checkpoint --num_workers $num_workers 
 
 ### Qualitative
 <p align="center">
-  <img src="./figs/EEG_embeddings.png?raw=true" width=85%>
+  <img src="./figs/embeddings.png?raw=true" width=85%>
 </p>
 
 <p align="center">
-  <img src="./figs/embeddings.png?raw=true" width=85%>
+  <img src="./figs/EEG_embeddings.png?raw=true" width=85%>
 </p>
