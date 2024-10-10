@@ -81,3 +81,18 @@ python3 main_finetune.py --eval --resume $checkpoint --num_workers $num_workers 
 <p align="center">
   <img src="./figs/EEG_embeddings.png?raw=true" width=85%>
 </p>
+
+
+## Citation
+Please cite the following work:
+```
+@article{turgut2024towards,
+  title={Towards Generalisable Time Series Understanding Across Domains},
+  author={Turgut, {\"O}zg{\"u}n and M{\"u}ller, Philip and Menten, Martin J and Rueckert, Daniel},
+  journal={arXiv preprint arXiv:2308.5914143},
+  year={2024}
+}
+```
+
+## Notice
+This project includes third-party software components that are subject to their respective licenses. Detailed information including component names, licenses, and copyright holders is provided in the respective files. Please review the NOTICE file before using or distributing this software.
