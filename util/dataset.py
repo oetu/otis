@@ -117,7 +117,7 @@ class TimeSeriesDataset(Dataset):
             # Calculate number of overlapping chunks
             stride=32
             if self.test == True:
-                stride = 2
+                stride = 1
             
             N_val = max(int(((data.shape[-1] - self.args.time_steps) / stride) + 1), 1)
             if self.N_val != -1:
