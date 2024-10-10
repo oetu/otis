@@ -62,8 +62,8 @@ def get_args_parser():
 
     parser.add_argument('--input_channels', type=int, default=1, metavar='N',
                         help='input channels')
-    parser.add_argument('--input_electrodes', type=int, default=12, metavar='N',
-                        help='input electrodes')
+    parser.add_argument('--input_variates', type=int, default=12, metavar='N',
+                        help='input variates')
     parser.add_argument('--time_steps', type=int, default=5000, metavar='N',
                         help='input length')
     parser.add_argument('--input_size', default=(1, 12, 5000), type=Tuple,

@@ -14,7 +14,7 @@ max_delta="0.25" # for AUROC
 
 # Model parameters
 input_channels="1"
-input_electrodes="12"
+input_variates="12"
 time_steps="2500"
 model_size="tiny"
 model="vit_"$model_size"_patchX"
@@ -147,7 +147,7 @@ output_dir=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($batch_s
 # or state the (final) epoch for the inference of all models up to this epoch
 resume=$checkpoint_base"/output/fin/"$folder"/"$subfolder"/fin_b"$(($batch_size*$accum_iter))"_blr"$blr"_"$pre_data"/checkpoint-15-auroc-75.8260.pth"
 
-cmd="python3 main_finetune.py --eval --resume $resume --seed $seed --downstream_task $downstream_task --mask_ratio $mask_ratio --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_electrodes $input_electrodes --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $batch_size --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $drop_path --weight_decay $weight_decay --layer_decay $layer_decay --min_lr $min_lr --blr $blr --warmup_epoch $warmup_epochs --smoothing $smoothing --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
+cmd="python3 main_finetune.py --eval --resume $resume --seed $seed --downstream_task $downstream_task --mask_ratio $mask_ratio --jitter_sigma $jitter_sigma --rescaling_sigma $rescaling_sigma --ft_surr_phase_noise $ft_surr_phase_noise --input_channels $input_channels --input_variates $input_variates --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $batch_size --epochs $epochs --patience $patience --max_delta $max_delta --accum_iter $accum_iter --drop_path $drop_path --weight_decay $weight_decay --layer_decay $layer_decay --min_lr $min_lr --blr $blr --warmup_epoch $warmup_epochs --smoothing $smoothing --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --nb_classes $nb_classes --num_workers $num_workers"
 
 if [ "$downstream_task" = "regression" ]; then
     cmd=$cmd" --lower_bnd $lower_bnd --upper_bnd $upper_bnd"
