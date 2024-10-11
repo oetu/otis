@@ -95,4 +95,4 @@ Please cite the following work:
 ```
 
 ## Notice
-This project includes third-party software components that are subject to their respective licenses. Detailed information including component names, licenses, and copyright holders is provided in the respective files. Please review the NOTICE file before using or distributing this software.
+This project includes third-party software components that are subject to their respective licenses. Detailed information including component names, licenses, and copyright holders is provided in the respective files. Please review the [LICENSE](https://github.com/oetu/otis/blob/main/LICENSE) file before using or distributing this software.
