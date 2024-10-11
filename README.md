@@ -1,5 +1,5 @@
-# OTiS
-An open model for general time series analysis.
+# OTiS: An open model for general time series analysis
+This is the official PyTorch implementation of our work [Towards Generalisable Time Series Understanding Across Domains](https://arxiv.org/abs/2410.07299) (2024).
 
 <p align="center">
   <img src="./figs/OTiS.png?raw=true" width=85%>
