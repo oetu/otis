@@ -89,7 +89,7 @@ Please cite the following work:
 @article{turgut2024towards,
   title={Towards Generalisable Time Series Understanding Across Domains},
   author={Turgut, {\"O}zg{\"u}n and M{\"u}ller, Philip and Menten, Martin J and Rueckert, Daniel},
-  journal={arXiv preprint arXiv:2308.5914143},
+  journal={arXiv preprint arXiv:2410.07299},
   year={2024}
 }
 ```
