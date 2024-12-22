@@ -156,7 +156,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
     def random_masking_blockwise(self, x, mask_c_ratio, mask_t_ratio):
         """
-        2D: ECG recording (N, 1, C, T) (masking c and t under mask_c_ratio and mask_t_ratio)
+        Time series of shape (N, 1, C, T), where C and T are masked separately.
         Perform per-sample random masking by per-sample shuffling.
         Per-sample shuffling is done by argsort random noise.
         x: [N, L, D], sequence
@@ -191,7 +191,7 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
 
     def forward_features(self, x, pos_embed_y):
         """
-        x: [B=N, L, D], sequence
+        x: [B=N, 1, C, T], sequence
         pos_embed_y: [B=N, C', T'], with C'*T'=L and C'=H/p, T'=W/q
 
         Note: patch_size: (p, q) 
