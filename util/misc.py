@@ -305,11 +305,24 @@ def get_grad_norm_(parameters, norm_type: float = 2.0) -> torch.Tensor:
     return total_norm
 
 
-def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
+def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, nb_ckpts_max:int=1,
+               domains:Dict=None, domain_offsets:Dict=None):
     output_dir = Path(args.output_dir)
-    epoch_name = str(epoch)
+
+    file_names = os.listdir(output_dir)
+    # remove directories from list
+    file_names = [file for file in file_names if os.path.isfile(os.path.join(args.output_dir, file))]
+    # ignore exceptions from list
+    exceptions = ["log.txt"]
+    file_names = [file for file in file_names if file not in exceptions and "epoch" in file]
+
+    # save the best nb_ckpts_max performing models
+    if len(file_names) >= nb_ckpts_max and is_main_process():
+        file_names = sorted(file_names, key=lambda x: float(x.split(".pth")[0].split("-")[-1]), reverse=True)
+        os.remove(os.path.join(output_dir, file_names[-1]))
+
     if loss_scaler is not None:
-        checkpoint_paths = [output_dir / ('checkpoint-%s.pth' % epoch_name)]
+        checkpoint_paths = [output_dir / (f"checkpoint-0-epoch-{epoch:.1f}.pth")]
         for checkpoint_path in checkpoint_paths:
             to_save = {
                 'model': model_without_ddp.state_dict(),
@@ -318,11 +331,17 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler):
                 'scaler': loss_scaler.state_dict(),
                 'args': args,
             }
+            if domains is not None:
+                to_save.update( {'domains': domains} )
+            if domain_offsets is not None:
+                to_save.update( {'domain_offsets': domain_offsets} )
 
             save_on_master(to_save, checkpoint_path)
     else:
         client_state = {'epoch': epoch}
-        model.save_checkpoint(save_dir=args.output_dir, tag="checkpoint-%s" % epoch_name, client_state=client_state)
+        model.save_checkpoint(save_dir=args.output_dir, 
+                              tag=f"checkpoint-0-epoch-{epoch:.1f}.pth", 
+                              client_state=client_state)
 
 
 def save_best_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, test_stats, 
@@ -394,7 +413,7 @@ def get_best_ckpt(data_path, eval_criterion):
 
     # Variables to keep track of the best score and corresponding filename
 
-    incr_criterions = ["acc", "acc_balanced", "precision", "recall", "f1", 
+    incr_criterions = ["epoch", "acc", "acc_balanced", "precision", "recall", "f1", "cohen",
                        "auroc", "auprc", "avg", "pcc", "r2"]
 
     incr_metric = eval_criterion in incr_criterions
