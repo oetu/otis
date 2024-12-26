@@ -69,7 +69,7 @@ def get_args_parser():
     parser.add_argument('--time_steps', type=int, default=5000, metavar='N',
                         help='input length')
     parser.add_argument('--input_size', default=(1, 12, 5000), type=Tuple,
-                        help='images input size')
+                        help='samples input size')
 
     parser.add_argument('--patch_height', type=int, default=1, metavar='N',
                         help='patch height')
@@ -179,7 +179,8 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--downstream_task', default='classification', type=str,
                         help='downstream task (default: classification)')
-    eval_criterions = ["loss", "acc", "acc_balanced", "precision", "recall", "f1", "auroc", "auprc", "avg", "rmse", "mae", "pcc", "r2"]
+    eval_criterions = ["epoch", "loss", "acc", "acc_balanced", "precision", "recall", "f1", "auroc", "auprc", "cohen", 
+                       "avg", "rmse", "mae", "pcc", "r2"]
     parser.add_argument('--eval_criterion', default='auroc', type=str, choices=eval_criterions,
                         help='downstream task evaluation metric (default: auroc)')
     
@@ -622,12 +623,12 @@ def main(args):
 
             test_stats, test_history = evaluate(data_loader_val, model_without_ddp, device, epoch, log_writer=log_writer, args=args)
             if args.downstream_task == 'classification':
-                print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
+                print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC / Cohen's Kappa of the network on {len(dataset_val)} test samples: ",
                       f"{test_stats['acc']:.2f}% / {test_stats['acc_balanced']:.2f}% / {test_stats['precision']:.2f}% / {test_stats['recall']:.2f}% / ",
-                      f"{test_stats['f1']:.2f}% / {test_stats['auroc']:.2f}% / {test_stats['auprc']:.2f}%")
+                      f"{test_stats['f1']:.2f}% / {test_stats['auroc']:.2f}% / {test_stats['auprc']:.2f}% / {test_stats['cohen']:.4f}")
             elif args.downstream_task == 'regression':
                 print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2) ",
-                      f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} / ",
+                      f"of the network on {len(dataset_val)} test samples: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} / ",
                       f"{test_stats['pcc']:.4f} / {test_stats['r2']:.4f}")
         
             if args.wandb and misc.is_main_process():
@@ -640,7 +641,7 @@ def main(args):
     
     print(f"Start training for {args.epochs} epochs")
     
-    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 
+    best_stats = {'loss':np.inf, 'acc':0.0, 'acc_balanced':0.0, 'precision':0.0, 'recall':0.0, 'f1':0.0, 'auroc':0.0, 'auprc':0.0, 'cohen':0.0,
                   'avg':0.0, 'epoch':0, 'rmse':np.inf, 'mae':np.inf, 'pcc':0.0, 'r2':-1.0}
     best_eval_scores = {'count':1, 'nb_ckpts_max':1, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
@@ -654,8 +655,29 @@ def main(args):
 
         test_stats, test_history = evaluate(data_loader_val, model_without_ddp, device, epoch, log_writer=log_writer, args=args)
 
-        if args.eval_criterion in ["loss", "rmse", "mae"]:
-            test_stats['avg'] = (test_stats['rmse'] + test_stats['mae']) / 2
+        if args.eval_criterion == "epoch":
+            if args.downstream_task == 'classification':
+                test_stats['avg'] = (test_stats['acc_balanced'] + test_stats['f1'] + test_stats['cohen']) / 3
+            elif args.downstream_task == 'regression':
+                test_stats['avg'] = (test_stats['pcc'] + test_stats['r2']) / 2
+            if args.output_dir:
+                # save the best nb_ckpts_max checkpoints
+                if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
+                    best_eval_scores['count'] += 1
+                else:
+                    best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'], reverse=True)
+                    best_eval_scores['eval_criterion'].pop()
+                best_eval_scores['eval_criterion'].append(epoch)
+
+                misc.save_model(
+                    args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
+                    loss_scaler=loss_scaler, epoch=epoch, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
+                    domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
+        elif args.eval_criterion in ["loss", "rmse", "mae"]:
+            if args.eval_criterion != "loss":
+                test_stats['avg'] = (test_stats['rmse'] + test_stats['mae']) / 2
+            else: 
+                test_stats['avg'] = test_stats['loss']
 
             if early_stop.evaluate_decreasing_metric(val_metric=test_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
@@ -677,7 +699,7 @@ def main(args):
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
             if args.downstream_task == 'classification':
-                test_stats['avg'] = (test_stats['acc_balanced'] + test_stats['precision'] + test_stats['recall'] + test_stats['f1']) / 4
+                test_stats['avg'] = (test_stats['acc_balanced'] + test_stats['f1'] + test_stats['cohen']) / 3
             elif args.downstream_task == 'regression':
                 test_stats['avg'] = (test_stats['pcc'] + test_stats['r2']) / 2
             
@@ -713,17 +735,18 @@ def main(args):
             best_stats['acc_balanced'] = max(best_stats['acc_balanced'], test_stats["acc_balanced"])
             best_stats['auroc'] = max(best_stats['auroc'], test_stats['auroc'])
             best_stats['auprc'] = max(best_stats['auprc'], test_stats['auprc'])
+            best_stats['cohen'] = max(best_stats['cohen'], test_stats['cohen'])
 
             if test_stats['avg'] >= best_stats['avg']:
                 best_stats['epoch'] = epoch
             best_stats['avg'] = max(best_stats['avg'], test_stats['avg'])
 
-            print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC of the network on {len(dataset_val)} test images: ",
+            print(f"Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC / Cohen's Kappa of the network on {len(dataset_val)} test samples: ",
                   f"{test_stats['acc']:.2f}% / {test_stats['acc_balanced']:.2f}% / {test_stats['precision']:.2f}% / {test_stats['recall']:.2f}% / ",
-                  f"{test_stats['f1']:.2f}% / {test_stats['auroc']:.2f}% / {test_stats['auprc']:.2f}%")
+                  f"{test_stats['f1']:.2f}% / {test_stats['auroc']:.2f}% / {test_stats['auprc']:.2f}% / {test_stats['cohen']:.4f}")
             print(f'Max Accuracy / Accuracy (balanced) / Precision / Recall / F1 / AUROC / AUPRC: {best_stats["acc"]:.2f}% / ',
                   f'{best_stats["acc_balanced"]:.2f}% / {best_stats["precision"]:.2f}% / {best_stats["recall"]:.2f}% / {best_stats["f1"]:.2f}% / ',
-                  f'{best_stats["auroc"]:.2f}% / {best_stats["auprc"]:.2f}%\n')
+                  f'{best_stats["auroc"]:.2f}% / {best_stats["auprc"]:.2f}% / {best_stats["cohen"]:.4f}\n')
 
         elif args.downstream_task == 'regression':
             # update best stats
@@ -742,7 +765,7 @@ def main(args):
                 best_stats['avg'] = max(best_stats['avg'], test_stats['avg'])
 
             print(f"Root Mean Squared Error (RMSE) / Mean Absolute Error (MAE) / Pearson Correlation Coefficient (PCC) / R Squared (R2) ",
-                  f"of the network on {len(dataset_val)} test images: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} / ",
+                  f"of the network on {len(dataset_val)} test samples: {test_stats['rmse']:.4f} / {test_stats['mae']:.4f} / ",
                   f"{test_stats['pcc']:.4f} / {test_stats['r2']:.4f}")
             print(f'Min Root Mean Squared Error (RMSE) / Min Mean Absolute Error (MAE) / Max Pearson Correlation Coefficient (PCC) / ',
                   f'Max R Squared (R2): {best_stats["rmse"]:.4f} / {best_stats["mae"]:.4f} / {best_stats["pcc"]:.4f} / {best_stats["r2"]:.4f}\n')
