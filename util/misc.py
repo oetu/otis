@@ -8,6 +8,7 @@
 # MAE:  https://github.com/facebookresearch/mae?tab=readme-ov-file
 # DeiT: https://github.com/facebookresearch/deit
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
+# timm: https://github.com/huggingface/pytorch-image-models/blob/main/timm/optim/_param_groups.py
 # --------------------------------------------------------
 
 from typing import Dict
@@ -455,8 +456,8 @@ def all_reduce_mean(x):
         return x
     
 
-def add_weight_decay_unfrozen_modules(model, weight_decay=1e-5, lr_scale=1.0, skip_list=()):
-    skip_list_new = []
+def add_weight_decay(model, weight_decay=1e-5, lr_scale=1.0, skip_list=()):
+    trainable_modules = []
 
     decay = []
     no_decay = []
@@ -469,9 +470,9 @@ def add_weight_decay_unfrozen_modules(model, weight_decay=1e-5, lr_scale=1.0, sk
             no_decay.append(param)
         else:
             decay.append(param)
-        skip_list_new.append(name)
+        trainable_modules.append(name)
 
-    skip_list_new = skip_list_new + skip_list
+    trainable_modules
 
     return [{'params': no_decay, 'weight_decay': 0., "lr_scale": lr_scale},
-            {'params': decay, 'weight_decay': weight_decay, "lr_scale": lr_scale}], skip_list_new
+            {'params': decay, 'weight_decay': weight_decay, "lr_scale": lr_scale}], trainable_modules

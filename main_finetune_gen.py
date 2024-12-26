@@ -29,7 +29,7 @@ import timm.optim.optim_factory as optim_factory
 
 from util.dataset import TimeSeriesDataset
 import util.misc as misc
-from util.misc import add_weight_decay_unfrozen_modules
+from util.misc import add_weight_decay
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.pos_embed import interpolate_pos_embed_x, interpolate_decoder_pos_embed_x
 from util.callbacks import EarlyStop
@@ -68,7 +68,7 @@ def get_args_parser():
     parser.add_argument('--time_steps', type=int, default=5000, metavar='N',
                         help='input length')
     parser.add_argument('--input_size', default=(1, 12, 5000), type=Tuple,
-                        help='images input size')
+                        help='samples input size')
                         
     parser.add_argument('--patch_height', type=int, default=1, metavar='N',
                         help='patch height')
@@ -126,29 +126,39 @@ def get_args_parser():
 
     # Callback parameters
     parser.add_argument('--patience', default=-1, type=float,
-                        help='Early stopping whether val is worse than train for specified nb of epochs (default: -1, i.e. no early stopping)')
+                        help='Early stopping, if val is worse than train for specified nb of epochs \
+                              (default: -1, i.e. no early stopping)')
     parser.add_argument('--max_delta', default=0, type=float,
                         help='Early stopping threshold (val has to be worse than (train+delta)) (default: 0)')
     
     # * Finetuning params
     parser.add_argument('--finetune', default='',
                         help='finetune from checkpoint')
-    
     parser.add_argument('--ignore_pos_embed_y', action='store_true', default=False,
                         help='Ignore pre-trained position embeddings Y (spatial axis) from checkpoint')
+    
+    parser.add_argument('--zero_shot', action='store_true', default=False,
+                        help='Freeze all parameters except for the position embeddings Y (spatial axis) of the encoder')
+    
     parser.add_argument('--freeze_pos_embed_y', action='store_true', default=False,
-                        help='Make position embeddings Y (spatial axis) non-trainable')
-    parser.add_argument('--freeze_encoder', action='store_true', default=False,
-                        help='Make the encoder (i.e. the feature extractor) non-trainable, thus only train the decoder')
-    parser.add_argument('--ignore_decoder', action='store_true', default=False,
-                        help='Ignore the pre-trained decoder weights')
+                        help='Freeze position embeddings Y (spatial axis) of the encoder')
+    encoder_modules = ["none", "all", "ffn", "attn"]
+    parser.add_argument('--freeze_encoder', default='none', type=str, choices=encoder_modules,
+                        help='Freeze encoder modules (default: none)')
+    
+    parser.add_argument('--freeze_mask_token', action='store_true', default=False,
+                        help='Freeze mask token')
+    parser.add_argument('--freeze_decoder_pos_embed_y', action='store_true', default=False,
+                        help='Freeze position embeddings Y (spatial axis) of the decoder')
+    parser.add_argument('--freeze_decoder', action='store_true', default=False,
+                        help='Freeze all decoder modules')
 
     # Dataset parameters
     downstream_tasks = ["forecasting", "imputation"]
     parser.add_argument('--downstream_task', default='forecasting', type=str, choices=downstream_tasks,
                         help='downstream task (default: forecasting)')
     
-    eval_criterions = ["total_loss", "loss", "ncc", "mse", "mae"]
+    eval_criterions = ["epoch", "total_loss", "loss", "ncc", "mse", "mae"]
     parser.add_argument('--eval_criterion', default='mse', type=str, choices=eval_criterions,
                         help='downstream task evaluation metric (default: mse)')
     
@@ -177,6 +187,9 @@ def get_args_parser():
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--resume', default='',
                         help='resume from checkpoint')
+    
+    parser.add_argument('--save_embeddings', action='store_true', default=False,
+                        help='save model embeddings')
 
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -380,7 +393,7 @@ def main(args):
                     del checkpoint_model[key]
             print("Initializing new decoder_pred")
 
-        # load pos_embed_X
+        # load pos_embed_x
         interpolate_pos_embed_x(model, checkpoint_model)
 
         key = "pos_embed_x"
@@ -389,6 +402,7 @@ def main(args):
             del checkpoint_model[key]
 
         # load pos_embed_y together with domain_offsets
+        print(f"Identified domain: {dataset_train.domains}")
         assert len(dataset_train.domains) == 1, "There is more than one domain in the target dataset"
         target_domain = list(dataset_train.domains.keys())[0]
         # target_shape = list(dataset_train.domains.values())[0]
@@ -403,7 +417,7 @@ def main(args):
         if len(checkpoint["domain_offsets"]) > 1 and sum([v for v in checkpoint["domain_offsets"].values()]) == 0:
             # domain-agnostic pos_embed_y
             print("INFO: Found domain-agnostic pos_embed_y in checkpoint")
-            pos_embed_y_available = True
+            pos_embed_y_available = True # if pos_embed_y_available = False before
 
             # set offset to zero
             print(dataset_train.domain)
@@ -429,7 +443,7 @@ def main(args):
             print(f"Removing key {key} from pretrained checkpoint")
             del checkpoint_model[key]
 
-        if args.ignore_decoder:
+        if False: #args.ignore_decoder:
             # initialize new decoder
             print("Initializing new decoder")
 
@@ -462,122 +476,98 @@ def main(args):
 
         assert {'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
 
-    # initially freeze the pre-trained model
-    skip_list = []
-    for _, p in model.named_parameters():
-        p.requires_grad = False
-    
-    # make pos_embed_y trainable
-    for n, p in model.pos_embed_y.named_parameters():
-        p.requires_grad = True
-        skip_list.append(f"pos_embed_y.{n}")
-    
-    # make mask_token trainable
-    model.mask_token.requires_grad = True
-    skip_list.append(f"mask_token")
+    # keep track of trainable parameters
+    trainable_params = []
 
-    # # make encoder attn + norm trainable
-    # for n, p in model.blocks[:].named_parameters():
-    #     if "norm1" in n or "attn" in n:
-    #         p.requires_grad = True
-    #         skip_list.append(f"blocks.{n}")
-
-    # # make decoder attn + norm trainable
-    # for n, p in model.decoder_blocks[:].named_parameters():
-    #     if "norm1" in n or "attn" in n:
-    #         p.requires_grad = True
-    #         skip_list.append(f"decoder_blocks.{n}")
-
-    # # make encoder ffn + norm trainable
-    # for n, p in model.blocks[:].named_parameters():
-    #     if "norm2" in n or "mlp" in n:
-    #         p.requires_grad = True
-    #         skip_list.append(f"blocks.{n}")
- 
-    # # make decoder ffn + norm trainable
-    # for n, p in model.decoder_blocks[:].named_parameters():
-    #     if "norm2" in n or "mlp" in n:
-    #         p.requires_grad = True
-    #         skip_list.append(f"decoder_blocks.{n}")
-
-    # for n, p in model.named_parameters():
-    #     if p.requires_grad == True:
-    #         print(n)
-
-    # # make decoder_norm trainable
-    # for n, p in model.decoder_norm.named_parameters():
-    #     p.requires_grad = True
-    #     skip_list.append(f"decoder_norm.{n}")
-
-    # # make decoder_pred trainable
-    # for n, p in model.decoder_pred.named_parameters():
-    #     p.requires_grad = True
-    #     skip_list.append(f"decoder_pred.{n}")
-
-    if args.ignore_decoder:
-        # mask_token, decoder_norm, decoder_pred already trainable
-        # train new initialized decoder_embeb
-        for _, p in model.decoder_embed.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"decoder_embed.{n}")
-        # train new initialized decoder_pos_embed_y
-        for _, p in model.decoder_pos_embed_y.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"decoder_pos_embed_y.{n}")
-        # train new initialized decoder
-        for _, p in model.decoder_blocks[:].named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"decoder_blocks.{n}")       
-
-    if args.output_projection == "mlp":
-        # train new initialized mlp
-        for n, p in model.mlp.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"mlp.{n}")
-        # train new intialized mlp_norm
-        for n, p in model.mlp_norm.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"mlp_norm.{n}")
-        # train new intialized mlp_pred
-        for n, p in model.mlp_pred.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"mlp_pred.{n}")
-
-    if args.freeze_encoder:
-        # freeze patch_embed
-        for n, p in model.patch_embed.named_parameters():
-            p.requires_grad = False
-        # freeze encoder
-        for n, p in model.blocks[:].named_parameters():
-            p.requires_grad = False
-        # freeze norm
-        for n, p in model.norm.named_parameters():
+    if args.zero_shot:
+        # freeze the model
+        for _, p in model.named_parameters():
             p.requires_grad = False
 
-    if new_patch_size == True:
-        # mask_token, decoder_norm, decoder_pred already trainable
-        # train new intialized patch_embed
-        for n, p in model.patch_embed.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"patch_embed.{n}")
-        # make norm trainable
-        for n, p in model.norm.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"norm.{n}")
-        # make decoder_embed trainable
-        for n, p in model.decoder_embed.named_parameters():
-            p.requires_grad = True
-            skip_list.append(f"decoder_embed.{n}")
-    
-    if args.freeze_pos_embed_y:
-        # freeze pos_embed_y
+        # only pos_embed_y is trainable
         for n, p in model.pos_embed_y.named_parameters():
-            p.requires_grad = False
-        # freeze decoder_pos_embed_y
-        for n, p in model.decoder_pos_embed_y.named_parameters():
-            p.requires_grad = False
-    
-    # print(f"Trainable parameters:\n{skip_list}")
+            p.requires_grad = True
+            trainable_params.append(f"pos_embed_y.{n}")
+    else:
+        # default: entire model is trainable
+        trainable_params = [n for n, p in model.named_parameters() if p.requires_grad == True]
+
+        if args.freeze_encoder != "none":
+            # freeze patch_embed
+            for n, p in model.patch_embed.named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"patch_embed.{n}")
+            # freeze norm
+            for n, p in model.norm.named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"norm.{n}")
+
+            if args.freeze_encoder == "ffn":
+                # freeze the mlp and norm layers
+                for n, p in model.blocks[:].named_parameters():
+                    if "norm2" in n or "mlp" in n:
+                        p.requires_grad = False
+                        trainable_params.remove(f"blocks.{n}")
+            elif args.freeze_encoder == "attn":
+                # freeze the attn and norm layers
+                for n, p in model.blocks[:].named_parameters():
+                    if "norm1" in n or "attn" in n:
+                        p.requires_grad = False
+                        trainable_params.remove(f"blocks.{n}")
+            else:
+                # freeze the entire encoder
+                for n, p in model.blocks[:].named_parameters():
+                    p.requires_grad = False
+                    trainable_params.remove(f"blocks.{n}")
+        
+        if args.freeze_pos_embed_y:
+            # freeze pos_embed_y
+            for n, p in model.pos_embed_y.named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"pos_embed_y.{n}")
+
+        if args.freeze_decoder:
+            # freeze decoder_embed
+            for n, p in model.decoder_embed.named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"decoder_embed.{n}")
+            # freeze decoder
+            for n, p in model.decoder_blocks[:].named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"decoder_blocks.{n}")
+            # freeze decoder_norm
+            for n, p in model.decoder_norm.named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"decoder_norm.{n}")
+            # freeze decoder_pred
+            for n, p in model.decoder_pred.named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"decoder_pred.{n}")
+        
+        if args.freeze_decoder_pos_embed_y:
+            # freeze decoder_pos_embed_y
+            for n, p in model.decoder_pos_embed_y.named_parameters():
+                p.requires_grad = False
+                trainable_params.remove(f"decoder_pos_embed_y.{n}")
+
+        if args.freeze_mask_token:
+            model.mask_token.requires_grad = False
+            trainable_params.remove(f"mask_token")
+
+    if new_patch_size:
+        # train patch_embed
+        for n, p in model.patch_embed.named_parameters():
+            p.requires_grad = True
+            trainable_params.append(f"patch_embed.{n}")
+
+        # train decoder_pred
+        for n, p in model.decoder_pred.named_parameters():
+            p.requires_grad = True
+            trainable_params.append(f"decoder_pred.{n}")
+
+        # train mask token
+        model.mask_token.requires_grad = True
+        trainable_params.append(f"mask_token")
 
     if args.compile:
         model = torch.compile(model)
@@ -586,12 +576,16 @@ def main(args):
     model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_params_encoder = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and "decoder" not in n)
+    # params_encoder = [n for n, p in model.named_parameters() if p.requires_grad and "decoder" not in n]
     n_params_decoder = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and "decoder" in n)
+    # params_decoder = [n for n, p in model.named_parameters() if p.requires_grad and "decoder" in n]
 
     print("Model = %s" % str(model_without_ddp))
-    print('Number of params (M): %.2f' % (n_parameters / 1.e6))
-    print('Number of encoder params (M): %.2f' % (n_params_encoder / 1.e6))
-    print('Number of decoder params (M): %.2f' % (n_params_decoder / 1.e6))
+    print('Number of params (k): %.2f' % (n_parameters / 1.e3))
+    print('Number of encoder params (k): %.2f' % (n_params_encoder / 1.e3))
+    # print(params_encoder)
+    print('Number of decoder params (k): %.2f' % (n_params_decoder / 1.e3))
+    # print(params_decoder)
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
     
@@ -609,7 +603,15 @@ def main(args):
         model_without_ddp = model.module
     
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
+    param_groups_0, skip_list = [], []
+    if args.finetune and not args.zero_shot:
+        # increase the learning rate of the encoder's and decoder's pos_embed_y  
+        skip_list = [elem for elem in trainable_params if "pos_embed_y" not in elem]
+        param_groups_0, skip_list = add_weight_decay(model_without_ddp, args.weight_decay, lr_scale=10, skip_list=skip_list)
+
+    param_groups, _ = add_weight_decay(model_without_ddp, args.weight_decay, skip_list=skip_list)
+    param_groups = param_groups + param_groups_0
+
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()
@@ -634,7 +636,7 @@ def main(args):
                                                 log_writer=log_writer, args=args)
 
             print(f"Mean Squared Error (MSE) / Mean Absolute Error (MAE) / Normalized Cross-Correlation (NCC)", 
-                  f"of the network on {len(dataset_val)} test images: {test_stats['mse']:.4f} / {test_stats['mae']:.4f} /", 
+                  f"of the network on {len(dataset_val)} test samples: {test_stats['mse']:.4f} / {test_stats['mae']:.4f} /", 
                   f"{test_stats['ncc']:.4f}")
         
             if args.wandb and misc.is_main_process():
@@ -647,43 +649,13 @@ def main(args):
 
     print(f"Start training for {args.epochs} epochs")
     
-    best_stats = {'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
+    best_stats = {'epoch':-1, 'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
     best_eval_scores = {'count':1, 'nb_ckpts_max':1, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
-        if epoch == args.warmup_epochs*0:
-            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
-            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
-
-            print("Unfreezing the encoder attention layers")
-            # make encoder attn + norm trainable
-            for n, p in model_without_ddp.blocks[:].named_parameters():
-                if "norm1" in n or "attn" in n:
-                    p.requires_grad = True
-
-            print("Unfreezing the decoder")
-            for _, p in model_without_ddp.decoder_embed.named_parameters():
-                p.requires_grad = True
-            for n, p in model_without_ddp.decoder_pos_embed_y.named_parameters():
-                p.requires_grad = True
-            for _, p in model_without_ddp.decoder_blocks[:].named_parameters():
-                p.requires_grad = True
-
-            n_parameters_model = sum(p.numel() for p in model_without_ddp.parameters() if p.requires_grad)
-            print('Number of params (M): %.2f' % (n_parameters_model / 1.e6))
-
-            # adding all (new) parameters to the optimizer except for the ones in skip_list
-            # hence, the ones in skip_list are not updated even though requires_grad=True
-            # following timm: set wd as 0 for bias and norm layers
-            param_groups_new, skip_list = add_weight_decay_unfrozen_modules(model_without_ddp, 
-                                                                            args.weight_decay, 
-                                                                            lr_scale=0.033, 
-                                                                            skip_list=skip_list)
-            for params in param_groups_new:
-                optimizer.add_param_group(params)
-            print(optimizer)
-            # print(f"Trainable parameters:\n{skip_list}")
+        if epoch == 0:
+            print(f"Trainable parameters:\n{trainable_params}")
 
         if True: #args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
@@ -694,7 +666,22 @@ def main(args):
         val_stats, val_history = evaluate(data_loader_val, model, device, epoch,
                                           log_writer=log_writer, args=args)
 
-        if args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
+        if args.eval_criterion == "epoch":
+            best_stats['epoch'] = epoch
+            if args.output_dir:
+                # save the best nb_ckpts_max checkpoints
+                if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
+                    best_eval_scores['count'] += 1
+                else:
+                    best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'], reverse=True)
+                    best_eval_scores['eval_criterion'].pop()
+                best_eval_scores['eval_criterion'].append(epoch)
+
+                misc.save_model(
+                    args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
+                    loss_scaler=loss_scaler, epoch=epoch, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
+                    domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
+        elif args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
             if early_stop.evaluate_decreasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
@@ -741,7 +728,7 @@ def main(args):
         best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
 
         print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / Mean Absolute Error (MAE)",
-              f"of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / {val_stats['loss']:.4f} / ", 
+              f"of the network on {len(dataset_val)} val samples: {val_stats['total_loss']:.4f} / {val_stats['loss']:.4f} / ", 
               f"{val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / {val_stats['mae']:.2f}")
 
         print(f"Min Total Loss / Min Loss / Max NCC / Max Cosine Similarity / Min MSE / Min MAE: ",
