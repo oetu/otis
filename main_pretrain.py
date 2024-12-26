@@ -67,7 +67,7 @@ def get_args_parser():
     parser.add_argument('--time_steps', type=int, default=5000, metavar='N',
                         help='input length')
     parser.add_argument('--input_size', default=(1, 12, 5000), type=Tuple,
-                        help='images input size')
+                        help='samples input size')
                         
     parser.add_argument('--patch_height', type=int, default=1, metavar='N',
                         help='patch height')
@@ -144,7 +144,7 @@ def get_args_parser():
                         help='ignore pretrained position embeddings Y (spatial axis)')
     
     # Dataset parameters
-    eval_criterions = ['total_loss', 'loss', 'ncc', 'cos_sim', 'mse', 'mae']
+    eval_criterions = ['epoch', 'total_loss', 'loss', 'ncc', 'cos_sim', 'mse', 'mae']
     parser.add_argument('--eval_criterion', default='ncc', type=str, choices=eval_criterions,
                         help='pretraining evaluation metric (default: ncc)')
     
@@ -195,6 +195,9 @@ def get_args_parser():
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--resume', default='',
                         help='resume from checkpoint')
+    
+    parser.add_argument('--save_embeddings', action='store_true', default=False,
+                        help='save encoder embeddings (i.e. of visible tokens)')
 
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
@@ -545,7 +548,7 @@ def main(args):
 
     print(f"Start training for {args.epochs} epochs")
     
-    best_stats = {'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
+    best_stats = {'epoch':-1, 'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
     best_eval_scores = {'count':1, 'nb_ckpts_max':3, 'eval_criterion':[best_stats[args.eval_criterion]]}
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
@@ -571,7 +574,22 @@ def main(args):
                                              train_dataloader=data_loader_online_train, 
                                              val_dataloader=data_loader_online_val, args=args)
         
-        if args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
+        if args.eval_criterion == "epoch":
+            best_stats['epoch'] = epoch
+            if args.output_dir:
+                # save the best nb_ckpts_max checkpoints
+                if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
+                    best_eval_scores['count'] += 1
+                else:
+                    best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'], reverse=True)
+                    best_eval_scores['eval_criterion'].pop()
+                best_eval_scores['eval_criterion'].append(epoch)
+
+                misc.save_model(
+                    args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
+                    loss_scaler=loss_scaler, epoch=epoch, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
+                    domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
+        elif args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
             if early_stop.evaluate_decreasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
@@ -618,7 +636,7 @@ def main(args):
         best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
 
         print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / ",
-              f"Mean Absolute Error (MAE) of the network on {len(dataset_val)} val images: {val_stats['total_loss']:.4f} / ",
+              f"Mean Absolute Error (MAE) of the network on {len(dataset_val)} val samples: {val_stats['total_loss']:.4f} / ",
               f"{val_stats['loss']:.4f} / {val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / ",
               f"{val_stats['mae']:.2f}")
 

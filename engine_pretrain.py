@@ -9,6 +9,8 @@
 # DeiT: https://github.com/facebookresearch/deit
 # BEiT: https://github.com/microsoft/unilm/tree/master/beit
 # --------------------------------------------------------
+import os
+
 import math
 import sys
 from typing import Iterable
@@ -67,11 +69,11 @@ def train_one_epoch(model: torch.nn.Module,
 
         # compute model prediction
         with torch.cuda.amp.autocast():
-            loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask = model(samples, 
-                                                                                attn_mask, 
-                                                                                pos_embed_y, 
-                                                                                domain, 
-                                                                                mask_ratio=args.mask_ratio)
+            loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask, _ = model(samples, 
+                                                                                   attn_mask, 
+                                                                                   pos_embed_y, 
+                                                                                   domain, 
+                                                                                   mask_ratio=args.mask_ratio)
 
         batch_size = len(samples)
 
@@ -171,7 +173,7 @@ def train_one_epoch(model: torch.nn.Module,
         training_history['train_mse'] = train_stats["mse"]
         training_history['train_mae'] = train_stats["mae"]
 
-        if (epoch % 99) == 0:
+        if (epoch % 49) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
 
@@ -207,61 +209,71 @@ def train_one_epoch(model: torch.nn.Module,
 
             plt.subplot(811)
             plt.title(f"Input ({domain[idx]}, channel {0})")
-            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :], color='black')
 
             plt.subplot(812)
             plt.title(f"Input vs Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :], color='black')
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=min(x[0, 0, :].min(), x_hat[0, 0, :].min()), 
                              y2=max(x[0, 0, :].max(), x_hat[0, 0, :].max()), 
-                             where=mask_0, color='gray', alpha=0.15)
+                             where=mask_0, color='gray', alpha=0.25)
             
             plt.subplot(813)
             plt.title(f"Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat[0, 0, :].min(), 
                              y2=x_hat[0, 0, :].max(), 
-                             where=mask_0, color='gray', alpha=0.15)
+                             where=mask_0, color='gray', alpha=0.25)
 
             plt.subplot(814)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_0_maskedOnly.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat_masked[0, 0, :].min(), 
                              y2=x_hat_masked[0, 0, :].max(), 
-                             where=mask_0, color='gray', alpha=0.15)
+                             where=mask_0, color='gray', alpha=0.25)
+            
+            indices_visible_patches = np.where(mask_0 == False)
+            plt.scatter(indices_visible_patches, 
+                        x_hat_masked[0, 0, :][indices_visible_patches], 
+                        color='white', s=7, zorder=2)
 
             plt.subplot(815)
             plt.title(f"Input ({domain[idx]}, channel {ch_idx})")
-            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :], color='black')
 
             plt.subplot(816)
             plt.title(f"Input vs Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :], color='black')
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=min(x[0, ch_idx, :].min(), x_hat[0, ch_idx, :].min()), 
                              y2=max(x[0, ch_idx, :].max(), x_hat[0, ch_idx, :].max()), 
-                             where=mask_1, color='gray', alpha=0.15)
+                             where=mask_1, color='gray', alpha=0.25)
 
             plt.subplot(817)
             plt.title(f"Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat[0, ch_idx, :].min(), 
                              y2=x_hat[0, ch_idx, :].max(), 
-                             where=mask_1, color='gray', alpha=0.15)
+                             where=mask_1, color='gray', alpha=0.25)
 
             plt.subplot(818)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_1_maskedOnly.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat_masked[0, ch_idx, :].min(), 
                              y2=x_hat_masked[0, ch_idx, :].max(), 
-                             where=mask_1, color='gray', alpha=0.15)
+                             where=mask_1, color='gray', alpha=0.25)
+            
+            indices_visible_patches = np.where(mask_1 == False)
+            plt.scatter(indices_visible_patches, 
+                        x_hat_masked[0, ch_idx, :][indices_visible_patches], 
+                        color='white', s=7, zorder=2)
 
             plt.tight_layout()
             training_history["Reconstruction"] = wandb.Image(plt)
@@ -385,6 +397,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         print('log_dir: {}'.format(log_writer.log_dir))
     
     test_history = {}  
+    embeddings = []
 
     for batch in metric_logger.log_every(data_loader, 10, header):
         # push samples to device
@@ -400,11 +413,16 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         domain = batch[3]
 
         with torch.cuda.amp.autocast():
-            loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask = model(samples, 
-                                                                                attn_mask, 
-                                                                                pos_embed_y, 
-                                                                                domain, 
-                                                                                mask_ratio=args.mask_ratio)
+            loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask, latent = model(samples, 
+                                                                                        attn_mask, 
+                                                                                        pos_embed_y, 
+                                                                                        domain, 
+                                                                                        mask_ratio=args.mask_ratio)
+
+        if args.save_embeddings:
+            # latent of shape (B, 1+N', D)
+            embedding = latent[:, :1, :].mean(dim=1) # (B, D)
+            embeddings.append(embedding)
 
         batch_size = len(samples)
 
@@ -453,6 +471,15 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         metric_logger.meters['mse'].update(mse_value, n=batch_size)
         metric_logger.meters['mae'].update(mae_value, n=batch_size)
 
+    if args.save_embeddings and misc.is_main_process():
+            embeddings = torch.cat(embeddings, dim=0).to(device="cpu", dtype=torch.float32).detach() # (B, D)
+            embeddings_path = os.path.join(args.output_dir, "embeddings")
+            if not os.path.exists(embeddings_path):
+                os.makedirs(embeddings_path)
+            
+            file_name = f"embeddings_test.pt" if args.eval else f"embeddings_{epoch}.pt"
+            torch.save(embeddings, os.path.join(embeddings_path, file_name))
+
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged validation stats:", metric_logger)
@@ -484,7 +511,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_history['val_mse'] = test_stats["mse"]
         test_history['val_mae'] = test_stats["mae"]
 
-        if (epoch % 99) == 0:
+        if (epoch % 49) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
 
@@ -520,61 +547,71 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
 
             plt.subplot(811)
             plt.title(f"Input ({domain[idx]}, channel {0})")
-            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :], color='black')
 
             plt.subplot(812)
             plt.title(f"Input vs Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :])
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, 0, :], color='black')
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=min(x[0, 0, :].min(), x_hat[0, 0, :].min()), 
                              y2=max(x[0, 0, :].max(), x_hat[0, 0, :].max()), 
-                             where=mask_0, color='gray', alpha=0.15)
+                             where=mask_0, color='gray', alpha=0.25)
             
             plt.subplot(813)
             plt.title(f"Reconstruction (NCC {ncc_0.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, 0, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat[0, 0, :].min(), 
                              y2=x_hat[0, 0, :].max(), 
-                             where=mask_0, color='gray', alpha=0.15)
+                             where=mask_0, color='gray', alpha=0.25)
 
             plt.subplot(814)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_0_maskedOnly.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, 0, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat_masked[0, 0, :].min(), 
                              y2=x_hat_masked[0, 0, :].max(), 
-                             where=mask_0, color='gray', alpha=0.15)
+                             where=mask_0, color='gray', alpha=0.25)
+            
+            indices_visible_patches = np.where(mask_0 == False)
+            plt.scatter(indices_visible_patches, 
+                        x_hat_masked[0, 0, :][indices_visible_patches], 
+                        color='white', s=7, zorder=2)
 
             plt.subplot(815)
             plt.title(f"Input ({domain[idx]}, channel {ch_idx})")
-            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :], color='black')
 
             plt.subplot(816)
             plt.title(f"Input vs Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :])
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x[0, ch_idx, :], color='black')
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=min(x[0, ch_idx, :].min(), x_hat[0, ch_idx, :].min()), 
                              y2=max(x[0, ch_idx, :].max(), x_hat[0, ch_idx, :].max()), 
-                             where=mask_1, color='gray', alpha=0.15)
+                             where=mask_1, color='gray', alpha=0.25)
 
             plt.subplot(817)
             plt.title(f"Reconstruction (NCC {ncc_1.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat[0, ch_idx, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat[0, ch_idx, :].min(), 
                              y2=x_hat[0, ch_idx, :].max(), 
-                             where=mask_1, color='gray', alpha=0.15)
+                             where=mask_1, color='gray', alpha=0.25)
 
             plt.subplot(818)
             plt.title(f"Reconstruction of masked patches (NCC {ncc_1_maskedOnly.item():.2f}, masked patches in gray)")
-            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :])
+            plt.plot(range(0, x.shape[-1], 1), x_hat_masked[0, ch_idx, :], color='darkorange')
             plt.fill_between(range(0, x.shape[-1], 1), 
                              y1=x_hat_masked[0, ch_idx, :].min(), 
                              y2=x_hat_masked[0, ch_idx, :].max(), 
-                             where=mask_1, color='gray', alpha=0.15)
+                             where=mask_1, color='gray', alpha=0.25)
+            
+            indices_visible_patches = np.where(mask_1 == False)
+            plt.scatter(indices_visible_patches, 
+                        x_hat_masked[0, ch_idx, :][indices_visible_patches], 
+                        color='white', s=7, zorder=2)
 
             plt.tight_layout()
             test_history["Val Reconstruction"] = wandb.Image(plt)

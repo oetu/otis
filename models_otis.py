@@ -573,12 +573,12 @@ class OTiS(nn.Module):
 
         # apply Transformer blocks
         # (B, N)
-        attn_mask_visible_patches = attn_mask.flatten(1)
+        attn_mask_all_patches = attn_mask.flatten(1)
         # (B, 1+N), add cls token to attn mask
-        attn_mask_visible_patches = torch.cat((torch.ones(size=(attn_mask.shape[0], 1), device=x.device), attn_mask_visible_patches), dim=1)
+        attn_mask_all_patches = torch.cat((torch.ones(size=(attn_mask.shape[0], 1), device=x.device), attn_mask_all_patches), dim=1)
 
         for blk in self.blocks:
-            x = blk(x, attn_mask_visible_patches)
+            x = blk(x, attn_mask_all_patches)
 
         # (B, 1+N, D)        
         x = self.norm(x)
@@ -863,9 +863,11 @@ class OTiS(nn.Module):
         pos_embed_y: [N, C', T'], with C'*T'=L and C'=H/p, T'=W/q 
         """
         if self.output_projection == 'decoder':
+            # latent of visible tokens
             latent, mask, ids_restore = self.forward_encoder(imgs, attn_mask, pos_embed_y, mask_ratio)
             pred = self.forward_decoder(latent, attn_mask, pos_embed_y, ids_restore)  # [N, L, p*q*C]
         else: # mlp
+            # latent of all tokens
             latent, mask, ids_restore = self.forward_encoder_with_masked_patches(imgs, attn_mask, pos_embed_y, mask_ratio)
             pred = self.forward_mlp(latent)  # [N, L, p*q*C]
         
@@ -900,7 +902,7 @@ class OTiS(nn.Module):
             cos_sim_embed = torch.tensor([0.0], dtype=torch.float32, device=imgs.device)
             z_std = torch.tensor([0.0], dtype=torch.float32, device=imgs.device)
 
-        return loss, ncc, cos_sim, cos_sim_embed, z_std, imgs_hat, mask
+        return loss, ncc, cos_sim, cos_sim_embed, z_std, imgs_hat, mask, latent
 
 
 def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.70M decoder
