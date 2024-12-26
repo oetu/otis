@@ -48,12 +48,12 @@ torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $
 ### Forecasting
 Run the following command.
 ```
-python3 main_finetune_gen.py --num_workers $num_workers --seed $sd --downstream_task forecasting --mask_ratio $mr --input_channels $input_channels --input_variate$input_variates --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc --model $model --batch_size $bs --blr $blr --epochs $epochs --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --output_dir $output_dir
+python3 main_forecast.py --num_workers $num_workers --seed $sd --downstream_task forecasting --mask_ratio $mr --input_channels $input_channels --input_variate$input_variates --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc --model $model --batch_size $bs --blr $blr --epochs $epochs --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --output_dir $output_dir
 ```
 
 For slurm, run the following command.
 ```
-torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_finetune_gen.py --num_workers $num_workers --seed $sd --downstream_task forecasting --mask_ratio $mr --input_channels $input_channels --input_variates $input_variates --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc --model $model --batch_size $bs --blr $blr --epochs $epochs --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --output_dir $output_dir
+torchrun --rdzv-endpoint=localhost:$port --nproc_per_node $world_size --nnodes $nodes --node_rank 0 main_forecast.py --num_workers $num_workers --seed $sd --downstream_task forecasting --mask_ratio $mr --input_channels $input_channels --input_variates $input_variates --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --ncc_weight $ncc --model $model --batch_size $bs --blr $blr --epochs $epochs --warmup_epochs $warmup_epochs --data_path $data_path --val_data_path $val_data_path --output_dir $output_dir
 ```
 
 ## Evaluation

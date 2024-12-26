@@ -15,7 +15,7 @@ import os
 import uuid
 from pathlib import Path
 
-import main_finetune_gen as trainer
+import main_forecast as trainer
 import submitit
 
 

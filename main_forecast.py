@@ -25,7 +25,7 @@ import wandb
 # os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 # assert timm.__version__ == "0.3.2"  # version check
-import timm.optim.optim_factory as optim_factory
+# import timm.optim.optim_factory as optim_factory
 
 from util.dataset import TimeSeriesDataset
 import util.misc as misc
