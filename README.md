@@ -2,10 +2,10 @@
 This is the official PyTorch implementation of our work [Towards Generalisable Time Series Understanding Across Domains](https://arxiv.org/abs/2410.07299) (2024).
 
 <p align="center">
-  <img src="./figs/OTiS.png?raw=true" width=85%>
+  <img src="./figs/otis.png?raw=true" width=100%>
 </p>
 
-## Environment setup
+## Environment Setup
 Run the following commands from the root directory of this project to setup the environment and install the `timm` library. Note that this command block is only executed once during the initial environment setup.
 ```
 conda env create --file envs/otis.yaml
@@ -19,7 +19,7 @@ Activate the conda environment before running OTiS.
 conda activate otis
 ```
 
-## Model weights
+## Model Weights
 Download pre-trained model weights from the [google drive](https://drive.google.com/drive/folders/1sMxJwvyZY7M2Z_gykcjLgIXa13iYDCEf?usp=sharing).
 
 ## Training
@@ -63,23 +63,24 @@ python3 main_finetune.py --eval --resume $checkpoint --num_workers $num_workers 
 ```
 
 ## Results
-
-### Quantitative
+### Discriminative Tasks (Classification \& Regression)
 <p align="center">
-  <img src="./figs/discriminative_tasks.png?raw=true" width=85%>
+  <img src="./figs/discriminative_tasks.png?raw=true" width=100%>
 </p>
 
+### Generative Tasks (Forecasting)
 <p align="center">
-  <img src="./figs/generative_tasks.png?raw=true" width=85%>
+  <img src="./figs/generative_tasks.png?raw=true" width=100%>
 </p>
 
-### Qualitative
+### General Time Series Understanding
 <p align="center">
-  <img src="./figs/embeddings.png?raw=true" width=85%>
+  <img src="./figs/time_series_understanding.png?raw=true" width=100%>
 </p>
 
+### Unified Latent Space
 <p align="center">
-  <img src="./figs/EEG_embeddings.png?raw=true" width=85%>
+  <img src="./figs/latent_space.png?raw=true" width=100%>
 </p>
 
 
