@@ -23,11 +23,10 @@ from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import roc_auc_score, average_precision_score, precision_score, recall_score
 from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
 from sklearn.feature_selection import r_regression
+from sklearn.decomposition import PCA
 
 import wandb
 
-import umap
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -377,20 +376,79 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
                     test_history[f'Test/PCC/{i}'] = pcc[i]
                     test_history[f'Test/R2/{i}'] = r2[i]
 
-        if args.plot_embeddings and epoch % 10 == 0:
-            reducer = umap.UMAP(n_components=2, metric='euclidean')
-            umap_proj = reducer.fit_transform(embeddings)
-            
-            fig, ax = plt.subplots(figsize=(8, 8))
+        if args.plot_embeddings and epoch % 1 == 0:
+            font_size = 17
+            plt.rcParams.update({'font.size': font_size})
 
-            cmap = matplotlib.cm.get_cmap('tab20') # for the colours
-            for label in range(args.nb_classes):
-                indices = labels.numpy()==label
-                ax.scatter(umap_proj[indices, 0], umap_proj[indices, 1], c=np.array(cmap(label*3)).reshape(1, 4), label=label, alpha=0.5)
+            e = embeddings[::5]
+            labels = labels[::5]
 
-            ax.legend(fontsize='large', markerscale=2)
+            # Perform PCA to reduce embeddings to 2D
+            pca = PCA(n_components=2)
+            reduced_embeddings = pca.fit_transform(e)
 
-            test_history["UMAP Embeddings"] = wandb.Image(fig)
+            # Calculate centroids for each label
+            unique_labels = np.unique(labels)
+            centroids = np.array([
+                reduced_embeddings[labels.flatten() == label].mean(axis=0)
+                for label in unique_labels
+            ])
+
+            # Plot the embeddings with labels
+            colors = plt.cm.viridis(np.linspace(0, 1, len(unique_labels)))
+
+            fig, axs = plt.subplots(1, 1, figsize=(8, 8))
+
+            for label, color in zip(unique_labels, colors):
+                mask = labels.flatten() == label
+                alpha = 0.75
+                axs.scatter(
+                    reduced_embeddings[mask, 0],
+                    reduced_embeddings[mask, 1],
+                    color=color,
+                    label=f"class {label}",
+                    alpha=alpha
+                )
+
+            # Plot centroids
+            axs.scatter(
+                centroids[:, 0], 
+                centroids[:, 1],
+                c='red', marker='X', s=50, label='centroid'
+            )
+
+            axs.spines['top'].set_visible(False)
+            axs.spines['right'].set_visible(False)
+
+            # Add text for the number of samples in the upper left
+            n_samples = len(labels)
+            axs.text(
+                0.03, 1.0, f"n = {n_samples:,}", 
+                transform=axs.transAxes, ha="left", va="top", fontsize=font_size, 
+            )
+
+            axs.text(
+                0.03, 0.94, f"bACC = {acc_balanced/100:.2%}", 
+                # transform=axs.transAxes, ha="left", va="top", fontsize=14, bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7)
+                transform=axs.transAxes, ha="left", va="top", fontsize=font_size, 
+            )
+
+            # Calculate explained variance
+            explained_variance = pca.explained_variance_ratio_
+            total_explained_variance = np.sum(explained_variance)
+            axs.text(
+                0.03, 0.88, f"v = {total_explained_variance:.2%}", 
+                transform=axs.transAxes, ha="left", va="top", fontsize=font_size, 
+            )
+
+            plt.xticks([])
+            plt.yticks([])
+
+            plt.legend(loc="lower left")
+
+            plt.tight_layout()
+
+            test_history["PCA of val embeddings"] = wandb.Image(fig)
             plt.close('all')
     
     return test_stats, test_history
