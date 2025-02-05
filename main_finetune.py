@@ -337,8 +337,7 @@ def main(args):
         global_rank = misc.get_rank()
         print(f"global_rank: {global_rank}")
         sampler_train = torch.utils.data.DistributedSampler(
-            dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True
-        )
+            dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True)
         # print("Sampler_train = %s" % str(sampler_train))
 
         if args.dist_eval:
@@ -347,7 +346,7 @@ def main(args):
                       'This will slightly alter validation results as extra duplicate entries are added to achieve '
                       'equal num of samples per-process.')
             sampler_val = torch.utils.data.DistributedSampler(
-                dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=True)  # shuffle=True to reduce monitor bias
+                dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)  # shuffle=True to reduce monitor bias
         else:
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
         # print("Sampler_val = %s" % str(sampler_val))
@@ -359,7 +358,7 @@ def main(args):
                         'This will slightly alter validation results as extra duplicate entries are added to achieve '
                         'equal num of samples per-process.')
                 sampler_test = torch.utils.data.DistributedSampler(
-                    dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=True)  # shuffle=True to reduce monitor bias
+                    dataset_test, num_replicas=num_tasks, rank=global_rank, shuffle=False)  # shuffle=True to reduce monitor bias
             else:
                 sampler_test = torch.utils.data.SequentialSampler(dataset_test)
     else:
