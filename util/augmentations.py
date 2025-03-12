@@ -195,7 +195,13 @@ class CropResizing(object):
             if self.fixed_resize_len is None or self.fixed_resize_len > max_nb_time_steps:
                 resize_len = max_nb_time_steps
 
-            cropped_sample = torch.nn.functional.interpolate(cropped_sample, size=resize_len, mode="linear")
+            if cropped_sample.dim() > 3:
+                N, C, V, T = cropped_sample.shape
+                cropped_sample = cropped_sample.flatten(start_dim=0, end_dim=1)
+                cropped_sample = torch.nn.functional.interpolate(cropped_sample, size=resize_len, mode="linear")
+                cropped_sample = cropped_sample.view(N, C, V, -1)
+            else:
+                cropped_sample = torch.nn.functional.interpolate(cropped_sample, size=resize_len, mode="linear")
 
         return cropped_sample
 

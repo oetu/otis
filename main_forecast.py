@@ -363,17 +363,20 @@ def main(args):
 
     new_patch_size = False
     if args.finetune and not args.eval:
-        checkpoint = torch.load(args.finetune, map_location='cpu')
+        checkpoint = torch.load(args.finetune, map_location='cpu', weights_only=False)
 
         print("Load pretrained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
 
         # check if new and old patch_size match
+        nb_channels_ckpt = checkpoint_model['patch_embed.proj.weight'].shape[-3]
+        nb_channels_model = args.input_size[0]
+
         checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
         patch_height_ckpt, patch_width_ckpt = checkpoint_patch_size[0], checkpoint_patch_size[1]
         patch_height_model, patch_width_model = args.patch_size[0], args.patch_size[1]
 
-        if patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
+        if nb_channels_ckpt != nb_channels_model or patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
             new_patch_size = True
             # initialize new patch_embed
             for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
@@ -567,7 +570,7 @@ def main(args):
         trainable_params.append(f"mask_token")
 
     if args.compile:
-        model = torch.compile(model)
+        model = torch.compile(model, backend="inductor", mode="reduce-overhead")
     model.to(device, non_blocking=True)
 
     model_without_ddp = model
@@ -750,7 +753,7 @@ def main(args):
     if args.test and misc.is_main_process():
         args.resume = misc.get_best_ckpt(args.output_dir, eval_criterion=args.eval_criterion)
         
-        checkpoint = torch.load(args.resume)
+        checkpoint = torch.load(args.resume, weights_only=False)
         model_without_ddp.load_state_dict(checkpoint['model'])
         print("Run test data on checkpoint model %s" % args.resume)
         

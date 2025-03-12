@@ -27,7 +27,10 @@ from sklearn.decomposition import PCA
 
 import wandb
 
+import matplotlib
+matplotlib.use('Agg')           # prevents tkinter error
 import matplotlib.pyplot as plt
+
 import numpy as np
 
 from timm.data import Mixup
@@ -77,7 +80,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if mixup_fn is not None:
             samples, targets = mixup_fn(samples, targets)
 
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type="cuda"):
             outputs = model(samples, pos_embed_y) * targets_mask
             loss = criterion(outputs, targets)
 
@@ -121,13 +124,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     training_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
         labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)             # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")                 # weighted
         precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")   # macro
         recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")         # macro
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         if args.nb_classes > 2:
-            auc = 100*roc_auc_score(y_true=labels, y_score=probs, average="macro", multi_class="ovo")
+            auc = 100*roc_auc_score(y_true=labels, y_score=probs, average="macro", multi_class="ovr")
         else:
             auc = 100*roc_auc_score(y_true=labels, y_score=probs[:, 1], average="macro")
         auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="macro")
@@ -247,7 +250,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
             target_mask = target_mask.unsqueeze(dim=-1).repeat(1, args.nb_classes)
 
         # compute output
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type="cuda"):
             embedding = model.forward_features(images, pos_embed_y)
             output = model.forward_head(embedding)
             output = output * target_mask
@@ -293,13 +296,13 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
     test_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
     if args.downstream_task == 'classification':
         labels_onehot = torch.nn.functional.one_hot(labels, num_classes=-1)                 # (B, num_classes)
-        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="weighted")
-        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")    # macro
-        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")          # macro
+        f1 = 100*f1_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")                 # weighted
+        precision = 100*precision_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")   # macro
+        recall = 100*recall_score(y_true=labels, y_pred=logits.argmax(dim=-1), average="macro")         # macro
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         if args.nb_classes > 2:
-            auc = 100*roc_auc_score(y_true=labels, y_score=probs, average="macro", multi_class="ovo")
+            auc = 100*roc_auc_score(y_true=labels, y_score=probs, average="macro", multi_class="ovr")
         else:
             auc = 100*roc_auc_score(y_true=labels, y_score=probs[:, 1], average="macro")
         auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="macro")
@@ -445,9 +448,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
             plt.yticks([])
 
             plt.legend(loc="lower left")
-
             plt.tight_layout()
-
             test_history["PCA of val embeddings"] = wandb.Image(fig)
             plt.close('all')
     

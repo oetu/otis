@@ -398,17 +398,20 @@ def main(args):
 
     new_patch_size = False
     if args.pretrained_encoder:
-        checkpoint = torch.load(args.pretrained_encoder, map_location='cpu')
+        checkpoint = torch.load(args.pretrained_encoder, map_location='cpu', weights_only=False)
 
         print("Load pretrained encoder from: %s" % args.pretrained_encoder)
         checkpoint_model = checkpoint['model']
 
         # check if new and old patch_size match
+        nb_channels_ckpt = checkpoint_model['patch_embed.proj.weight'].shape[-3]
+        nb_channels_model = args.input_size[0]
+
         checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
         patch_height_ckpt, patch_width_ckpt = checkpoint_patch_size[0], checkpoint_patch_size[1]
         patch_height_model, patch_width_model = args.patch_size[0], args.patch_size[1]
 
-        if patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
+        if nb_channels_ckpt != nb_channels_model or patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
             new_patch_size = True
             # initialize new patch_embed module
             for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
@@ -505,7 +508,7 @@ def main(args):
     print(skip_list)
 
     if args.compile:
-        model = torch.compile(model)
+        model = torch.compile(model, backend="inductor", mode="reduce-overhead")
     model.to(device, non_blocking=True)
 
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)

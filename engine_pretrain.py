@@ -27,7 +27,7 @@ import util.lr_sched as lr_sched
 import util.statistics as statistics
 
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg')           # prevents tkinter error
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import f1_score, accuracy_score, balanced_accuracy_score
@@ -68,7 +68,7 @@ def train_one_epoch(model: torch.nn.Module,
         pos_embed_y = pos_embed_y.to(device, non_blocking=True)
 
         # compute model prediction
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type="cuda"):
             loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask, _ = model(samples, 
                                                                                    attn_mask, 
                                                                                    pos_embed_y, 
@@ -296,7 +296,7 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
         train_labels.append(label.to(device, non_blocking=True))
         pos_embed_y = pos_embed_y.to(device, non_blocking=True)
 
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type="cuda"):
             train_embeddings.append(model.forward_encoder_all_patches(data, pos_embed_y))
 
     train_embeddings = torch.cat(train_embeddings, dim=0)[:, 1:, :].mean(dim=1) # globally average pooled token
@@ -308,13 +308,16 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
     
     if args.online_evaluation_task == "classification":
         train_probs = torch.tensor(estimator.predict_proba(train_embeddings), dtype=torch.float16)
-        classifier_f1_train = f1_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="weighted")
-        classifier_precision_train = precision_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="weighted")
-        classifier_recall_train = recall_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="weighted")
+        classifier_f1_train = f1_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="macro")
+        classifier_precision_train = precision_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="macro")
+        classifier_recall_train = recall_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="macro")
         classifier_acc_train = accuracy_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1))
         classifier_acc_balanced_train = balanced_accuracy_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1))
-        classifier_auc_train = roc_auc_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=-1), y_score=train_probs, average="weighted")
-        classifier_auprc_train = average_precision_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=-1), y_score=train_probs, average="weighted")
+        if args.online_num_classes > 2:
+            classifier_auc_train = roc_auc_score(y_true=train_labels, y_score=train_probs, average="macro", multi_class="ovr")
+        else:
+            classifier_auc_train = roc_auc_score(y_true=train_labels, y_score=train_probs[:, 1], average="macro")
+        classifier_auprc_train = average_precision_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=args.online_num_classes), y_score=train_probs, average="macro")
     elif args.online_evaluation_task == "regression":
         train_preds = torch.tensor(estimator.predict(train_embeddings), dtype=torch.float16)
         classifier_rmse_train = np.float64(root_mean_squared_error(train_preds, train_labels, multioutput="raw_values"))
@@ -331,7 +334,7 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
         val_labels.append(label.to(device, non_blocking=True))
         pos_embed_y = pos_embed_y.to(device, non_blocking=True)
 
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type="cuda"):
             val_embeddings.append(model.forward_encoder_all_patches(data, pos_embed_y))
 
     val_embeddings = torch.cat(val_embeddings, dim=0)[:, 1:, :].mean(dim=1) # globally average pooled token
@@ -341,13 +344,16 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
     
     if args.online_evaluation_task == "classification":
         val_probs = torch.tensor(estimator.predict_proba(val_embeddings), dtype=torch.float16)
-        classifier_f1_val = f1_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="weighted")
-        classifier_precision_val = precision_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="weighted")
-        classifier_recall_val = recall_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="weighted")
+        classifier_f1_val = f1_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="macro")
+        classifier_precision_val = precision_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="macro")
+        classifier_recall_val = recall_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="macro")
         classifier_acc_val = accuracy_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1))
         classifier_acc_balanced_val = balanced_accuracy_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1))
-        classifier_auc_val = roc_auc_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=-1), y_score=val_probs, average="weighted")
-        classifier_auprc_val = average_precision_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=-1), y_score=val_probs, average="weighted")
+        if args.online_num_classes > 2:
+            classifier_auc_val = roc_auc_score(y_true=val_labels, y_score=val_probs, average="macro", multi_class="ovr")
+        else:
+            classifier_auc_val = roc_auc_score(y_true=val_labels, y_score=val_probs[:, 1], average="macro")
+        classifier_auprc_val = average_precision_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=args.online_num_classes), y_score=val_probs, average="macro")
     elif args.online_evaluation_task == "regression":
         val_preds = torch.tensor(estimator.predict(val_embeddings), dtype=torch.float16)
         classifier_rmse_val = np.float64(root_mean_squared_error(val_preds, val_labels, multioutput="raw_values"))
@@ -412,7 +418,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
 
         domain = batch[3]
 
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type="cuda"):
             loss, ncc, cos_sim, cos_sim_embed, z_std, samples_hat, mask, latent = model(samples, 
                                                                                         attn_mask, 
                                                                                         pos_embed_y, 

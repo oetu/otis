@@ -12,8 +12,6 @@
 import os
 import argparse
 
-import re
-
 import json
 from typing import Tuple
 import numpy as np
@@ -53,6 +51,8 @@ def get_args_parser():
     # Model parameters
     parser.add_argument('--model', default='vit_baseDeep_patchX', type=str, metavar='MODEL',
                         help='Name of model to train (default: vit_baseDeep_patchX)')
+    parser.add_argument('--compile', action='store_true', default=False,
+                        help='Use torch compile')
     
     parser.add_argument('--univariate', action='store_true', default=False,
                         help='Univariate time series analysis (i.e. treat each variate independently)')
@@ -121,6 +121,8 @@ def get_args_parser():
                         help='Early stopping threshold (val has to be worse than (train+delta)) (default: 0)')
 
     # Criterion parameters
+    parser.add_argument('--weighted_loss', action='store_true', default=False,
+                        help='Apply inverse frequency weighted loss (default: False)')
     parser.add_argument('--smoothing', type=float, default=0.1,
                         help='Label smoothing (default: 0.1)')
 
@@ -257,6 +259,7 @@ def main(args):
                                       labels_path=args.labels_path, 
                                       labels_mask_path=args.labels_mask_path, 
                                       downstream_task=args.downstream_task, 
+                                      weighted_loss=args.weighted_loss,
                                       univariate=args.univariate,
                                       train=True, 
                                       N_val=1,
@@ -281,9 +284,6 @@ def main(args):
                                         test=True,
                                         N_val=1,
                                         args=args)
-
-    # train balanced
-    # class_weights = 2.0 / (2.0 * torch.Tensor([1.0, 1.0])) # total_nb_samples / (nb_classes * samples_per_class)
 
     print("Training set size: ", len(dataset_train))
     print("Validation set size: ", len(dataset_val))
@@ -384,7 +384,7 @@ def main(args):
 
     new_patch_size = False
     if args.finetune and not args.eval:
-        checkpoint = torch.load(args.finetune, map_location='cpu')
+        checkpoint = torch.load(args.finetune, map_location='cpu', weights_only=False)
 
         print("Load pretrained checkpoint from: %s" % args.finetune)
         checkpoint_model = checkpoint['model']
@@ -395,11 +395,14 @@ def main(args):
                 del checkpoint_model[k]
 
         # check if new and old patch_size match
+        nb_channels_ckpt = checkpoint_model['patch_embed.proj.weight'].shape[-3]
+        nb_channels_model = args.input_size[0]
+
         checkpoint_patch_size = checkpoint_model['patch_embed.proj.weight'].shape[-2:]
         patch_height_ckpt, patch_width_ckpt = checkpoint_patch_size[0], checkpoint_patch_size[1]
         patch_height_model, patch_width_model = args.patch_size[0], args.patch_size[1]
 
-        if patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
+        if nb_channels_ckpt != nb_channels_model or patch_height_ckpt != patch_height_model or patch_width_ckpt != patch_width_model:
             new_patch_size = True
             # initialize new patch_embed
             for key in ["patch_embed.proj.weight", "patch_embed.proj.bias", 
@@ -513,7 +516,7 @@ def main(args):
             args.resume = "/".join(sub_strings[:-1]) + "/checkpoint-" + str(0) + ".pth"
 
         # load pos_embed_x from checkpoint
-        checkpoint = torch.load(args.resume, map_location='cpu')
+        checkpoint = torch.load(args.resume, map_location='cpu', weights_only=False)
         checkpoint_model = checkpoint['model']
         interpolate_pos_embed_x(model, checkpoint_model)
 
@@ -529,6 +532,8 @@ def main(args):
         dataset_val.set_domain_offsets(checkpoint["domain_offsets"])
         print(f"New domain_offsets: {dataset_train.offsets}")
     
+    if args.compile:
+        model = torch.compile(model, backend="inductor", mode="reduce-overhead")
     model.to(device, non_blocking=True)
 
     model_without_ddp = model
@@ -568,8 +573,11 @@ def main(args):
     print(optimizer)
     loss_scaler = NativeScaler()
 
-    # class_weights = class_weights.to(device=device, non_blocking=True)
     class_weights = None
+    print(dataset_train.class_weights)
+    if dataset_train.class_weights is not None:
+        class_weights = dataset_train.class_weights.to(device=device, non_blocking=True)
+    
     if args.downstream_task == 'regression':
         criterion = torch.nn.MSELoss()
     elif args.smoothing > 0.:
@@ -634,7 +642,7 @@ def main(args):
 
         if args.eval_criterion == "epoch":
             if args.downstream_task == 'classification':
-                test_stats['avg'] = (test_stats['acc_balanced'] + test_stats['f1'] + test_stats['cohen']) / 3
+                test_stats['avg'] = (test_stats['auroc'] + test_stats['acc_balanced'] + test_stats['f1'] + test_stats['cohen']) / 4
             elif args.downstream_task == 'regression':
                 test_stats['avg'] = (test_stats['pcc'] + test_stats['r2']) / 2
             if args.output_dir:
@@ -676,7 +684,7 @@ def main(args):
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
             if args.downstream_task == 'classification':
-                test_stats['avg'] = (test_stats['acc_balanced'] + test_stats['f1'] + test_stats['cohen']) / 3
+                test_stats['avg'] = (test_stats['auroc'] + test_stats['acc_balanced'] + test_stats['f1'] + test_stats['cohen']) / 4
             elif args.downstream_task == 'regression':
                 test_stats['avg'] = (test_stats['pcc'] + test_stats['r2']) / 2
             
@@ -766,7 +774,7 @@ def main(args):
     if args.test and misc.is_main_process():
         args.resume = misc.get_best_ckpt(args.output_dir, eval_criterion=args.eval_criterion)
         
-        checkpoint = torch.load(args.resume)
+        checkpoint = torch.load(args.resume, weights_only=False)
         model_without_ddp.load_state_dict(checkpoint['model'])
         print("Run test data on checkpoint model %s" % args.resume)
         
