@@ -25,38 +25,7 @@ from timm.models.layers import Mlp
 from util.patch_embed import PatchEmbed
 from util.pos_embed import get_1d_sincos_pos_embed
 import util.statistics as statistics
-
-
-class Attention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
-        super().__init__()
-        assert dim % num_heads == 0, 'dim should be divisible by num_heads'
-        self.num_heads = num_heads
-        head_dim = dim // num_heads
-        self.scale = head_dim ** -0.5
-
-        self.mha = nn.MultiheadAttention(embed_dim=dim, num_heads=num_heads, dropout=attn_drop, batch_first=True)
-
-        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
-
-        self.attn_map = None
-
-    def forward(self, x, attn_mask=None):
-        B, N, C = x.shape # C = embed_dim
-        qkv = self.qkv(x).reshape(B, N, 3, C).permute(2, 0, 1, 3) # (QKV, B, Heads, N, head_dim)
-        q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple) (B, Heads, N, head_dim)
-
-        if attn_mask is not None:
-            attn_mask = 1 - attn_mask
-        attn, attn_weights = self.mha(q, k, v, key_padding_mask=attn_mask)
-        self.attn_map = attn_weights
-
-        x = self.proj(attn)
-        x = self.proj_drop(x)
-        return x
+from util.transformer import Attention, DyT
 
 
 class OTiS(nn.Module):
@@ -909,7 +878,9 @@ def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.7
     model = OTiS(
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, 
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # DyT
+        **kwargs)
     return model
 
 def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.57M decoder
@@ -947,29 +918,6 @@ def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0
         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
-
-# def mae_vit_base_patchX_dec512d8b(**kwargs): # 86M params in total
-#     model = MaskedAutoencoderViT(
-#         embed_dim=768, depth=12, num_heads=12, # dim=64 per head
-#         decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-# def mae_vit_large_patchX_dec512d8b(**kwargs): # 307M params in total
-#     model = MaskedAutoencoderViT(
-#         embed_dim=1024, depth=24, num_heads=16, # dim=64 per head
-#         decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-# def mae_vit_huge_patchX_dec512d8b(**kwargs): # 632M params in total
-#     model = MaskedAutoencoderViT(
-#         embed_dim=1280, depth=32, num_heads=16, # dim=80 per head
-#         decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, # dim=32 per head
-#         mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-#     return model
-
-
 # set recommended archs
 otis_baseDeep_dec160d4b_patchX = otis_baseDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_baseDeep_dec128d2b_patchX = otis_baseDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
@@ -979,47 +927,3 @@ otis_largeDeep_dec128d2b_patchX = otis_largeDeep_patchX_dec128d2b  # decoder: 12
 
 otis_hugeDeep_dec160d4b_patchX = otis_hugeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_hugeDeep_dec128d2b_patchX = otis_hugeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
-
-
-# def _attention_forward_wrapper(self, attn_obj):
-#     """
-#     Modified version of def forward() of class Attention() in timm.models.vision_transformer
-#     """
-#     def my_forward(x, attn_mask=None):
-#         B, N, C = x.shape # C = embed_dim
-#         # (3, B, Heads, N, head_dim)
-#         qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
-#         q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple)
-
-#         # (B, Heads, N, N)
-#         attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
-
-#         if attn_mask is not None:
-#             # (B, 1, N)
-#             attn_mask_batch = attn_mask.unsqueeze(1).clone()
-#             # (B, 1, N, N)
-#             attn_mask_batch = torch.einsum("bhn,bhl->bhnl", attn_mask_batch, attn_mask_batch)
-#             # (B, Heads, N, N)
-#             attn_mask_batch = attn_mask_batch.expand(-1, attn_obj.num_heads, -1, -1)
-
-#             # (B, Heads, N, N)
-#             attn[attn_mask_batch==0] = -torch.inf # will be zero after softmax, exp(-inf)=0
-
-#         # attn = attn.softmax(dim=-1) # returns nan if there is rows with -inf only :S
-#         # implement a modified softmax version that includes a small positive term in the denominator
-#         attn = torch.exp(attn - attn.max()) # avoid numerical instability by subtracting the maximum value
-#         attn = attn / (attn.sum(dim=-1, keepdim=True) + 1e-9)
-
-#         # (B, Heads, N, N)
-#         attn_obj.attn_map = attn # this was added 
-
-#         # (B, Heads, N, N)
-#         attn = attn_obj.attn_drop(attn)
-
-#         # (B, N, Heads*head_dim)
-#         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-#         x = attn_obj.proj(x)
-#         x = attn_obj.proj_drop(x)
-#         return x
-    
-#     return my_forward
