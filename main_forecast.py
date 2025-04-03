@@ -570,7 +570,8 @@ def main(args):
         trainable_params.append(f"mask_token")
 
     if args.compile:
-        model = torch.compile(model, backend="inductor", mode="reduce-overhead")
+        # model = torch.compile(model, backend="inductor", mode="reduce-overhead")
+        model.forward = torch.compile(model.forward)
     model.to(device, non_blocking=True)
 
     model_without_ddp = model
