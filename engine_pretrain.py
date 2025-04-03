@@ -478,13 +478,14 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         metric_logger.meters['mae'].update(mae_value, n=batch_size)
 
     if args.save_embeddings and misc.is_main_process():
-            embeddings = torch.cat(embeddings, dim=0).to(device="cpu", dtype=torch.float32).detach() # (B, D)
-            embeddings_path = os.path.join(args.output_dir, "embeddings")
-            if not os.path.exists(embeddings_path):
-                os.makedirs(embeddings_path)
-            
-            file_name = f"embeddings_test.pt" if args.eval else f"embeddings_{epoch}.pt"
-            torch.save(embeddings, os.path.join(embeddings_path, file_name))
+        embeddings = torch.cat(embeddings, dim=0).to(device="cpu", dtype=torch.float32).detach() # (B, D)
+        
+        embeddings_path = os.path.join(args.output_dir, "embeddings")
+        if not os.path.exists(embeddings_path):
+            os.makedirs(embeddings_path)
+        
+        file_name = f"embeddings_{epoch}.pt"
+        torch.save(embeddings, os.path.join(embeddings_path, file_name))
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

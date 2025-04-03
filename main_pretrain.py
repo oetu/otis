@@ -250,7 +250,6 @@ def main(args):
                                     domain_offsets=dataset_train.offsets, 
                                     univariate=args.univariate,
                                     train=False, 
-                                    N_val=2,
                                     args=args)
 
     print("Training set size: ", len(dataset_train))
@@ -508,7 +507,7 @@ def main(args):
     print(skip_list)
 
     if args.compile:
-        model = torch.compile(model, backend="inductor", mode="reduce-overhead")
+        model.forward = torch.compile(model.forward, dynamic=True)
     model.to(device, non_blocking=True)
 
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
