@@ -125,7 +125,7 @@ class TimeSeriesDataset(Dataset):
         if self.train == False:
             # validate / test on more than one chunk per sample
             # Calculate number of overlapping chunks
-            stride=32
+            stride = 32 # ili : 4, traffic : 32
             if self.test == True:
                 stride = 1
             
