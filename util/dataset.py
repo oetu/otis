@@ -10,6 +10,9 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+import math
+from collections import Counter
+
 import util.augmentations as augmentations
 
 
@@ -60,10 +63,13 @@ class TimeSeriesDataset(Dataset):
         unique_domains = list(set(domain_list))
         
         self.domain_weights = {}
+        domain_counts = Counter(domain_list)
+        total_domains = len(domain_list)
+        num_unique_domains = len(unique_domains)
         for mod_current in unique_domains:
-            mod_indices = torch.tensor([mod == mod_current for mod in domain_list])
-            mod_weight = len(domain) / (len(unique_domains) * mod_indices.sum())
-            self.domain_weights.update( {mod_current: mod_weight} )
+            count = domain_counts[mod_current]
+            mod_weight = math.sqrt(total_domains / (num_unique_domains * count))
+            self.domain_weights.update( {mod_current: torch.tensor(mod_weight, dtype=torch.float32)} )
 
         self.offsets = {}
         if domain_offsets is None:
