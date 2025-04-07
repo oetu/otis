@@ -320,7 +320,6 @@ def main(args):
                                                  labels_path=args.labels_path_online, 
                                                  labels_mask_path=args.labels_mask_path_online, 
                                                  downstream_task=args.online_evaluation_task, 
-                                                 domain_offsets=dataset_train.offsets, 
                                                  univariate=args.univariate,
                                                  train=True, 
                                                  args=args)
@@ -328,7 +327,7 @@ def main(args):
                                                labels_path=args.val_labels_path_online, 
                                                labels_mask_path=args.val_labels_mask_path_online, 
                                                downstream_task=args.online_evaluation_task, 
-                                               domain_offsets=dataset_train.offsets, 
+                                               domain_offsets=dataset_online_train.offsets, 
                                                univariate=args.univariate,
                                                train=False, 
                                                N_val=5,
