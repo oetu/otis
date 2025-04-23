@@ -173,7 +173,7 @@ def train_one_epoch(model: torch.nn.Module,
         training_history['train_mse'] = train_stats["mse"]
         training_history['train_mae'] = train_stats["mae"]
 
-        if (epoch % 49) == 0:
+        if (epoch % 10) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
 
@@ -518,7 +518,7 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         test_history['val_mse'] = test_stats["mse"]
         test_history['val_mae'] = test_stats["mae"]
 
-        if (epoch % 49) == 0:
+        if (epoch % 10) == 0:
             steps = 1
             idx = random.randint(0, len(samples)-1)
 

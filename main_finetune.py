@@ -21,8 +21,6 @@ from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
 
-import torch.distributed as dist
-
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
 # os.environ["WANDB__SERVICE_WAIT"] = "500"
