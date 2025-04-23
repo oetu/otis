@@ -18,6 +18,8 @@ import math
 import torch
 import torch.nn as nn
 
+import numpy as np
+
 from timm.models.vision_transformer import Block
 from timm.models.layers import trunc_normal_
 from timm.models.layers import Mlp
@@ -25,7 +27,7 @@ from timm.models.layers import Mlp
 from util.patch_embed import PatchEmbed
 from util.pos_embed import get_1d_sincos_pos_embed
 import util.statistics as statistics
-from util.transformer import Attention, DyT
+from util.transformer import Attention, TemporalRoPEAttention, DyT
 
 
 class OTiS(nn.Module):
@@ -40,7 +42,7 @@ class OTiS(nn.Module):
                  head_mlp_ratio=4., head_dropout=0.1, head_activation=nn.GELU,
                  mlp_ratio=4., norm_layer=nn.LayerNorm, 
                  norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False, contrastive_loss=False,
-                 include_forecasting=False, forecasting_probability=0.33, forecasting_mask_ratio=0.5,
+                 probabilistic_masking=False, include_forecasting=False, forecasting_probability=0.33, forecasting_mask_ratio=0.5,
                  downstream=None):
         super().__init__()
 
@@ -78,8 +80,8 @@ class OTiS(nn.Module):
         # modify the attention operation to consider attention masks
         for block in self.blocks:
             block.forward = self._block_forward_wrapper(block)
-            # block.attn.forward = self._attention_forward_wrapper(block.attn)
             block.attn = Attention(embed_dim, num_heads, qkv_bias=True)
+            # block.attn = TemporalRoPEAttention(embed_dim, num_heads, max_num_patches_x, qkv_bias=True)
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
@@ -121,8 +123,8 @@ class OTiS(nn.Module):
             # modify the attention operation to consider attention masks
             for block in self.decoder_blocks:
                 block.forward = self._block_forward_wrapper(block)
-                # block.attn.forward = self._attention_forward_wrapper(block.attn)
                 block.attn = Attention(decoder_embed_dim, decoder_num_heads, qkv_bias=True)
+                # block.attn = TemporalRoPEAttention(decoder_embed_dim, decoder_num_heads, max_num_patches_x, qkv_bias=True)
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
@@ -160,6 +162,7 @@ class OTiS(nn.Module):
 
         self.contrastive_loss = contrastive_loss
 
+        self.probabilistic_masking = probabilistic_masking
         self.include_forecasting = include_forecasting
         self.forecasting_probability = forecasting_probability
         self.forecasting_mask_ratio = forecasting_mask_ratio
@@ -179,6 +182,13 @@ class OTiS(nn.Module):
             x = x + block_obj.drop_path1(block_obj.ls1(block_obj.attn(block_obj.norm1(x), attn_mask)))
             x = x + block_obj.drop_path2(block_obj.ls2(block_obj.mlp(block_obj.norm2(x))))
             return x
+    
+        # # RoPE (rotary position embeddings)
+        # def my_forward(x, attn_mask=None, attn_mask_input=None, ids_restore=None, V=1, T=1):
+        #     x = x + block_obj.drop_path1(block_obj.ls1(block_obj.attn(block_obj.norm1(x), attn_mask, 
+        #                                                               attn_mask_input, ids_restore, V, T)))
+        #     x = x + block_obj.drop_path2(block_obj.ls2(block_obj.mlp(block_obj.norm2(x))))
+        #     return x
 
         return my_forward
 
@@ -274,12 +284,19 @@ class OTiS(nn.Module):
         attn_mask: [N, C', T'], with L=C'*T'
         """
         N, L, D = x.shape  # batch, length, dim
-        len_keep = math.ceil(L * (10 - 10 * mask_ratio)/10) # factor 10 to compensate float precision 
+        if self.probabilistic_masking:
+            masking_ratio = mask_ratio - 0.05 + 0.1 * np.abs(np.random.normal(loc=0.0, scale=0.65))
+        else:
+            masking_ratio = mask_ratio
+        len_keep = math.ceil(L * (10 - 10 * masking_ratio)/10) # factor 10 to compensate float precision 
         
         if self.downstream == "forecasting" or (self.include_forecasting and random.random() < self.forecasting_probability):
             if self.include_forecasting:
                 # pretraining
-                forecasting_ratio = self.forecasting_mask_ratio
+                if self.probabilistic_masking:
+                    forecasting_ratio = self.forecasting_mask_ratio - 0.05 + 0.1 * np.abs(np.random.normal(loc=0.0, scale=0.65))
+                else:
+                    forecasting_ratio = self.forecasting_mask_ratio
             else:
                 # downstream finetuning
                 forecasting_ratio = mask_ratio
@@ -339,8 +356,8 @@ class OTiS(nn.Module):
 
             # Create auxiliary mask
             # to set values of masked patches to infinity such that they are certainly removed
-            # [N, 1, 1]
-            len_keeps = torch.ceil( attn_mask[:, 0, :].sum(dim=-1) * (10 - 10 * mask_ratio) / 10 ).to(torch.long).view(-1, 1, 1)
+            # [N, 1, 1], nb of unmasked tokens per variate
+            len_keeps = torch.ceil(attn_mask[:, 0, :].sum(dim=-1) * (10-10*masking_ratio)/10).to(torch.long).view(-1, 1, 1)
             # [N, C', T']
             aux_mask = torch.arange(nb_of_patches, device=x.device).expand(N, nb_of_channels, nb_of_patches) < len_keeps
             aux_mask = 1 - aux_mask.to(torch.float32)
@@ -372,8 +389,9 @@ class OTiS(nn.Module):
             noise = noise.flatten(1)
         
         # sort noise for each sample
-        # [N, L]
+        # [N, L], the first len_keep indices correspond to the visible tokens, the remaining L-len_keep to the masked tokens
         ids_shuffle = torch.argsort(noise, dim=1)   # ascend: small is keep, large is remove
+        # [N, L], to restore the original token order after concatenating masked tokens to the visible tokens (before the decoding)
         ids_restore = torch.argsort(ids_shuffle, dim=1)
 
         # keep the first subset
@@ -407,6 +425,7 @@ class OTiS(nn.Module):
         # embed patches
         # (B, D, C', T')
         x = self.patch_embed(x)
+        B, D, V, T = x.shape
 
         # add pos embed X w/o cls token
         # (B, D, C', T')
@@ -458,6 +477,7 @@ class OTiS(nn.Module):
 
         for blk in self.blocks:
             x = blk(x, attn_mask_visible_patches)
+            # x = blk(x, attn_mask_visible_patches, attn_mask, ids_restore, V, T) # RoPE
 
         # (B, 1+N', D)        
         x = self.norm(x)
@@ -479,6 +499,7 @@ class OTiS(nn.Module):
         # embed patches
         # (B, D, C', T')
         x = self.patch_embed(x)
+        B, D, V, T = x.shape
 
         # flatten
         # (B, N, D), with N=C'*T'
@@ -548,6 +569,7 @@ class OTiS(nn.Module):
 
         for blk in self.blocks:
             x = blk(x, attn_mask_all_patches)
+            # x = blk(x, attn_mask_all_patches, None, None, V, T) # RoPE
 
         # (B, 1+N, D)        
         x = self.norm(x)
@@ -566,6 +588,7 @@ class OTiS(nn.Module):
         # embed patches
         # (B, D, C', T')
         x = self.patch_embed(x)
+        B, D, V, T = x.shape
 
         # add pos embed X w/o cls token
         # (1, 1+T'_max, D/2)
@@ -608,6 +631,7 @@ class OTiS(nn.Module):
         # (B, 1+N), add cls token to attn mask
         for blk in self.blocks:
             x = blk(x)
+            # x = blk(x, None, None, None, V, T) # RoPE
 
         x = self.norm(x)
 
@@ -645,6 +669,7 @@ class OTiS(nn.Module):
 
         # (B, D_dec, C', T')
         x = x.view(x.shape[0], x.shape[1], attn_mask.shape[-2], -1)
+        B, D_dec, V, T = x.shape
 
         # add pos embed x
         # (B, D_dec, C', T')
@@ -692,6 +717,7 @@ class OTiS(nn.Module):
 
         for blk in self.decoder_blocks:
             x = blk(x, attn_mask_batch)
+            # x = blk(x, attn_mask_batch, None, None, V, T) # RoPE
 
         # (B, 1+N, D_dec)
         x = self.decoder_norm(x)
@@ -879,7 +905,7 @@ def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.7
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), # DyT
+        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
         **kwargs)
     return model
 
@@ -887,35 +913,45 @@ def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.5
     model = OTiS(
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, 
+        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        **kwargs)
     return model
 
 def otis_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.74M decoder
     model = OTiS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, 
+        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        **kwargs)
     return model
 
 def otis_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.60M decoder
     model = OTiS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, 
+        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        **kwargs)
     return model
 
 def otis_hugeDeep_patchX_dec160d4b(**kwargs):    # nb_params: 130.81M encoder, 1.78M decoder
     model = OTiS(
         embed_dim=576, depth=24, num_heads=8,                               # dim=72 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, 
+        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        **kwargs)
     return model
 
 def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0.63M decoder
     model = OTiS(
         embed_dim=576, depth=24, num_heads=8,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
-        mlp_ratio=4, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+        mlp_ratio=4, 
+        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        **kwargs)
     return model
 
 # set recommended archs

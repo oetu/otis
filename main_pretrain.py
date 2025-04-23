@@ -92,6 +92,8 @@ def get_args_parser():
                         help='Add cos similarity as additional loss term')
 
     # Augmentation parameters
+    parser.add_argument('--probabilistic_masking', action='store_true', default=False,
+                        help='Randomly vary the masking ratio during pretraining.')
     parser.add_argument('--mask_ratio', default=0.75, type=float,
                         help='Masking ratio (percentage of removed patches).')
     parser.add_argument('--include_forecasting', action='store_true', default=False,
@@ -389,6 +391,7 @@ def main(args):
         masked_patch_loss=args.masked_patch_loss,
         domain_weighted_loss=args.domain_weighted_loss,
         contrastive_loss=(args.cos_weight > 0.0),
+        probabilistic_masking=args.probabilistic_masking,
         include_forecasting=args.include_forecasting,
         forecasting_probability=args.forecasting_probability,
         forecasting_mask_ratio=args.forecasting_mask_ratio,
