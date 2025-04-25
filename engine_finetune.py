@@ -14,6 +14,7 @@ import os
 
 import math
 import sys
+import time
 from typing import Iterable, Optional
 
 import torch
@@ -453,3 +454,39 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
             plt.close('all')
     
     return test_stats, test_history
+
+
+@torch.no_grad()
+def extract_embeddings(data_loader, model, device, args=None):
+    # switch to evaluation mode
+    model.eval()
+    
+    # required for metrics calculation
+    embeddings = []
+
+    start_time = time.time()
+    for idx, batch in enumerate(data_loader):
+        if idx % 10 == 0:
+            end_time = time.time()
+            print(idx*args.batch_size, end_time-start_time)
+
+        samples = batch[0]
+        samples = samples.to(device, non_blocking=True)
+
+        pos_embed_y = batch[3]
+        pos_embed_y = pos_embed_y.to(device, non_blocking=True)
+
+        # compute output
+        with torch.amp.autocast(device_type="cuda"):
+            embedding = model.forward_features(samples, pos_embed_y)
+
+        embeddings.append(embedding)
+    
+    if misc.is_main_process():
+        embeddings = torch.cat(embeddings, dim=0).to(device="cpu", dtype=torch.float32).detach() # (B, D)
+        embeddings_path = os.path.join(args.output_dir, "embeddings")
+        if not os.path.exists(embeddings_path):
+            os.makedirs(embeddings_path)
+        
+        file_name = f"embeddings_eval.pt"
+        torch.save(embeddings, os.path.join(embeddings_path, file_name))

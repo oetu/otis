@@ -39,7 +39,7 @@ from util.callbacks import EarlyStop
 
 import models_vit
 
-from engine_finetune import train_one_epoch, evaluate
+from engine_finetune import train_one_epoch, evaluate, extract_embeddings
 
 
 def get_args_parser():
@@ -244,6 +244,8 @@ def get_args_parser():
                         help='start epoch')
     parser.add_argument('--eval', action='store_true',
                         help='Perform evaluation only')
+    parser.add_argument('--extract_embeddings', action='store_true', default=False,
+                        help='Perform embeddings extraction only')
     parser.add_argument('--num_workers', default=24, type=int)
     parser.add_argument('--pin_mem', action='store_true', default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
@@ -611,6 +613,10 @@ def main(args):
 
     if not args.eval:
         misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+
+    if args.extract_embeddings:
+        extract_embeddings(data_loader_val, model_without_ddp, device, args=args)
+        exit(0)
 
     if args.eval:
         sub_strings = args.resume.split("/")
