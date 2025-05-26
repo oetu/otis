@@ -905,7 +905,7 @@ def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.7
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
-        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         **kwargs)
     return model
 
@@ -914,7 +914,7 @@ def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.5
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, 
-        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         **kwargs)
     return model
 
@@ -923,7 +923,7 @@ def otis_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
-        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         **kwargs)
     return model
 
@@ -932,7 +932,7 @@ def otis_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, 
-        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         **kwargs)
     return model
 
@@ -941,7 +941,7 @@ def otis_hugeDeep_patchX_dec160d4b(**kwargs):    # nb_params: 130.81M encoder, 1
         embed_dim=576, depth=24, num_heads=8,                               # dim=72 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
-        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         **kwargs)
     return model
 
@@ -950,7 +950,7 @@ def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0
         embed_dim=576, depth=24, num_heads=8,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, 
-        norm_layer=DyT, #partial(nn.LayerNorm, eps=1e-6)
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         **kwargs)
     return model
 
