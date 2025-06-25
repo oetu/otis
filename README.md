@@ -19,6 +19,9 @@ Activate the conda environment before running OTiS.
 conda activate otis
 ```
 
+## Data Formatting
+The data is presented as a list of tuples (_domain_: str, _sample_: torch.Tensor). Each _sample_ should have the shape (C, V, T), where C, V, and T represent the number of channels (similar to RGB channels in images; default: 1), the number of variates, and the number of time points, respectively. During fine-tuning and linear probing, if the _domain_ was previously seen during pre-training, positional embeddings for the variates are loaded from the checkpoint; otherwise, they are intialised randomly.
+
 ## Model Weights
 Download pre-trained model weights from the [google drive](https://drive.google.com/drive/folders/1sMxJwvyZY7M2Z_gykcjLgIXa13iYDCEf?usp=sharing).
 
