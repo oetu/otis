@@ -736,18 +736,19 @@ def main(args):
               f"{best_stats['total_loss']:.4f} / {best_stats['loss']:.4f} / {best_stats['ncc']:.2f} / ", 
               f"{best_stats['cos_sim']:.2f} / {best_stats['mse']:.2f} / {best_stats['mae']:.2f}\n")
             
+        total_time = time.time() - start_time
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 
                      **{f'val_{k}': v for k, v in val_stats.items()},
+                     'n_parameters': n_parameters,
                      'epoch': epoch, 
-                     'n_parameters': n_parameters}
-
+                     'time_per_epoch' : total_time}
+        
         if args.output_dir and misc.is_main_process():
             if log_writer:
                 log_writer.flush()
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
-
-        total_time = time.time() - start_time
+        
         if args.wandb and misc.is_main_process():
             wandb.log(train_history | val_history | {"Time per epoch [sec]": total_time})
 

@@ -756,18 +756,19 @@ def main(args):
             print(f'Min Root Mean Squared Error (RMSE) / Min Mean Absolute Error (MAE) / Max Pearson Correlation Coefficient (PCC) / ',
                   f'Max R Squared (R2): {best_stats["rmse"]:.4f} / {best_stats["mae"]:.4f} / {best_stats["pcc"]:.4f} / {best_stats["r2"]:.4f}\n')
         
+        total_time = time.time() - start_time
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 
                      **{f'test_{k}': v for k, v in test_stats.items()}, 
+                     'n_parameters': n_parameters,
                      'epoch': epoch, 
-                     'n_parameters': n_parameters}
-
+                     'time_per_epoch': total_time}
+        
         if args.output_dir and misc.is_main_process():
             if log_writer:
                 log_writer.flush()
             with open(os.path.join(args.output_dir, "log.txt"), mode="a", encoding="utf-8") as f:
                 f.write(json.dumps(log_stats) + "\n")
-
-        total_time = time.time() - start_time
+        
         if args.wandb and misc.is_main_process():
             wandb.log(train_history | test_history | {"Time per epoch [sec]": total_time})
 
