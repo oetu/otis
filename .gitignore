@@ -16,7 +16,7 @@ util/masking.py
 
 main_finetune_baselines.py
 models_baselines.py
-envs/otis_mmt.yaml
+envs/otis_baseline.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

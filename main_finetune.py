@@ -587,7 +587,7 @@ def main(args):
     # build optimizer with layer-wise lr decay (lrd)
     param_groups = lrd.param_groups_lrd(model_without_ddp, args.weight_decay,
         no_weight_decay_list=model_without_ddp.no_weight_decay(), layer_decay=args.layer_decay)
-    optimizer = torch.optim.AdamW(param_groups, lr=args.lr)
+    optimizer = torch.optim.AdamW(param_groups, lr=args.lr, eps=1e-8)
     print(optimizer)
     loss_scaler = NativeScaler()
 
