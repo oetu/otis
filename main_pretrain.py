@@ -24,9 +24,6 @@ import torch.backends.cudnn as cudnn
 import wandb
 # os.environ["WANDB__SERVICE_WAIT"] = "500"
 
-# assert timm.__version__ == "0.3.2"  # version check
-import timm.optim.optim_factory as optim_factory
-
 from util.dataset import TimeSeriesDataset
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
@@ -248,14 +245,15 @@ def main(args):
                                       univariate=args.univariate,
                                       train=True, 
                                       args=args)
-    dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
-                                    domain_offsets=dataset_train.offsets, 
-                                    univariate=args.univariate,
-                                    train=False, 
-                                    args=args)
-
     print("Training set size: ", len(dataset_train))
-    print("Validation set size: ", len(dataset_val))
+
+    if args.val_data_path:
+        dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
+                                        domain_offsets=dataset_train.offsets, 
+                                        univariate=args.univariate,
+                                        train=False, 
+                                        args=args)
+        print("Validation set size: ", len(dataset_val))
 
     if True:  # args.distributed:
         num_tasks = misc.get_world_size()
@@ -266,16 +264,17 @@ def main(args):
             dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True)
         # print("Sampler_train = %s" % str(sampler_train))
 
-        if args.dist_eval:
-            if len(dataset_val) % num_tasks != 0:
-                print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
-                      'This will slightly alter validation results as extra duplicate entries are added to achieve '
-                      'equal num of samples per-process.')
-            sampler_val = torch.utils.data.DistributedSampler(
-                dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)  # shuffle=True to reduce monitor bias
-        else:
-            sampler_val = torch.utils.data.SequentialSampler(dataset_val)
-        # print("Sampler_val = %s" % str(sampler_train))
+        if args.val_data_path:
+            if args.dist_eval:
+                if len(dataset_val) % num_tasks != 0:
+                    print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
+                        'This will slightly alter validation results as extra duplicate entries are added to achieve '
+                        'equal num of samples per-process.')
+                sampler_val = torch.utils.data.DistributedSampler(
+                    dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)  # shuffle=True to reduce monitor bias
+            else:
+                sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+            # print("Sampler_val = %s" % str(sampler_train))
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
 
@@ -305,16 +304,17 @@ def main(args):
         drop_last=False,
     )
 
-    data_loader_val = torch.utils.data.DataLoader(
-        dataset_val, 
-        sampler=sampler_val,
-        # shuffle=False,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        collate_fn=dataset_val.collate_fn,
-        pin_memory=args.pin_mem,
-        drop_last=False,
-    )
+    if args.val_data_path:
+        data_loader_val = torch.utils.data.DataLoader(
+            dataset_val, 
+            sampler=sampler_val,
+            # shuffle=False,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            collate_fn=dataset_val.collate_fn,
+            pin_memory=args.pin_mem,
+            drop_last=False,
+        )
 
     # online evaluation
     if args.online_evaluation:
@@ -344,7 +344,7 @@ def main(args):
         # print("Sampler_online_train = %s" % str(sampler_online_train))
 
         if args.dist_eval:
-            if len(dataset_val) % num_tasks != 0:
+            if len(dataset_online_val) % num_tasks != 0:
                 print('Warning: Enabling distributed online evaluation with an eval dataset not divisible '
                       'by process number. '
                       'This will slightly alter validation results as extra duplicate entries are added '
@@ -480,9 +480,9 @@ def main(args):
 
         assert {'pos_embed_x', 'pos_embed_y.weight'}.issubset(set(msg.missing_keys))
 
-    # partially freeze the model
     skip_list = []
     if args.pretrained_encoder and args.freeze_encoder:
+        # partially freeze the mode:
         # freeze patch_embed
         for n, p in model.patch_embed.named_parameters():
             p.requires_grad = False
@@ -538,7 +538,7 @@ def main(args):
         model_without_ddp = model.module
     
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
+    param_groups = misc.add_weight_decay_timm(model_without_ddp, args.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()
@@ -561,12 +561,15 @@ def main(args):
         train_stats, train_history = train_one_epoch(model, data_loader_train, optimizer, device, epoch, loss_scaler,
                                                      log_writer=log_writer, args=args)
 
-        val_stats, val_history = evaluate(data_loader_val, model, device, epoch, 
-                                          log_writer=log_writer, args=args)
+        eval_stats = train_stats
+        if args.val_data_path:
+            val_stats, val_history = evaluate(data_loader_val, model, device, epoch, 
+                                              log_writer=log_writer, args=args)
+            eval_stats = val_stats
 
         # online evaluation of the downstream task
         online_history = {}
-        if args.online_evaluation and epoch % 5 == 0:
+        if args.online_evaluation and epoch % 10 == 0:
             if args.online_evaluation_task == "classification":
                 online_estimator = LogisticRegression(class_weight='balanced', max_iter=2000)
             elif args.online_evaluation_task == "regression":
@@ -592,63 +595,63 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         elif args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
-            if early_stop.evaluate_decreasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
+            if early_stop.evaluate_decreasing_metric(val_metric=eval_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
 
-            if args.output_dir and val_stats[args.eval_criterion] <= max(best_eval_scores['eval_criterion']):
+            if args.output_dir and eval_stats[args.eval_criterion] <= max(best_eval_scores['eval_criterion']):
                 # save the best nb_ckpts_max checkpoints
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'])
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(val_stats[args.eval_criterion])
+                best_eval_scores['eval_criterion'].append(eval_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=eval_stats, 
                     evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         else:
-            if early_stop.evaluate_increasing_metric(val_metric=val_stats[args.eval_criterion]) and misc.is_main_process():
+            if early_stop.evaluate_increasing_metric(val_metric=eval_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
 
-            if args.output_dir and val_stats[args.eval_criterion] >= min(best_eval_scores['eval_criterion']):
+            if args.output_dir and eval_stats[args.eval_criterion] >= min(best_eval_scores['eval_criterion']):
                 # save the best nb_ckpts_max checkpoints
                 if best_eval_scores['count'] < best_eval_scores['nb_ckpts_max']:
                     best_eval_scores['count'] += 1
                 else:
                     best_eval_scores['eval_criterion'] = sorted(best_eval_scores['eval_criterion'], reverse=True)
                     best_eval_scores['eval_criterion'].pop()
-                best_eval_scores['eval_criterion'].append(val_stats[args.eval_criterion])
+                best_eval_scores['eval_criterion'].append(eval_stats[args.eval_criterion])
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=val_stats, 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=eval_stats, 
                     evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
         
-        best_stats['total_loss'] = min(best_stats['total_loss'], val_stats['total_loss'])
-        best_stats['loss'] = min(best_stats['loss'], val_stats['loss'])
-        best_stats['ncc'] = max(best_stats['ncc'], val_stats['ncc'])
-        best_stats['cos_sim'] = max(best_stats['cos_sim'], val_stats['cos_sim'])
-        best_stats['mse'] = min(best_stats['mse'], val_stats['mse'])
-        best_stats['mae'] = min(best_stats['mae'], val_stats['mae'])
+        best_stats['total_loss'] = min(best_stats['total_loss'], eval_stats['total_loss'])
+        best_stats['loss'] = min(best_stats['loss'], eval_stats['loss'])
+        best_stats['ncc'] = max(best_stats['ncc'], eval_stats['ncc'])
+        best_stats['cos_sim'] = max(best_stats['cos_sim'], eval_stats['cos_sim'])
+        best_stats['mse'] = min(best_stats['mse'], eval_stats['mse'])
+        best_stats['mae'] = min(best_stats['mae'], eval_stats['mae'])
 
         print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / ",
-              f"Mean Absolute Error (MAE) of the network on {len(dataset_val)} val samples: {val_stats['total_loss']:.4f} / ",
-              f"{val_stats['loss']:.4f} / {val_stats['ncc']:.2f} / {val_stats['cos_sim']:.2f} / {val_stats['mse']:.2f} / ",
-              f"{val_stats['mae']:.2f}")
+              f"Mean Absolute Error (MAE) of the network on {len((dataset_val if args.val_data_path else dataset_train))} val samples: {eval_stats['total_loss']:.4f} / ",
+              f"{eval_stats['loss']:.4f} / {eval_stats['ncc']:.2f} / {eval_stats['cos_sim']:.2f} / {eval_stats['mse']:.2f} / ",
+              f"{eval_stats['mae']:.2f}")
 
         print(f"Min Total Loss / Min Loss / Max NCC / Max Cosine Similarity / Min MSE / Min MAE: ",
               f"{best_stats['total_loss']:.4f} / {best_stats['loss']:.4f} / {best_stats['ncc']:.2f} / ", 
               f"{best_stats['cos_sim']:.2f} / {best_stats['mse']:.2f} / {best_stats['mae']:.2f}\n")
         
         total_time = time.time() - start_time
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()}, 
-                     **{f'val_{k}': v for k, v in val_stats.items()},
+        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
+                     **({f'val_{k}': v for k, v in val_stats.items()} if args.val_data_path else {}),
                      'n_parameters': n_parameters,
                      'epoch': epoch, 
                      'time_per_epoch' : total_time}
@@ -660,7 +663,11 @@ def main(args):
                 f.write(json.dumps(log_stats) + "\n")
         
         if args.wandb and misc.is_main_process():
-            wandb.log(train_history | val_history | online_history | {"Time per epoch [sec]": total_time})
+            log_data = {**train_history,
+                        **(val_history if args.val_data_path else {}),
+                        **online_history,
+                        "Time per epoch [sec]": total_time}
+            wandb.log(log_data)
 
     if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})

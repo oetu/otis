@@ -82,6 +82,7 @@ def train_one_epoch(model: torch.nn.Module,
         cos_sim_value = cos_sim.item()
         cos_sim_embed_value = cos_sim_embed.item()
         z_std_value = z_std.item()
+        total_loss_value = loss_value + args.ncc_weight * (1 - ncc_value) + args.cos_weight * cos_sim
 
         if not math.isfinite(loss_value) and misc.is_main_process():
             print("Loss is {}, stopping training".format(loss_value))
@@ -139,6 +140,50 @@ def train_one_epoch(model: torch.nn.Module,
 
         metric_logger.meters['mse'].update(mse_value, n=batch_size)
         metric_logger.meters['mae'].update(mae_value, n=batch_size)
+        
+        total_loss_value_reduce = misc.all_reduce_mean(total_loss_value)
+        loss_value_reduce = misc.all_reduce_mean(loss_value)
+        ncc_value_reduce = misc.all_reduce_mean(ncc_value)
+        cos_sim_value_reduce = misc.all_reduce_mean(cos_sim_value)
+        cos_sim_embed_value_reduce = misc.all_reduce_mean(cos_sim_embed_value)
+        z_std_value_reduce = misc.all_reduce_mean(z_std_value)
+        mse_value_reduce = misc.all_reduce_mean(mse_value)
+        mae_value_reduce = misc.all_reduce_mean(mae_value)
+
+        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
+            """ We use epoch_1000x as the x-axis in tensorboard.
+            This calibrates different curves when batch size changes.
+            """
+            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
+            log_writer.add_scalar('lr', lr, epoch_1000x)
+
+            log_writer.add_scalar('train/train_total_loss', total_loss_value_reduce, epoch_1000x)
+            log_writer.add_scalar('train/train_loss', loss_value_reduce, epoch_1000x)
+            log_writer.add_scalar('train/train_ncc', ncc_value_reduce, epoch_1000x)
+            log_writer.add_scalar('train/train_cos_sim', cos_sim_value_reduce, epoch_1000x)
+            log_writer.add_scalar('train/train_cos_sim_embed', cos_sim_embed_value_reduce, epoch_1000x)
+            log_writer.add_scalar('train/train_z_std', z_std_value_reduce, epoch_1000x)
+            # evaluation only on the masked patches
+            log_writer.add_scalar('train/train_mse', mse_value_reduce, epoch_1000x)
+            log_writer.add_scalar('train/train_mae', mae_value_reduce, epoch_1000x)
+
+        if args.wandb == True and (data_iter_step + 1) % accum_iter == 0:
+            """ We use epoch_1000x as the x-axis in tensorboard.
+            This calibrates different curves when batch size changes.
+            """
+            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
+            if misc.is_main_process():
+                wandb.log({"epoch_1000x": epoch_1000x,
+                           "lr": lr,
+                           "train_total_loss": total_loss_value_reduce,
+                           "train_loss": loss_value_reduce,
+                           "train_ncc": ncc_value_reduce,
+                           "train_cos_sim": cos_sim_value_reduce,
+                           "train_cos_sim_embed": cos_sim_embed_value_reduce,
+                           "train_z_std": z_std_value_reduce,
+                           # evaluation only on the masked patches
+                           "train_mse": mse_value_reduce,
+                           "train_mae": mae_value_reduce},step=epoch_1000x)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -146,32 +191,9 @@ def train_one_epoch(model: torch.nn.Module,
 
     train_stats = {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
-    # tensorboard
-    if log_writer is not None:
-        log_writer.add_scalar('train/train_total_loss', train_stats["total_loss"], epoch)
-        log_writer.add_scalar('train/train_loss', train_stats["loss"], epoch)
-        log_writer.add_scalar('train/train_ncc', train_stats["ncc"], epoch)
-        log_writer.add_scalar('train/train_cos_sim', train_stats["cos_sim"], epoch)
-        log_writer.add_scalar('train/train_cos_sim_embed', train_stats["cos_sim_embed"], epoch)
-        log_writer.add_scalar('train/train_z_std', train_stats["z_std"], epoch)
-        log_writer.add_scalar('lr', train_stats["lr"], epoch)
-        # evaluation only on the masked patches
-        log_writer.add_scalar('train/train_mse', train_stats["mse"], epoch)
-        log_writer.add_scalar('train/train_mae', train_stats["mae"], epoch)
-
     # wandb
     if args.wandb == True:
         training_history['epoch'] = epoch
-        training_history['train_total_loss'] = train_stats["total_loss"]
-        training_history['train_loss'] = train_stats["loss"]
-        training_history['train_ncc'] = train_stats["ncc"]
-        training_history['train_cos_sim'] = train_stats["cos_sim"]
-        training_history['train_cos_sim_embed'] = train_stats["cos_sim_embed"]
-        training_history['train_z_std'] = train_stats["z_std"]
-        training_history['lr'] = train_stats["lr"]
-        # evaluation only on the masked patches
-        training_history['train_mse'] = train_stats["mse"]
-        training_history['train_mae'] = train_stats["mae"]
 
         if (epoch % 10) == 0:
             steps = 1

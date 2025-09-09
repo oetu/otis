@@ -21,8 +21,8 @@ import torch.nn as nn
 import numpy as np
 
 from timm.models.vision_transformer import Block
-from timm.models.layers import trunc_normal_
-from timm.models.layers import Mlp
+from timm.layers.weight_init import trunc_normal_
+from timm.layers.mlp import Mlp
 
 from util.patch_embed import PatchEmbed
 from util.pos_embed import get_1d_sincos_pos_embed

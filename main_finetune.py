@@ -26,7 +26,7 @@ import wandb
 # os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 # assert timm.__version__ == "0.3.2" # version check
-from timm.models.layers import trunc_normal_
+from timm.layers.weight_init import trunc_normal_
 from timm.data.mixup import Mixup
 from timm.loss import SoftTargetCrossEntropy #, LabelSmoothingCrossEntropy
 

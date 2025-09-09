@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-from timm.data import Mixup
+from timm.data.mixup import Mixup
 
 import util.misc as misc
 import util.lr_sched as lr_sched
@@ -112,7 +112,24 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         metric_logger.update(lr=max_lr)
 
-        # loss_value_reduce = misc.all_reduce_mean(loss_value)
+        loss_value_reduce = misc.all_reduce_mean(loss_value)
+        if log_writer is not None and (data_iter_step + 1) % accum_iter == 0:
+            """ We use epoch_1000x as the x-axis in tensorboard.
+            This calibrates different curves when batch size changes.
+            """
+            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
+            log_writer.add_scalar('loss', loss_value_reduce, epoch_1000x)
+            log_writer.add_scalar('lr', max_lr, epoch_1000x)
+
+        if args.wandb == True and (data_iter_step + 1) % accum_iter == 0:
+            """ We use epoch_1000x as the x-axis in tensorboard.
+            This calibrates different curves when batch size changes.
+            """
+            epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
+            if misc.is_main_process():
+                wandb.log({"epoch_1000x": epoch_1000x,
+                           "loss": loss_value_reduce,
+                           "lr": max_lr}, step=epoch_1000x)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -159,14 +176,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         training_stats["r2"] = pcc if isinstance(pcc, float) else r2.mean(axis=-1)
 
     # tensorboard
-    if log_writer is not None: #and (data_iter_step + 1) % accum_iter == 0:
-        #""" We use epoch_1000x as the x-axis in tensorboard.
-        #This calibrates different curves when batch size changes.
-        #"""
-        #epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
-        log_writer.add_scalar('loss', training_stats["loss"], epoch)
-        log_writer.add_scalar('lr', training_stats["lr"], epoch)
-
+    if log_writer is not None: 
         if args.downstream_task == 'classification':
             log_writer.add_scalar('perf/train_f1', f1, epoch)
             log_writer.add_scalar('perf/train_precision', precision, epoch)
@@ -185,8 +195,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     # wandb
     if args.wandb == True:
         training_history['epoch'] = epoch
-        training_history['loss'] = training_stats["loss"]
-        training_history['lr'] = training_stats["lr"]
         if args.downstream_task == 'classification':
             training_history['f1'] = f1
             training_history['precision'] = precision
@@ -303,10 +311,18 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         acc = 100*accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         acc_balanced = 100*balanced_accuracy_score(y_true=labels, y_pred=logits.argmax(dim=-1))
         if args.nb_classes > 2:
-            auc = 100*roc_auc_score(y_true=labels, y_score=probs, average="macro", multi_class="ovr")
+            if len(torch.unique(labels)) > 2: 
+                # in case there is only one class in the batch 
+                auc = 100*roc_auc_score(y_true=labels, y_score=probs, average="macro", multi_class="ovr")
+            else:
+                auc = torch.nan
         else:
             auc = 100*roc_auc_score(y_true=labels, y_score=probs[:, 1], average="macro")
-        auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="macro")
+        if len(torch.unique(labels)) > 2:
+            # in case there is only one class in the batch
+            auprc = 100*average_precision_score(y_true=labels_onehot, y_score=probs, average="macro")
+        else:
+            auprc = torch.nan
         cohen = 100*cohen_kappa_score(y1=labels, y2=logits.argmax(dim=-1))
         
         test_stats["f1"] = f1
