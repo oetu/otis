@@ -65,6 +65,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     logits, labels = [], []
 
     for data_iter_step, (samples, targets, targets_mask, pos_embed_y) in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
+        start_time = time.time()
+
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
             lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
@@ -98,6 +100,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if (data_iter_step + 1) % accum_iter == 0:
             optimizer.zero_grad()
 
+        total_time = time.time() - start_time
+
         logits.append(outputs)
         labels.append(targets)
 
@@ -128,6 +132,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             epoch_1000x = int((data_iter_step / len(data_loader) + epoch) * 1000)
             if misc.is_main_process():
                 wandb.log({"epoch_1000x": epoch_1000x,
+                           "time_per_step[sec]": total_time,
                            "loss": loss_value_reduce,
                            "lr": max_lr}, step=epoch_1000x)
 
