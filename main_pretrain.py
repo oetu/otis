@@ -22,7 +22,7 @@ import torch
 import torch.backends.cudnn as cudnn
 # from torch.utils.tensorboard import SummaryWriter
 import wandb
-# os.environ["WANDB__SERVICE_WAIT"] = "500"
+os.environ["WANDB__SERVICE_WAIT"] = "500"
 
 from util.dataset import TimeSeriesDataset
 import util.misc as misc
