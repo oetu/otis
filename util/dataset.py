@@ -14,6 +14,7 @@ import math
 from collections import Counter
 
 import util.augmentations as augmentations
+import util.transformations as transformations
 
 
 class TimeSeriesDataset(Dataset):
@@ -157,6 +158,7 @@ class TimeSeriesDataset(Dataset):
                                            lower_bnd=self.args.crop_lower_bnd, 
                                            upper_bnd=self.args.crop_upper_bnd,
                                            resize=True),
+                # transformations.Normalization(),
                 augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
                 augmentations.Jitter(sigma=self.args.jitter_sigma),
                 augmentations.Rescaling(sigma=self.args.rescaling_sigma),
