@@ -22,7 +22,7 @@ import numpy as np
 
 from timm.models.vision_transformer import Block
 from timm.layers.weight_init import trunc_normal_
-from timm.layers.mlp import Mlp
+from timm.layers.mlp import Mlp, SwiGLU
 
 from util.patch_embed import PatchEmbed
 from util.pos_embed import get_1d_sincos_pos_embed
@@ -72,7 +72,8 @@ class OTiS(nn.Module):
         self.pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, embed_dim // 2, padding_idx=0) # +1 padding embed
 
         self.blocks = nn.ModuleList([
-            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer) # MLP with GELU activation
+            # Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, act_layer=nn.SiLU, mlp_layer=SwiGLU) # MLP with SwiGLU activation
             for i in range(depth)])
         
         self.norm = norm_layer(embed_dim)
@@ -115,6 +116,7 @@ class OTiS(nn.Module):
 
             self.decoder_blocks = nn.ModuleList([
                 Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.GELU, norm_layer=norm_layer)
+                # Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.SiLU, mlp_layer=SwiGLU, norm_layer=norm_layer) # MLP with SwiGLU activation
                 for i in range(decoder_depth)])
 
             self.decoder_norm = norm_layer(decoder_embed_dim)
