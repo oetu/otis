@@ -6,12 +6,10 @@ This is the official PyTorch implementation of our work [Towards Generalisable T
 </p>
 
 ## Environment Setup
-Run the following commands from the root directory of this project to setup the environment and install the `timm` library. Note that this command block is only executed once during the initial environment setup.
+Run the following commands from the root directory of this project to setup the environment. Note that this command block is only executed once during the initial environment setup.
 ```
 conda env create --file envs/otis.yaml
 conda activate otis
-git clone https://github.com/oetu/pytorch-image-models.git
-pip install -e pytorch-image-models
 ```
 
 Activate the conda environment before running OTiS.
