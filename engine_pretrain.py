@@ -63,7 +63,7 @@ def train_one_epoch(model: torch.nn.Module,
 
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
+            lr_sched.adjust_learning_rate_wsd(optimizer, data_iter_step / len(data_loader) + epoch, args)
 
         # push samples to device
         samples = samples.to(device, non_blocking=True)
@@ -328,30 +328,41 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
             train_embeddings.append(model.forward_encoder_all_patches(data, pos_embed_y))
 
     train_embeddings = torch.cat(train_embeddings, dim=0)[:, 1:, :].mean(dim=1) # globally average pooled token
-    train_embeddings = train_embeddings.cpu()
+    train_embeddings = train_embeddings.cpu().numpy()  # Convert to numpy for sklearn
     train_labels = torch.cat(train_labels, dim=0)
     train_labels = train_labels.cpu()
 
-    estimator.fit(train_embeddings, train_labels) # only fit with training data
-    
+    # Convert one-hot labels to class indices for fitting if needed
     if args.online_evaluation_task == "classification":
-        train_probs = torch.tensor(estimator.predict_proba(train_embeddings), dtype=torch.float16)
-        classifier_f1_train = f1_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="macro")
-        classifier_precision_train = precision_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="macro")
-        classifier_recall_train = recall_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1), average="macro")
-        classifier_acc_train = accuracy_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1))
-        classifier_acc_balanced_train = balanced_accuracy_score(y_true=train_labels, y_pred=train_probs.argmax(dim=-1))
+        train_labels_for_fit = train_labels.argmax(dim=-1).numpy() if train_labels.ndim > 1 and train_labels.shape[-1] > 1 else train_labels.numpy()
+    else:
+        train_labels_for_fit = train_labels.numpy()
+
+    estimator.fit(train_embeddings, train_labels_for_fit) # only fit with training data
+
+    if args.online_evaluation_task == "classification":
+        train_probs = estimator.predict_proba(train_embeddings)  # Keep as numpy, don't convert to torch
+        # Convert one-hot labels to class indices if needed
+        train_labels_indices = train_labels.argmax(dim=-1).numpy() if train_labels.ndim > 1 and train_labels.shape[-1] > 1 else train_labels.numpy()
+
+        classifier_f1_train = f1_score(y_true=train_labels_indices, y_pred=train_probs.argmax(axis=-1), average="macro")
+        classifier_precision_train = precision_score(y_true=train_labels_indices, y_pred=train_probs.argmax(axis=-1), average="macro")
+        classifier_recall_train = recall_score(y_true=train_labels_indices, y_pred=train_probs.argmax(axis=-1), average="macro")
+        classifier_acc_train = accuracy_score(y_true=train_labels_indices, y_pred=train_probs.argmax(axis=-1))
+        classifier_acc_balanced_train = balanced_accuracy_score(y_true=train_labels_indices, y_pred=train_probs.argmax(axis=-1))
         if args.online_num_classes > 2:
-            classifier_auc_train = roc_auc_score(y_true=train_labels, y_score=train_probs, average="macro", multi_class="ovr")
+            classifier_auc_train = roc_auc_score(y_true=train_labels_indices, y_score=train_probs, average="macro", multi_class="ovr")
         else:
-            classifier_auc_train = roc_auc_score(y_true=train_labels, y_score=train_probs[:, 1], average="macro")
-        classifier_auprc_train = average_precision_score(y_true=torch.nn.functional.one_hot(train_labels, num_classes=args.online_num_classes), y_score=train_probs, average="macro")
+            classifier_auc_train = roc_auc_score(y_true=train_labels_indices, y_score=train_probs[:, 1], average="macro")
+        # Use one-hot labels directly if already one-hot, otherwise convert
+        train_labels_onehot = train_labels.numpy() if train_labels.ndim > 1 and train_labels.shape[-1] > 1 else np.eye(args.online_num_classes)[train_labels.numpy()]
+        classifier_auprc_train = average_precision_score(y_true=train_labels_onehot, y_score=train_probs, average="macro")
     elif args.online_evaluation_task == "regression":
-        train_preds = torch.tensor(estimator.predict(train_embeddings), dtype=torch.float16)
-        classifier_rmse_train = np.float64(root_mean_squared_error(train_preds, train_labels, multioutput="raw_values"))
-        classifier_mae_train = np.float64(mean_absolute_error(train_preds, train_labels, multioutput="raw_values"))
-        classifier_pcc_train = np.concatenate([r_regression(train_preds[:, i].view(-1, 1), train_labels[:, i]) for i in range(train_labels.shape[-1])], axis=0)
-        classifier_r2_train = np.stack([r2_score(train_labels[:, i], train_preds[:, i]) for i in range(train_labels.shape[-1])], axis=0)
+        train_preds = estimator.predict(train_embeddings)  # Keep as numpy
+        classifier_rmse_train = np.float64(root_mean_squared_error(train_preds, train_labels.numpy(), multioutput="raw_values"))
+        classifier_mae_train = np.float64(mean_absolute_error(train_preds, train_labels.numpy(), multioutput="raw_values"))
+        classifier_pcc_train = np.concatenate([r_regression(train_preds[:, i].reshape(-1, 1), train_labels.numpy()[:, i]) for i in range(train_labels.shape[-1])], axis=0)
+        classifier_r2_train = np.stack([r2_score(train_labels.numpy()[:, i], train_preds[:, i]) for i in range(train_labels.shape[-1])], axis=0)
 
     # validation
     val_embeddings = []
@@ -366,28 +377,33 @@ def evaluate_online(estimator, model, device, train_dataloader, val_dataloader, 
             val_embeddings.append(model.forward_encoder_all_patches(data, pos_embed_y))
 
     val_embeddings = torch.cat(val_embeddings, dim=0)[:, 1:, :].mean(dim=1) # globally average pooled token
-    val_embeddings = val_embeddings.cpu()
+    val_embeddings = val_embeddings.cpu().numpy()  # Convert to numpy for sklearn
     val_labels = torch.cat(val_labels, dim=0)
     val_labels = val_labels.cpu()
-    
+
     if args.online_evaluation_task == "classification":
-        val_probs = torch.tensor(estimator.predict_proba(val_embeddings), dtype=torch.float16)
-        classifier_f1_val = f1_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="macro")
-        classifier_precision_val = precision_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="macro")
-        classifier_recall_val = recall_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1), average="macro")
-        classifier_acc_val = accuracy_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1))
-        classifier_acc_balanced_val = balanced_accuracy_score(y_true=val_labels, y_pred=val_probs.argmax(dim=-1))
+        val_probs = estimator.predict_proba(val_embeddings)  # Keep as numpy, don't convert to torch
+        # Convert one-hot labels to class indices if needed
+        val_labels_indices = val_labels.argmax(dim=-1).numpy() if val_labels.ndim > 1 and val_labels.shape[-1] > 1 else val_labels.numpy()
+
+        classifier_f1_val = f1_score(y_true=val_labels_indices, y_pred=val_probs.argmax(axis=-1), average="macro")
+        classifier_precision_val = precision_score(y_true=val_labels_indices, y_pred=val_probs.argmax(axis=-1), average="macro")
+        classifier_recall_val = recall_score(y_true=val_labels_indices, y_pred=val_probs.argmax(axis=-1), average="macro")
+        classifier_acc_val = accuracy_score(y_true=val_labels_indices, y_pred=val_probs.argmax(axis=-1))
+        classifier_acc_balanced_val = balanced_accuracy_score(y_true=val_labels_indices, y_pred=val_probs.argmax(axis=-1))
         if args.online_num_classes > 2:
-            classifier_auc_val = roc_auc_score(y_true=val_labels, y_score=val_probs, average="macro", multi_class="ovr")
+            classifier_auc_val = roc_auc_score(y_true=val_labels_indices, y_score=val_probs, average="macro", multi_class="ovr")
         else:
-            classifier_auc_val = roc_auc_score(y_true=val_labels, y_score=val_probs[:, 1], average="macro")
-        classifier_auprc_val = average_precision_score(y_true=torch.nn.functional.one_hot(val_labels, num_classes=args.online_num_classes), y_score=val_probs, average="macro")
+            classifier_auc_val = roc_auc_score(y_true=val_labels_indices, y_score=val_probs[:, 1], average="macro")
+        # Use one-hot labels directly if already one-hot, otherwise convert
+        val_labels_onehot = val_labels.numpy() if val_labels.ndim > 1 and val_labels.shape[-1] > 1 else np.eye(args.online_num_classes)[val_labels.numpy()]
+        classifier_auprc_val = average_precision_score(y_true=val_labels_onehot, y_score=val_probs, average="macro")
     elif args.online_evaluation_task == "regression":
-        val_preds = torch.tensor(estimator.predict(val_embeddings), dtype=torch.float16)
-        classifier_rmse_val = np.float64(root_mean_squared_error(val_preds, val_labels, multioutput="raw_values"))
-        classifier_mae_val = np.float64(mean_absolute_error(val_preds, val_labels, multioutput="raw_values"))
-        classifier_pcc_val = np.concatenate([r_regression(val_preds[:, i].view(-1, 1), val_labels[:, i]) for i in range(val_labels.shape[-1])], axis=0)
-        classifier_r2_val = np.stack([r2_score(val_labels[:, i], val_preds[:, i]) for i in range(val_labels.shape[-1])], axis=0)
+        val_preds = estimator.predict(val_embeddings)  # Keep as numpy
+        classifier_rmse_val = np.float64(root_mean_squared_error(val_preds, val_labels.numpy(), multioutput="raw_values"))
+        classifier_mae_val = np.float64(mean_absolute_error(val_preds, val_labels.numpy(), multioutput="raw_values"))
+        classifier_pcc_val = np.concatenate([r_regression(val_preds[:, i].reshape(-1, 1), val_labels.numpy()[:, i]) for i in range(val_labels.shape[-1])], axis=0)
+        classifier_r2_val = np.stack([r2_score(val_labels.numpy()[:, i], val_preds[:, i]) for i in range(val_labels.shape[-1])], axis=0)
 
     # stats
     if args.online_evaluation_task == "classification":
