@@ -133,7 +133,9 @@ def get_args_parser():
     parser.add_argument('--attention_pool', action='store_true', default=False)
     parser.add_argument('--cls_token', action='store_false', dest='global_pool',
                         help='Use class token instead of global pool for classification')
-    
+    parser.add_argument('--use_swiglu', action='store_true', default=False,
+                        help='Use SwiGLU activation in MLP layers (must match pretraining)')
+
     parser.add_argument('--ignore_pos_embed_y', action='store_true', default=False,
                         help='Ignore pre-trained position embeddings Y (spatial axis) from checkpoint')
     parser.add_argument('--freeze_pos_embed_y', action='store_true', default=False,
@@ -379,7 +381,8 @@ def main(args):
         masking_blockwise=args.masking_blockwise,
         mask_ratio=args.mask_ratio,
         mask_c_ratio=args.mask_c_ratio,
-        mask_t_ratio=args.mask_t_ratio
+        mask_t_ratio=args.mask_t_ratio,
+        use_swiglu=args.use_swiglu
     )
 
     new_patch_size = False

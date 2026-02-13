@@ -73,6 +73,11 @@ def get_args_parser():
     parser.add_argument('--patch_size', default=(1, 100), type=Tuple,
                         help='patch size')
 
+    parser.add_argument('--drop_path', type=float, default=0.1, metavar='PCT',
+                        help='Drop path rate for encoder (default: 0.1)')
+    parser.add_argument('--drop_path_decoder', type=float, default=0.0, metavar='PCT',
+                        help='Drop path rate for decoder (default: 0.0)')
+
     parser.add_argument('--separate_dec_pos_embed_y', action='store_true', default=False,
                         help='Use separate position embeddings Y for the decoder')
 
@@ -121,9 +126,9 @@ def get_args_parser():
     parser.add_argument('--lr', type=float, default=None, metavar='LR',
                         help='learning rate (absolute lr)')
     parser.add_argument('--blr', type=float, default=1e-3, metavar='LR',
-                        help='base learning rate: absolute_lr = base_lr * total_batch_size / 256')
-    parser.add_argument('--min_lr', type=float, default=0., metavar='LR',
-                        help='lower lr bound for cyclic schedulers that hit 0')
+                        help='base learning rate: absolute_lr = base_lr * total_batch_size / 32')
+    parser.add_argument('--min_lr', type=float, default=None, metavar='LR',
+                        help='lower lr bound for cyclic schedulers that hit 0 (should be 0.1x of peak lr)')
 
     parser.add_argument('--warmup_epochs', type=int, default=40, metavar='N',
                         help='epochs to warmup LR')
@@ -395,6 +400,8 @@ def main(args):
         include_forecasting=args.include_forecasting,
         forecasting_probability=args.forecasting_probability,
         forecasting_mask_ratio=args.forecasting_mask_ratio,
+        drop_path=args.drop_path,
+        drop_path_decoder=args.drop_path_decoder,
     )
 
     new_patch_size = False
@@ -527,6 +534,9 @@ def main(args):
     if args.lr is None:  # only base_lr is specified
         args.lr = args.blr * eff_batch_size / 32
 
+    if args.min_lr is None:
+        args.min_lr = args.lr * 0.1
+
     print("base lr: %.2e" % (args.lr * 32 / eff_batch_size))
     print("actual lr: %.2e" % args.lr)
 
@@ -538,7 +548,7 @@ def main(args):
         model_without_ddp = model.module
     
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = misc.add_weight_decay_timm(model_without_ddp, args.weight_decay)
+    param_groups = misc.add_weight_decay_timm_lrd(model_without_ddp, args.weight_decay, layer_decay=0.95)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()

@@ -34,13 +34,13 @@ class OTiS(nn.Module):
     """ 
         Open model for general time series analysis 
     """
-    def __init__(self, domains:dict, domain_weights:dict, domain_agnostic:str=False, 
+    def __init__(self, domains:dict, domain_weights:dict, domain_agnostic:str=False,
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
                  embed_dim=1024, depth=24, num_heads=16,
                  output_projection='decoder',
                  decoder_embed_dim=512, decoder_depth=8, decoder_num_heads=16, separate_dec_pos_embed_y=False,
                  head_mlp_ratio=4., head_dropout=0.1, head_activation=nn.GELU,
-                 mlp_ratio=4., norm_layer=nn.LayerNorm, 
+                 mlp_ratio=4., norm_layer=nn.LayerNorm, drop_path=0.1, drop_path_decoder=0.0,
                  norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False, contrastive_loss=False,
                  probabilistic_masking=False, include_forecasting=False, forecasting_probability=0.33, forecasting_mask_ratio=0.5,
                  downstream=None):
@@ -72,10 +72,10 @@ class OTiS(nn.Module):
         self.pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, embed_dim // 2, padding_idx=0) # +1 padding embed
 
         self.blocks = nn.ModuleList([
-            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer) # MLP with GELU activation
-            # Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, act_layer=nn.SiLU, mlp_layer=SwiGLU) # MLP with SwiGLU activation
+            # Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, drop_path=drop_path) # MLP with GELU activation
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, act_layer=nn.SiLU, mlp_layer=SwiGLU, drop_path=drop_path) # MLP with SwiGLU activation
             for i in range(depth)])
-        
+
         self.norm = norm_layer(embed_dim)
 
         # modify the attention operation to consider attention masks
@@ -115,8 +115,8 @@ class OTiS(nn.Module):
                 self.decoder_pos_embed_y = nn.Linear(embed_dim // 2, decoder_embed_dim // 2)
 
             self.decoder_blocks = nn.ModuleList([
-                Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.GELU, norm_layer=norm_layer)
-                # Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.SiLU, mlp_layer=SwiGLU, norm_layer=norm_layer) # MLP with SwiGLU activation
+                # Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.GELU, norm_layer=norm_layer, drop_path=drop_path_decoder)
+                Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.SiLU, mlp_layer=SwiGLU, norm_layer=norm_layer, drop_path=drop_path_decoder) # MLP with SwiGLU activation
                 for i in range(decoder_depth)])
 
             self.decoder_norm = norm_layer(decoder_embed_dim)

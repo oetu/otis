@@ -19,6 +19,7 @@ import torch.nn as nn
 
 import timm.models.vision_transformer
 from timm.layers.weight_init import trunc_normal_
+from timm.layers.mlp import SwiGLU
 
 from util.patch_embed import PatchEmbed
 from util.pos_embed import get_1d_sincos_pos_embed
@@ -28,8 +29,14 @@ from util.transformer import Attention, DyT
 class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
     """ Vision Transformer with support for global average pooling
     """
-    def __init__(self, img_size, domains:dict, patch_size=(1, 100), global_pool=False, attention_pool=False, 
-                 masking_blockwise=False, mask_ratio=0.0, mask_c_ratio=0.0, mask_t_ratio=0.0, **kwargs):
+    def __init__(self, img_size, domains:dict, patch_size=(1, 100), global_pool=False, attention_pool=False,
+                 masking_blockwise=False, mask_ratio=0.0, mask_c_ratio=0.0, mask_t_ratio=0.0,
+                 use_swiglu=False, **kwargs):
+        # Set activation function based on use_swiglu flag
+        if use_swiglu:
+            kwargs['act_layer'] = nn.SiLU
+            kwargs['mlp_layer'] = SwiGLU
+
         super(VisionTransformer, self).__init__(**kwargs)
 
         embed_dim = kwargs['embed_dim']
@@ -247,23 +254,26 @@ class VisionTransformer(timm.models.vision_transformer.VisionTransformer):
         return x
 
 
-def vit_baseDeep_patchX(**kwargs):
+def vit_baseDeep_patchX(use_swiglu=False, **kwargs):
     model = VisionTransformer(
         embed_dim=192, depth=12, num_heads=3, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        use_swiglu=use_swiglu,
         **kwargs)
     return model
 
-def vit_largeDeep_patchX(**kwargs):
+def vit_largeDeep_patchX(use_swiglu=False, **kwargs):
     model = VisionTransformer(
         embed_dim=384, depth=18, num_heads=6, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        use_swiglu=use_swiglu,
         **kwargs)
     return model
 
-def vit_hugeDeep_patchX(**kwargs):
+def vit_hugeDeep_patchX(use_swiglu=False, **kwargs):
     model = VisionTransformer(
         embed_dim=576, depth=24, num_heads=8, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        use_swiglu=use_swiglu,
         **kwargs)
     return model
