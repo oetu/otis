@@ -491,3 +491,57 @@ def add_weight_decay_timm(model, weight_decay=1e-5, skip_list=()):
     return [
         {'params': no_decay, 'weight_decay': 0.},
         {'params': decay, 'weight_decay': weight_decay}]
+
+
+def add_weight_decay_timm_lrd(model, weight_decay=1e-5, skip_list=(), layer_decay=.95):
+    """
+    with layer-wise lr decay (LRD) for ViTs, following BEiT
+    """
+
+    num_layers = len(model.blocks) + 1
+    layer_scales = list(layer_decay ** (num_layers - i) for i in range(num_layers + 1))
+
+    param_groups = {}
+
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue  # frozen weights
+
+        # Determine weight decay
+        if len(param.shape) == 1 or name.endswith(".bias") or name in skip_list:
+            g_decay = "no_decay"
+            this_decay = 0.
+        else:
+            g_decay = "decay"
+            this_decay = weight_decay
+
+        # Determine layer ID
+        layer_id = get_layer_id_for_vit(name, num_layers)
+        group_name = "layer_%d_%s" % (layer_id, g_decay)
+
+        if group_name not in param_groups:
+            this_scale = layer_scales[layer_id]
+            param_groups[group_name] = {
+                "lr_scale": this_scale,
+                "weight_decay": this_decay,
+                "params": [],
+            }
+
+        param_groups[group_name]["params"].append(param)
+
+    return list(param_groups.values())
+
+
+def get_layer_id_for_vit(name, num_layers):
+    """
+    Assign a parameter with its layer id
+    Following BEiT: https://github.com/microsoft/unilm/blob/master/beit/optim_factory.py#L33
+    """
+    if name in ['cls_token', 'pos_embed', 'pos_embed_x', 'pos_embed_y']:
+        return 0
+    elif name.startswith('patch_embed'):
+        return 0
+    elif name.startswith('blocks'):
+        return int(name.split('.')[1]) + 1
+    else:
+        return num_layers
