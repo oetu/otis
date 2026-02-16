@@ -287,7 +287,7 @@ class OTiS(nn.Module):
         """
         N, L, D = x.shape  # batch, length, dim
         if self.probabilistic_masking:
-            masking_ratio = mask_ratio - 0.05 + 0.1 * np.abs(np.random.normal(loc=0.0, scale=0.65))
+            masking_ratio = mask_ratio + np.random.uniform(0, 0.15)
         else:
             masking_ratio = mask_ratio
         len_keep = math.ceil(L * (10 - 10 * masking_ratio)/10) # factor 10 to compensate float precision 
@@ -296,7 +296,7 @@ class OTiS(nn.Module):
             if self.include_forecasting:
                 # pretraining
                 if self.probabilistic_masking:
-                    forecasting_ratio = self.forecasting_mask_ratio - 0.05 + 0.1 * np.abs(np.random.normal(loc=0.0, scale=0.65))
+                    forecasting_ratio = self.forecasting_mask_ratio + np.random.uniform(0, 0.15)
                 else:
                     forecasting_ratio = self.forecasting_mask_ratio
             else:
