@@ -1,5 +1,5 @@
-# OTiS: An open model for general time series analysis
-This is the official PyTorch implementation of our work [Towards Generalisable Time Series Understanding Across Domains](https://arxiv.org/abs/2410.07299) (2024).
+# OTIS: Learning High-Quality Time Series Features With Tiny Encoders
+This is the official PyTorch implementation of our work [OTIS: Learning High-Quality Time Series Features With Tiny Encoders](https://arxiv.org/abs/2410.07299) (2026).
 
 
 ## Environment Setup
@@ -60,30 +60,54 @@ Use the `--eval` flag. For classification tasks, e.g. run the following command.
 python3 main_finetune.py --eval --resume $checkpoint --num_workers $num_workers --seed $sd --downstream_task classification --nb_classes $nb_classes --input_channels $input_channels --input_variates $input_variates --time_steps $time_steps --patch_height $patch_height --patch_width $patch_width --model $model --batch_size $batch_size --epochs $epochs --blr $blr --warmup_epochs $warmup_epochs --data_path $data_path --labels_path $labels_path --val_data_path $val_data_path --val_labels_path $val_labels_path --output_dir $output_dir
 ```
 
-## Results
+## Quantitative Results
+### Deployment
+<p align="center">
+  <img src="./figs/pareto_frontier.png?raw=true" width=100%>
+</p>
+
 ### Discriminative Capabilites
 <p align="center">
-  <img src="./figs/discriminative_tasks.png?raw=true" width=100%>
+  <img src="./figs/classification.png?raw=true" width=100%>
+</p>
+
+<p align="center">
+  <img src="./figs/regression.png?raw=true" width=100%>
 </p>
 
 ### Generative Capabilities
 <p align="center">
-  <img src="./figs/generative_tasks.png?raw=true" width=100%>
+  <img src="./figs/forecasting.png?raw=true" width=100%>
 </p>
 
-### Consistent Representation Space
+### Few-Shot Capabilities 
 <p align="center">
-  <img src="./figs/time_series_understanding.png?raw=true" width=100%>
+  <img src="./figs/frozen_encoder_classification.png?raw=true" width=100%>
+</p>
+
+<p align="center">
+  <img src="./figs/frozen_encoder_forecasting.png?raw=true" width=100%>
+</p>
+
+## Qualitative results
+### Isolating Multi-Domain Data Heterogeneity
+<p align="center">
+  <img src="./figs/variate_embeddings.png?raw=true" width=100%>
+</p>
+
+### Learning A Consistent Representation Space
+<p align="center">
+  <img src="./figs/representation_space.png?raw=true" width=100%>
 </p>
 
 ## Citation
 Please cite the following work:
 ```
-@article{turgut2024towards,
-  title={Towards Generalisable Time Series Understanding Across Domains},
+@article{turgut2026otis,
+  title={OTIS: Learning High-Quality Time Series Features With Tiny Encoders},
   author={Turgut, {\"O}zg{\"u}n and M{\"u}ller, Philip and Menten, Martin J and Rueckert, Daniel},
   journal={arXiv preprint arXiv:2410.07299},
-  year={2024}
+  year={2026}
 }
 ```
 
