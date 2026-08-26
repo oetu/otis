@@ -17,6 +17,8 @@ util/masking.py
 main_finetune_baselines.py
 models_baselines.py
 
+eeg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

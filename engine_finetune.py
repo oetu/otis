@@ -38,7 +38,6 @@ from timm.data.mixup import Mixup
 
 import util.misc as misc
 import util.lr_sched as lr_sched
-import util.plot as plot
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -69,7 +68,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         # we use a per iteration (instead of per epoch) lr scheduler
         if data_iter_step % accum_iter == 0:
-            lr_sched.adjust_learning_rate(optimizer, data_iter_step / len(data_loader) + epoch, args)
+            global_step = epoch * len(data_loader) + data_iter_step
+            lr_sched.adjust_learning_rate_schedule(optimizer, global_step,
+                                                   args.epochs * len(data_loader), args)
 
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
@@ -276,11 +277,6 @@ def evaluate(data_loader, model, device, epoch, log_writer=None, args=None):
         labels.append(target)
 
         metric_logger.update(loss=loss.item())
-
-    if args.wandb and args.plot_attention_map:
-        attention_map = model.blocks[-1].attn.attn_map
-        idx = 1 if args.batch_size > 1 else 0
-        test_history["Attention"] = plot.plot_attention(images, attention_map, idx)
 
     if args.save_embeddings and misc.is_main_process():
         embeddings = torch.cat(embeddings, dim=0).to(device="cpu", dtype=torch.float32).detach() # (B, D)

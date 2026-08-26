@@ -43,8 +43,14 @@ class OTiS(nn.Module):
                  mlp_ratio=4., norm_layer=nn.LayerNorm, drop_path=0.1, drop_path_decoder=0.0,
                  norm_pix_loss=False, masked_patch_loss=False, domain_weighted_loss=False, contrastive_loss=False,
                  probabilistic_masking=False, include_forecasting=False, forecasting_probability=0.33, forecasting_mask_ratio=0.5,
+                 use_swiglu=False,
                  downstream=None):
         super().__init__()
+
+        # Set activation / MLP layer based on use_swiglu flag (mirrors models_vit)
+        self.use_swiglu = use_swiglu
+        _act_layer = nn.SiLU if use_swiglu else nn.GELU
+        _mlp_layer = SwiGLU if use_swiglu else Mlp
 
         # --------------------------------------------------------------------------
         # OTiS encoder specifics
@@ -72,8 +78,8 @@ class OTiS(nn.Module):
         self.pos_embed_y = nn.Embedding(total_num_embeddings_y + 1, embed_dim // 2, padding_idx=0) # +1 padding embed
 
         self.blocks = nn.ModuleList([
-            # Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, drop_path=drop_path) # MLP with GELU activation
-            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, act_layer=nn.SiLU, mlp_layer=SwiGLU, drop_path=drop_path) # MLP with SwiGLU activation
+            # MLP with SwiGLU activation if use_swiglu else MLP with GELU activation
+            Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer, act_layer=_act_layer, mlp_layer=_mlp_layer, drop_path=drop_path)
             for i in range(depth)])
 
         self.norm = norm_layer(embed_dim)
@@ -115,8 +121,8 @@ class OTiS(nn.Module):
                 self.decoder_pos_embed_y = nn.Linear(embed_dim // 2, decoder_embed_dim // 2)
 
             self.decoder_blocks = nn.ModuleList([
-                # Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.GELU, norm_layer=norm_layer, drop_path=drop_path_decoder)
-                Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=nn.SiLU, mlp_layer=SwiGLU, norm_layer=norm_layer, drop_path=drop_path_decoder) # MLP with SwiGLU activation
+                # MLP with SwiGLU activation if use_swiglu else MLP with GELU activation
+                Block(decoder_embed_dim, decoder_num_heads, mlp_ratio, qkv_bias=True, act_layer=_act_layer, mlp_layer=_mlp_layer, norm_layer=norm_layer, drop_path=drop_path_decoder)
                 for i in range(decoder_depth)])
 
             self.decoder_norm = norm_layer(decoder_embed_dim)
@@ -853,6 +859,116 @@ class OTiS(nn.Module):
 
         return loss_batch, ncc_batch, imgs_hat
 
+    def forward_encoder_collect_patch_norms(self, x, attn_mask):
+        """Diagnostic forward pass: all patches visible, recording per-layer
+        patch-token L2 norms. CLS is stripped from the returned norms.
+
+        Builds ``pos_embed_y`` internally from ``attn_mask.shape`` using raw
+        variate indices 1..V (no domain offset) — the caller only needs
+        samples + attn_mask.
+
+        Returns:
+            norms_per_layer: list of (B, N) tensors (pre-block-0, post each
+                             block, post final norm) — CLS excluded.
+            valid_mask:      (B, N) 0/1 flattened attn_mask.
+            latent:          (B, 1+N, D) final encoder output (CLS included).
+        """
+        B = x.shape[0]
+        V = attn_mask.shape[1]
+        T = attn_mask.shape[2]
+
+        # embed patches + add pos embeds (mirrors forward_encoder_all_patches)
+        x = self.patch_embed(x)
+
+        pos_embed_y = (torch.arange(V, device=x.device, dtype=torch.long)
+                       .view(1, V, 1).expand(B, V, T).contiguous())
+
+        pos_embed_x = self.pos_embed_x
+        pos_embed_x = torch.nn.functional.pad(pos_embed_x, (x.shape[1]//2, 0), "constant", 0)
+        pos_embed_x_batch = torch.permute(pos_embed_x, (0, 2, 1)).unsqueeze(-2)
+        pos_embed_x_batch = pos_embed_x_batch[..., 1:x.shape[-1]+1]
+        pos_embed_x_batch = pos_embed_x_batch.expand(-1, -1, x.shape[2], -1)
+        x = x + pos_embed_x_batch
+
+        pos_embed_y_batch = self.pos_embed_y(pos_embed_y)
+        pos_embed_y_batch = torch.nn.functional.pad(pos_embed_y_batch, (0, x.shape[1]//2), "constant", 0)
+        pos_embed_y_batch = torch.permute(pos_embed_y_batch, (0, 3, 1, 2))
+        x = x + pos_embed_y_batch
+
+        x = x.flatten(2).transpose(1, 2)
+
+        cls_token = self.cls_token + pos_embed_x[:, :1, :]
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+
+        attn_mask_all = torch.cat(
+            (torch.ones(size=(attn_mask.shape[0], 1), device=x.device),
+             attn_mask.flatten(1)), dim=1)
+
+        norms = [x[:, 1:, :].float().norm(dim=-1)]
+        for blk in self.blocks:
+            x = blk(x, attn_mask_all)
+            norms.append(x[:, 1:, :].float().norm(dim=-1))
+        x = self.norm(x)
+        norms.append(x[:, 1:, :].float().norm(dim=-1))
+
+        valid_mask = attn_mask.flatten(1)
+        return norms, valid_mask, x
+
+    def forward_decoder_collect_patch_norms(self, x, attn_mask):
+        """Diagnostic decoder forward: all patches visible (no mask tokens
+        since the encoder already produced a full 1+N latent in the
+        companion encoder diagnostic), recording per-layer patch-token L2
+        norms. CLS is stripped from the returned norms.
+        """
+        B = x.shape[0]
+        V = attn_mask.shape[1]
+        T = attn_mask.shape[2]
+
+        x = self.decoder_embed(x)
+
+        cls_token = x[:, :1, :]
+        patches = torch.permute(x[:, 1:, :], (0, 2, 1))
+        patches = patches.view(patches.shape[0], patches.shape[1], attn_mask.shape[-2], -1)
+
+        pos_embed_y = (torch.arange(V, device=x.device, dtype=torch.long)
+                       .view(1, V, 1).expand(B, V, T).contiguous())
+
+        decoder_pos_embed_x = self.decoder_pos_embed_x
+        decoder_pos_embed_x = torch.nn.functional.pad(decoder_pos_embed_x, (patches.shape[1]//2, 0), "constant", 0)
+        decoder_pos_embed_x_batch = torch.permute(decoder_pos_embed_x, (0, 2, 1)).unsqueeze(-2)
+        decoder_pos_embed_x_batch = decoder_pos_embed_x_batch[..., 1:patches.shape[-1]+1]
+        decoder_pos_embed_x_batch = decoder_pos_embed_x_batch.expand(-1, -1, patches.shape[2], -1)
+        patches = patches + decoder_pos_embed_x_batch
+
+        if self.separate_dec_pos_embed_y:
+            decoder_pos_embed_y_batch = self.decoder_pos_embed_y(pos_embed_y)
+        else:
+            decoder_pos_embed_y_batch = self.decoder_pos_embed_y(self.pos_embed_y(pos_embed_y))
+        decoder_pos_embed_y_batch = torch.nn.functional.pad(decoder_pos_embed_y_batch, (0, patches.shape[1]//2), "constant", 0)
+        decoder_pos_embed_y_batch = torch.permute(decoder_pos_embed_y_batch, (0, 3, 1, 2))
+        patches = patches + decoder_pos_embed_y_batch
+
+        cls_token = cls_token + decoder_pos_embed_x[:, :1, :]
+
+        patches = patches.flatten(2).transpose(1, 2)
+
+        x = torch.cat((cls_token, patches), dim=1)
+
+        attn_mask_all = torch.cat(
+            (torch.ones(size=(attn_mask.shape[0], 1), device=x.device),
+             attn_mask.flatten(1)), dim=1)
+
+        norms = [x[:, 1:, :].float().norm(dim=-1)]
+        for blk in self.decoder_blocks:
+            x = blk(x, attn_mask_all)
+            norms.append(x[:, 1:, :].float().norm(dim=-1))
+        x = self.decoder_norm(x)
+        norms.append(x[:, 1:, :].float().norm(dim=-1))
+
+        valid_mask = attn_mask.flatten(1)
+        return norms, valid_mask
+
     def forward(self, imgs, attn_mask, pos_embed_y, domain, mask_ratio=0.75):
         """
         imgs: [N, C, H, W]
@@ -920,6 +1036,24 @@ def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.5
         **kwargs)
     return model
 
+def otis_smallDeep_patchX_dec160d4b(**kwargs):   # nb_params: 14.77M encoder, 1.71M decoder
+    model = OTiS(
+        embed_dim=256, depth=14, num_heads=4,                               # dim=64 per head
+        decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
+        mlp_ratio=4, 
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        **kwargs)
+    return model
+
+def otis_mediumDeep_patchX_dec160d4b(**kwargs):  # nb_params: 25.30M encoder, 1.71M decoder
+    model = OTiS(
+        embed_dim=256, depth=24, num_heads=4,                               # dim=64 per head
+        decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
+        mlp_ratio=4, 
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        **kwargs)
+    return model
+
 def otis_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.74M decoder
     model = OTiS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
@@ -933,6 +1067,15 @@ def otis_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.
     model = OTiS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
+        mlp_ratio=4, 
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        **kwargs)
+    return model
+
+def otis_xlargeDeep_patchX_dec160d4b(**kwargs):  # nb_params: 77.30M encoder, 1.74M decoder
+    model = OTiS(
+        embed_dim=448, depth=24, num_heads=7,                               # dim=64 per head
+        decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
         norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         **kwargs)
@@ -960,8 +1103,13 @@ def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0
 otis_baseDeep_dec160d4b_patchX = otis_baseDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_baseDeep_dec128d2b_patchX = otis_baseDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
 
+otis_smallDeep_dec160d4b_patchX = otis_smallDeep_patchX_dec160d4b   # decoder: 160 dim, 4 blocks
+otis_mediumDeep_dec160d4b_patchX = otis_mediumDeep_patchX_dec160d4b # decoder: 160 dim, 4 blocks
+
 otis_largeDeep_dec160d4b_patchX = otis_largeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_largeDeep_dec128d2b_patchX = otis_largeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
+
+otis_xlargeDeep_dec160d4b_patchX = otis_xlargeDeep_patchX_dec160d4b # decoder: 160 dim, 4 blocks
 
 otis_hugeDeep_dec160d4b_patchX = otis_hugeDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_hugeDeep_dec128d2b_patchX = otis_hugeDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks

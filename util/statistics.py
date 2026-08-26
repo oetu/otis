@@ -119,3 +119,43 @@ def masked_var(tensor, attn_mask=None, dim=None, keep_dim=False):
             return torch.sum(squared_deviations) / (torch.sum(attn_mask.unsqueeze(-1).repeat(1, 1, tensor.shape[-1])) - 1 + 1e-9)
         else:
             return torch.sum(squared_deviations, dim=dim, keepdim=keep_dim) / (torch.sum(attn_mask.unsqueeze(-1).repeat(1, 1, tensor.shape[-1]), dim=dim, keepdim=keep_dim) - 1 + 1e-9)
+
+def rankme(z: torch.Tensor, eps: float = 1e-7) -> torch.Tensor:
+    """
+    RankMe — effective-rank diagnostic of self-supervised representations.
+
+    Computes the exponentiated Shannon entropy of the singular-value spectrum:
+        RankMe(Z) = exp(-Σ_i p_i log p_i),    p_i = σ_i(Z) / ‖σ(Z)‖_1 + ε
+    Bounded in [1, min(n, d)]. Higher = more directions used = less collapsed.
+
+    Reference: Garrido, Balestriero, Najman, LeCun.
+        "RankMe: Assessing the Downstream Performance of Pretrained
+         Self-Supervised Representations by Their Rank", ICML 2023.
+
+    Parameters
+    ----------
+    z : (..., D) tensor of token embeddings (raw, un-normalised).
+        Higher-rank inputs are flattened to (N, D); D is the last dim.
+    eps : numerical stabiliser inside the log/division.
+
+    Returns
+    -------
+    scalar tensor on z.device.
+    """
+    if z.dim() > 2:
+        z = z.reshape(-1, z.shape[-1])
+    # eigvalsh of the smaller-side Gram matrix avoids a full SVD; cuSOLVER prefers
+    # fp32 to bf16/fp16, so we cast. Wrapped in no_grad: this is a diagnostic and
+    # backward through eigvalsh is unstable near degenerate spectra.
+    with torch.no_grad():
+        z = z.float()
+        n, d = z.shape
+        if n >= d:
+            gram = z.T @ z                                # (d, d)
+        else:
+            gram = z @ z.T                                # (n, n)
+        evals = torch.linalg.eigvalsh(gram).clamp(min=0)
+        singular = evals.sqrt()
+        p = singular / (singular.sum() + eps)
+        entropy = -(p * (p + eps).log()).sum()
+        return entropy.exp()

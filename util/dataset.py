@@ -6,6 +6,10 @@
 # --------------------------------------------------------
 from typing import Any, Tuple, Dict
 
+import os
+
+import numpy as np
+
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -244,3 +248,167 @@ class TimeSeriesDataset(Dataset):
         pos_embed_y = torch.stack([pos_embed_y[idx] for idx, sample in enumerate(batch) for i in range(len(sample[0]))], dim=0)
 
         return data, label, label_mask, torch.LongTensor(pos_embed_y)
+
+
+class TimeSeriesDatasetMmap(Dataset):
+    """
+    Memory-mapped, multi-domain time series dataset — drop-in replacement
+    for :class:`TimeSeriesDataset` that reads the mmap directory format
+    produced by ``util.preprocess`` (``data.bin`` + ``index.npy``
+    + ``domains.npy`` + ``domain_names.npy``).
+
+    Per-sample shapes can vary; ``self.domains`` collapses each domain to
+    its observed max ``(V, T)`` so that ``pos_embed_y`` has enough slots.
+    """
+
+    def __init__(self, data_path: str, labels_path: str = None, labels_mask_path: str = None,
+                 downstream_task: str = None, weighted_loss: bool = False,
+                 domain_offsets: Dict = None, domain_agnostic: bool = False,
+                 univariate: bool = False,
+                 train: bool = False,
+                 test: bool = False,
+                 N_val: int = 1,
+                 args=None,
+                 **kwargs) -> None:
+        # Metadata (tiny, loaded eagerly)
+        self.index = np.load(os.path.join(data_path, "index.npy"))        # (N, 3) [offset, V, T]
+        domain_ids = np.load(os.path.join(data_path, "domains.npy"))      # (N,) int
+        domain_names = np.load(os.path.join(data_path, "domain_names.npy"), allow_pickle=True)
+        # Flat float32 binary
+        self.fp = np.memmap(os.path.join(data_path, "data.bin"), dtype=np.float32, mode="r")
+
+        N = len(self.index)
+        self.domain_ids = domain_ids.astype(np.int64)
+        self.domain_names = [str(n) for n in domain_names]
+
+        # Collapse each domain to its observed max (V, T)
+        max_shape = {}
+        for i in range(N):
+            name = self.domain_names[self.domain_ids[i]]
+            V_i, T_i = int(self.index[i, 1]), int(self.index[i, 2])
+            if name not in max_shape or (V_i, T_i) > max_shape[name]:
+                max_shape[name] = (max(max_shape.get(name, (0, 0))[0], V_i),
+                                   max(max_shape.get(name, (0, 0))[1], T_i))
+
+        # Per-sample domain descriptor reuses the collapsed max shape so
+        # the ``set`` dedup keeps exactly one entry per domain.
+        self.domain = [(self.domain_names[self.domain_ids[i]],
+                        torch.Size([1, max_shape[self.domain_names[self.domain_ids[i]]][0],
+                                    max_shape[self.domain_names[self.domain_ids[i]]][1]]))
+                       for i in range(N)]
+
+        self.univariate = univariate
+        self.domain_agnostic = True if self.univariate else domain_agnostic
+
+        self.domains = {d: s for d, s in sorted(list(set(self.domain)))}
+
+        # Domain weights
+        domain_list = [m[0] for m in self.domain]
+        unique_domains = list(set(domain_list))
+        self.domain_weights = {}
+        counts = Counter(domain_list)
+        total = len(domain_list)
+        num_unique = len(unique_domains)
+        for mod in unique_domains:
+            w = math.sqrt(total / (num_unique * counts[mod]))
+            self.domain_weights[mod] = torch.tensor(w, dtype=torch.float32)
+
+        # pos_embed_y offsets
+        self.offsets = {}
+        if domain_offsets is None:
+            offset = 0
+            for d, shape in self.domains.items():
+                self.offsets[d] = offset
+                if not self.domain_agnostic:
+                    offset += shape[-2]
+        else:
+            self.offsets = domain_offsets
+
+        # Labels
+        if labels_path:
+            self.labels = torch.load(labels_path, map_location=torch.device('cpu'), weights_only=False)
+        else:
+            self.labels = torch.zeros(size=(N,))
+        if labels_mask_path:
+            self.labels_mask = torch.load(labels_mask_path, map_location=torch.device('cpu'), weights_only=False)
+        else:
+            self.labels_mask = torch.ones_like(self.labels)
+
+        self.downstream_task = downstream_task
+        self.weighted_loss = weighted_loss
+        self.class_weights = None
+        if self.downstream_task == "classification" and weighted_loss:
+            self.class_weights = torch.sqrt(len(self.labels) / self.labels.argmax(-1).unique(return_counts=True)[-1])
+
+        self.train = train
+        self.test = test
+        self.N_val = N_val
+        self.args = args
+
+    def set_domain_offsets(self, domain_offsets: Dict = None):
+        self.offsets = domain_offsets
+
+    def _load_sample(self, idx):
+        o, V, T = int(self.index[idx, 0]), int(self.index[idx, 1]), int(self.index[idx, 2])
+        arr = self.fp[o: o + V * T].reshape(V, T)
+        # (1, 1, V, T)
+        return torch.from_numpy(arr.copy()).unsqueeze(0).unsqueeze(0)
+
+    def __len__(self) -> int:
+        return len(self.index)
+
+    def __getitem__(self, idx) -> Tuple[Any, Any]:
+        data = self._load_sample(idx)  # (1, 1, V, T)
+        if self.univariate:
+            data = data.permute(2, 1, 0, 3)  # (V, 1, 1, T)
+
+        N = data.shape[0]
+
+        if self.train is False:
+            stride = 32
+            if self.test is True:
+                stride = 1
+            N_val = max(int(((data.shape[-1] - self.args.time_steps) / stride) + 1), 1)
+            if self.N_val != -1:
+                N_val = min(N_val, self.N_val)
+            N *= N_val
+            data_chunks = [data[..., i * stride:(i * stride + self.args.time_steps)] for i in range(N_val)]
+            data = torch.cat(data_chunks, dim=0)
+        else:
+            N_val = max(data.shape[-1] - self.args.time_steps + 1, 1)
+            if self.N_val != -1:
+                N_val = min(N_val, self.N_val)
+            N *= N_val
+            transform = transforms.Compose([
+                augmentations.CropResizing(fixed_resize_len=self.args.time_steps,
+                                           lower_bnd=self.args.crop_lower_bnd,
+                                           upper_bnd=self.args.crop_upper_bnd,
+                                           resize=True),
+                augmentations.FTSurrogate(phase_noise_magnitude=self.args.ft_surr_phase_noise, prob=0.5),
+                augmentations.Jitter(sigma=self.args.jitter_sigma),
+                augmentations.Rescaling(sigma=self.args.rescaling_sigma),
+            ])
+            data_chunks = [transform(data) for i in range(N_val)]
+            data = torch.cat(data_chunks, dim=0)
+
+        if self.downstream_task == 'regression':
+            label = self.labels[idx][..., self.args.lower_bnd:self.args.upper_bnd]
+            label_mask = self.labels_mask[idx][..., self.args.lower_bnd:self.args.upper_bnd]
+        else:
+            label = self.labels[idx].type(torch.LongTensor).argmax(dim=-1)
+            label_mask = torch.ones_like(label)
+
+        domain, _ = self.domain[idx]
+        domain_offset = self.offsets[domain]
+
+        label = [label for _ in range(N)]
+        label_mask = [label_mask for _ in range(N)]
+        domain = [domain for _ in range(N)]
+
+        return data, label, label_mask, self.args.patch_size, domain_offset, domain, self.args.time_steps, self.univariate
+
+    # Reuse TimeSeriesDataset's batch collation (format is identical).
+    # Accessing a staticmethod via the class unwraps the descriptor, so
+    # re-wrap with ``staticmethod`` to keep it unbound on the subclass.
+    collate_fn = staticmethod(TimeSeriesDataset.collate_fn)
+    collate_fn_ft = staticmethod(TimeSeriesDataset.collate_fn_ft)

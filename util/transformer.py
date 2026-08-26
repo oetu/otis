@@ -11,35 +11,47 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class Attention(nn.Module):
+    """
+    Multi-head self-attention built on PyTorch's fused scaled-dot-product
+    attention (Flash / mem-efficient kernels).
+
+    Note: SDPA does not expose the attention weights, so ``attn_map`` stays None.
+    """
     def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.):
         super().__init__()
         assert dim % num_heads == 0, 'dim should be divisible by num_heads'
         self.num_heads = num_heads
-        head_dim = dim // num_heads
-        self.scale = head_dim ** -0.5
-
-        self.mha = nn.MultiheadAttention(embed_dim=dim, num_heads=num_heads, dropout=attn_drop, batch_first=True)
+        self.head_dim = dim // num_heads
+        self.scale = self.head_dim ** -0.5
 
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
-        self.attn_map = None
+        self.attn_map = None  # SDPA does not expose attention weights
 
     def forward(self, x, attn_mask=None):
         B, N, D = x.shape # D = embed_dim
-        qkv = self.qkv(x).reshape(B, N, 3, D).permute(2, 0, 1, 3) # (QKV, B, N, D)
-        q, k, v = qkv.unbind(0)   # make torchscript happy (cannot use tensor as tuple) (B, N, D)
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)  # each (B, num_heads, N, head_dim)
 
         if attn_mask is not None:
-            attn_mask = 1 - attn_mask
-        attn, attn_weights = self.mha(q, k, v, key_padding_mask=attn_mask)
-        self.attn_map = attn_weights
+            # attn_mask: (B, N) with 1=keep, 0=mask -> boolean (B, 1, 1, N) where
+            # True means "attend to this position" (SDPA mask semantic).
+            attn_mask = attn_mask.bool().unsqueeze(1).unsqueeze(2)
 
+        attn = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=attn_mask,
+            dropout_p=self.attn_drop.p if self.training else 0.0,
+            scale=self.scale,
+        )  # (B, num_heads, N, head_dim)
+
+        attn = attn.transpose(1, 2).reshape(B, N, D)
         x = self.proj(attn)
         x = self.proj_drop(x)
         return x

@@ -262,9 +262,33 @@ def vit_baseDeep_patchX(use_swiglu=False, **kwargs):
         **kwargs)
     return model
 
+def vit_smallDeep_patchX(use_swiglu=False, **kwargs):
+    model = VisionTransformer(
+        embed_dim=256, depth=14, num_heads=4, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        use_swiglu=use_swiglu,
+        **kwargs)
+    return model
+
+def vit_mediumDeep_patchX(use_swiglu=False, **kwargs):
+    model = VisionTransformer(
+        embed_dim=256, depth=24, num_heads=4, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        use_swiglu=use_swiglu,
+        **kwargs)
+    return model
+
 def vit_largeDeep_patchX(use_swiglu=False, **kwargs):
     model = VisionTransformer(
         embed_dim=384, depth=18, num_heads=6, mlp_ratio=4, qkv_bias=True,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
+        use_swiglu=use_swiglu,
+        **kwargs)
+    return model
+
+def vit_xlargeDeep_patchX(use_swiglu=False, **kwargs):
+    model = VisionTransformer(
+        embed_dim=448, depth=24, num_heads=7, mlp_ratio=4, qkv_bias=True,
         norm_layer=partial(nn.LayerNorm, eps=1e-6), # alternatively DyT
         use_swiglu=use_swiglu,
         **kwargs)

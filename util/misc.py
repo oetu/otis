@@ -265,8 +265,9 @@ def init_distributed_mode(args):
 class NativeScalerWithGradNormCount:
     state_dict_key = "amp_scaler"
 
-    def __init__(self):
-        self._scaler = torch.amp.GradScaler("cuda")
+    def __init__(self, amp_dtype: str = 'fp16'):
+        # bf16 autocast doesn't need loss scaling; disable the scaler so it is a no-op.
+        self._scaler = torch.amp.GradScaler("cuda", enabled=(amp_dtype == 'fp16'))
 
     def __call__(self, loss, optimizer, clip_grad=None, parameters=None, create_graph=False, update_grad=True):
         self._scaler.scale(loss).backward(create_graph=create_graph)
@@ -323,7 +324,7 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, nb
         os.remove(os.path.join(output_dir, file_names[-1]))
 
     if loss_scaler is not None:
-        checkpoint_paths = [output_dir / (f"checkpoint-0-epoch-{epoch:.1f}.pth")]
+        checkpoint_paths = [output_dir / (f"checkpoint-epoch-{epoch}.pth")]
         for checkpoint_path in checkpoint_paths:
             to_save = {
                 'model': model_without_ddp.state_dict(),
@@ -341,7 +342,7 @@ def save_model(args, epoch, model, model_without_ddp, optimizer, loss_scaler, nb
     else:
         client_state = {'epoch': epoch}
         model.save_checkpoint(save_dir=args.output_dir, 
-                              tag=f"checkpoint-0-epoch-{epoch:.1f}.pth", 
+                              tag=f"checkpoint-epoch-{epoch}.pth", 
                               client_state=client_state)
 
 

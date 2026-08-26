@@ -124,8 +124,12 @@ def get_args_parser():
     parser.add_argument('--min_lr', type=float, default=0., metavar='LR',
                         help='lower lr bound for cyclic schedulers that hit 0')
 
-    parser.add_argument('--warmup_epochs', type=int, default=5, metavar='N',
-                        help='epochs to warmup LR')
+    parser.add_argument('--lr_schedule', default='wsd', type=str, choices=['wsd', 'cosine'],
+                        help='learning rate schedule: warmup-stable-decay (default) or cosine')
+    parser.add_argument('--warmup_fraction', type=float, default=0.1,
+                        help='fraction of total optimizer steps used for linear warmup (default: 0.1)')
+    parser.add_argument('--decay_fraction', type=float, default=0.1,
+                        help='WSD only: fraction of total optimizer steps used for the cosine decay phase (default: 0.1)')
 
     # Callback parameters
     parser.add_argument('--patience', default=-1, type=float,
@@ -235,7 +239,6 @@ def get_args_parser():
     parser.add_argument('--resume', default='',
                         help='resume from checkpoint')
     
-    parser.add_argument('--plot_attention_map', action='store_true', default=False)
     parser.add_argument('--plot_embeddings', action='store_true', default=False)
     parser.add_argument('--save_embeddings', action='store_true', default=False,
                         help='save model embeddings')

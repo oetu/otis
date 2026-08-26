@@ -13,8 +13,18 @@ import os
 import argparse
 
 import json
+import sys
 from typing import Tuple
 import numpy as np
+# Allow loading object-dtype .npy files pickled under numpy 2.x (which references
+# the renamed ``numpy._core`` module path) when running under numpy 1.x. The
+# legacy domain metadata in our mmap data shards (e.g. ``domain_names.npy``) was
+# saved with numpy 2.x; this shim lets a numpy 1.x env read them.
+if not hasattr(np, "_core"):
+    sys.modules.setdefault("numpy._core", np.core)
+    sys.modules.setdefault("numpy._core.multiarray", np.core.multiarray)
+    if hasattr(np.core, "_multiarray_umath"):
+        sys.modules.setdefault("numpy._core._multiarray_umath", np.core._multiarray_umath)
 import time
 from pathlib import Path
 
@@ -24,16 +34,31 @@ import torch.backends.cudnn as cudnn
 import wandb
 os.environ["WANDB__SERVICE_WAIT"] = "500"
 
-from util.dataset import TimeSeriesDataset
+from util.dataset import TimeSeriesDataset, TimeSeriesDatasetMmap
 import util.misc as misc
 from util.misc import NativeScalerWithGradNormCount as NativeScaler
 from util.pos_embed import interpolate_pos_embed_x
 from util.callbacks import EarlyStop
+from util.token_l2_norms import (track_token_l2_norms, plot_token_l2_norms,
+                                 plot_last_layer_norm_evolution)
 
 import models_otis
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
-from engine_pretrain import train_one_epoch, evaluate_online, evaluate
+from engine_pretrain import (train_one_epoch, evaluate_online, evaluate,
+                             evaluate_online_kshot, evaluate_online_forecast)
+
+
+def _ts_dataset_cls(path: str):
+    """Auto-pick dataset class: mmap directory vs ``.pt`` file."""
+    return TimeSeriesDatasetMmap if os.path.isdir(path) else TimeSeriesDataset
+
+
+def _token_norm_collate(batch):
+    """Strip pos_embed_y + domain from the standard 4-tuple collate, since
+    :func:`track_token_l2_norms` iterates ``(samples, attn_mask)`` pairs."""
+    data, attn_mask, _pos_embed_y, _domain = TimeSeriesDataset.collate_fn(batch)
+    return data, attn_mask
 
 
 def get_args_parser():
@@ -56,6 +81,15 @@ def get_args_parser():
     
     parser.add_argument('--domain_agnostic', action='store_true', default=False,
                         help='Share position embedding Y across all domains')
+
+    parser.add_argument('--amp_dtype', default='fp16', type=str, choices=['fp16', 'bf16'],
+                        help='CUDA AMP autocast dtype for the training forward pass (default: fp16). '
+                             'GradScaler is auto-disabled under bf16.')
+
+    parser.add_argument('--use_swiglu', action='store_true', default=False,
+                        help='Use SwiGLU MLP with SiLU activation in encoder and decoder blocks (default: Mlp + GELU)')
+    parser.add_argument('--layer_decay', type=float, default=0.95,
+                        help='Layer-wise LR decay factor (default 0.95; set to >=1.0 to disable)')
 
     parser.add_argument('--input_channels', type=int, default=1, metavar='N',
                         help='input channels')
@@ -130,8 +164,12 @@ def get_args_parser():
     parser.add_argument('--min_lr', type=float, default=None, metavar='LR',
                         help='lower lr bound for cyclic schedulers that hit 0 (should be 0.1x of peak lr)')
 
-    parser.add_argument('--warmup_epochs', type=int, default=40, metavar='N',
-                        help='epochs to warmup LR')
+    parser.add_argument('--lr_schedule', default='wsd', type=str, choices=['wsd', 'cosine'],
+                        help='learning rate schedule: warmup-stable-decay (default) or cosine')
+    parser.add_argument('--warmup_fraction', type=float, default=0.1,
+                        help='fraction of total optimizer steps used for linear warmup (default: 0.1)')
+    parser.add_argument('--decay_fraction', type=float, default=0.1,
+                        help='WSD only: fraction of total optimizer steps used for the cosine decay phase (default: 0.1)')
 
     # Callback parameters
     parser.add_argument('--patience', default=-1, type=float,
@@ -148,7 +186,7 @@ def get_args_parser():
                         help='ignore pretrained position embeddings Y (spatial axis)')
     
     # Dataset parameters
-    eval_criterions = ['epoch', 'total_loss', 'loss', 'ncc', 'cos_sim', 'mse', 'mae']
+    eval_criterions = ['epoch', 'total_loss', 'loss', 'ncc', 'cos_sim', 'mse', 'mae', 'patch_patch_sim', 'rankme', 'kshot_cls_acc']
     parser.add_argument('--eval_criterion', default='ncc', type=str, choices=eval_criterions,
                         help='pretraining evaluation metric (default: ncc)')
     
@@ -156,7 +194,28 @@ def get_args_parser():
                         help='dataset path')
     parser.add_argument('--val_data_path', default='', type=str,
                         help='validation dataset path')
-    
+
+    # Fig.1 diagnostics — prototype k-shot UEA, synthetic forecasting, token L2 norms.
+    parser.add_argument('--online_kshot', action='store_true', default=False,
+                        help='Run prototypical k-shot classification over UEA datasets every 2 epochs.')
+    parser.add_argument('--online_kshot_data_base', default='', type=str,
+                        help='Base directory holding the UEA k-shot datasets.')
+    parser.add_argument('--online_forecast', action='store_true', default=False,
+                        help='Run a synthetic right-sided-masking forecasting eval every 2 epochs.')
+    parser.add_argument('--online_forecast_data_path', default='', type=str,
+                        help='Path to the synthetic forecasting dataset (.pt).')
+    parser.add_argument('--online_forecast_time_steps', default=2400, type=int,
+                        help='Time steps used for synthetic forecasting eval.')
+    parser.add_argument('--online_forecast_mask_ratio', default=0.25, type=float,
+                        help='Right-sided mask ratio for synthetic forecasting eval.')
+
+    parser.add_argument('--track_token_norms', action='store_true', default=False,
+                        help='Log per-layer patch-token L2-norm density diagrams every N epochs.')
+    parser.add_argument('--track_token_norms_samples', default=4096, type=int,
+                        help='Number of samples to feed through the token-norm diagnostic.')
+    parser.add_argument('--track_token_norms_freq', default=2, type=int,
+                        help='Run the token-norm diagnostic every N epochs.')
+
     parser.add_argument('--online_evaluation', action='store_true', default=False,
                         help='Perform online evaluation of a downstream task')
     parser.add_argument('--online_evaluation_task', default='classification', type=str,
@@ -245,19 +304,21 @@ def main(args):
 
     # load data
     # domain_offsets are initialized in dataset_train
-    dataset_train = TimeSeriesDataset(data_path=args.data_path, 
-                                      domain_agnostic=args.domain_agnostic, 
-                                      univariate=args.univariate,
-                                      train=True, 
-                                      args=args)
+    TrainCls = _ts_dataset_cls(args.data_path)
+    dataset_train = TrainCls(data_path=args.data_path,
+                             domain_agnostic=args.domain_agnostic,
+                             univariate=args.univariate,
+                             train=True,
+                             args=args)
     print("Training set size: ", len(dataset_train))
 
     if args.val_data_path:
-        dataset_val = TimeSeriesDataset(data_path=args.val_data_path, 
-                                        domain_offsets=dataset_train.offsets, 
-                                        univariate=args.univariate,
-                                        train=False, 
-                                        args=args)
+        ValCls = _ts_dataset_cls(args.val_data_path)
+        dataset_val = ValCls(data_path=args.val_data_path,
+                             domain_offsets=dataset_train.offsets,
+                             univariate=args.univariate,
+                             train=False,
+                             args=args)
         print("Validation set size: ", len(dataset_val))
 
     if True:  # args.distributed:
@@ -299,7 +360,7 @@ def main(args):
             wandb.init(project=args.wandb_project, config=config, entity=args.wandb_entity)
 
     data_loader_train = torch.utils.data.DataLoader(
-        dataset_train, 
+        dataset_train,
         sampler=sampler_train,
         # shuffle=True,
         batch_size=args.batch_size,
@@ -307,6 +368,7 @@ def main(args):
         collate_fn=dataset_train.collate_fn,
         pin_memory=args.pin_mem,
         drop_last=False,
+        persistent_workers=True,
     )
 
     if args.val_data_path:
@@ -320,6 +382,34 @@ def main(args):
             pin_memory=args.pin_mem,
             drop_last=False,
         )
+
+    # Token L2-norm diagnostic loader — re-uses the training dataset but
+    # emits only ``(samples, attn_mask)`` for :func:`track_token_l2_norms`.
+    if args.track_token_norms:
+        data_loader_token_norms = torch.utils.data.DataLoader(
+            dataset_train,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            collate_fn=_token_norm_collate,
+            pin_memory=args.pin_mem,
+            drop_last=False,
+        )
+
+    # History of last-block (pre-final-norm) patch-token L2 norms, one entry
+    # per diagnostic call. Used at end-of-training to render a Fig 4(b)-style
+    # multi-curve density plot showing the gradual emergence of the high-norm
+    # outlier tail across pre-training.
+    last_layer_norm_history_enc = []
+    last_layer_norm_history_dec = []
+    last_layer_norm_enc_dim = None
+    last_layer_norm_dec_dim = None
+
+    # Final-epoch full-stack snapshot, persisted to token_norms_final.pt so the
+    # multi-layer "Token L2 Norms" panel can be regenerated offline.
+    final_token_norms_enc = None
+    final_token_norms_dec = None
+    final_token_norms_epoch = None
 
     # online evaluation
     if args.online_evaluation:
@@ -402,6 +492,7 @@ def main(args):
         forecasting_mask_ratio=args.forecasting_mask_ratio,
         drop_path=args.drop_path,
         drop_path_decoder=args.drop_path_decoder,
+        use_swiglu=args.use_swiglu,
     )
 
     new_patch_size = False
@@ -548,10 +639,10 @@ def main(args):
         model_without_ddp = model.module
     
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = misc.add_weight_decay_timm_lrd(model_without_ddp, args.weight_decay, layer_decay=0.95)
+    param_groups = misc.add_weight_decay_timm_lrd(model_without_ddp, args.weight_decay, layer_decay=args.layer_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
-    loss_scaler = NativeScaler()
+    loss_scaler = NativeScaler(amp_dtype=args.amp_dtype)
 
     misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
 
@@ -560,8 +651,11 @@ def main(args):
 
     print(f"Start training for {args.epochs} epochs")
     
-    best_stats = {'epoch':-1, 'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf}
+    best_stats = {'epoch':-1, 'total_loss':np.inf, 'loss':np.inf, 'ncc':0.0, 'cos_sim':-1.0, 'mse':np.inf, 'mae':np.inf, 'patch_patch_sim':np.inf, 'rankme':0.0, 'kshot_cls_acc':0.0}
     best_eval_scores = {'count':1, 'nb_ckpts_max':3, 'eval_criterion':[best_stats[args.eval_criterion]]}
+
+    if args.eval_criterion == 'kshot_cls_acc' and not (args.online_kshot and args.online_kshot_data_base):
+        raise ValueError("--eval_criterion kshot_cls_acc requires --online_kshot with --online_kshot_data_base")
     for epoch in range(args.start_epoch, args.epochs):
         start_time = time.time()
 
@@ -576,6 +670,82 @@ def main(args):
             val_stats, val_history = evaluate(data_loader_val, model, device, epoch, 
                                               log_writer=log_writer, args=args)
             eval_stats = val_stats
+
+        # Fig.1 diagnostics — every 2 epochs.
+        online_diag_history = {}
+        if misc.is_main_process() and (epoch % 2 == 0 or epoch == args.epochs - 1):
+            if args.online_kshot and args.online_kshot_data_base:
+                try:
+                    online_diag_history.update(
+                        evaluate_online_kshot(model_without_ddp, device, args.online_kshot_data_base))
+                except Exception as e:
+                    print(f"[online_kshot] skipped due to {type(e).__name__}: {e}")
+            if args.online_forecast and args.online_forecast_data_path:
+                try:
+                    online_diag_history.update(
+                        evaluate_online_forecast(model_without_ddp, device,
+                                                 args.online_forecast_data_path, args,
+                                                 mask_ratio=args.online_forecast_mask_ratio,
+                                                 time_steps=args.online_forecast_time_steps))
+                except Exception as e:
+                    print(f"[online_forecast] skipped due to {type(e).__name__}: {e}")
+
+        # Expose the online k-shot CLS balanced accuracy as a selectable eval metric.
+        # Absent on epochs where k-shot didn't run; the selection block below skips this epoch in that case.
+        if 'online/kshot_cls_avg_acc_balanced' in online_diag_history:
+            eval_stats['kshot_cls_acc'] = online_diag_history['online/kshot_cls_avg_acc_balanced']
+
+        # Per-layer patch-token L2 norm density panels.
+        token_norm_history = {}
+        if (args.track_token_norms and misc.is_main_process()
+                and (epoch % args.track_token_norms_freq == 0 or epoch == args.epochs - 1)):
+            try:
+                enc_norms, dec_norms, enc_dim, dec_dim = track_token_l2_norms(
+                    model, data_loader_token_norms, device,
+                    num_samples=args.track_token_norms_samples, mode="both")
+                img = plot_token_l2_norms(encoder_norms=enc_norms, decoder_norms=dec_norms,
+                                          encoder_embed_dim=enc_dim, decoder_embed_dim=dec_dim)
+                if img is not None:
+                    token_norm_history["Token L2 Norms"] = img
+                # Record the last-block, pre-final-norm distribution (index -2;
+                # index -1 is post-LayerNorm, which flattens the outlier tail).
+                if enc_norms is not None and len(enc_norms) >= 2:
+                    last_layer_norm_history_enc.append((epoch, enc_norms[-2].clone()))
+                    last_layer_norm_enc_dim = enc_dim
+                if dec_norms is not None and len(dec_norms) >= 2:
+                    last_layer_norm_history_dec.append((epoch, dec_norms[-2].clone()))
+                    last_layer_norm_dec_dim = dec_dim
+
+                # Stash the full per-layer norms at the final epoch so the
+                # "Token L2 Norms" figure can be regenerated offline.
+                if epoch == args.epochs - 1:
+                    final_token_norms_enc = (
+                        [t.clone() for t in enc_norms] if enc_norms is not None else None)
+                    final_token_norms_dec = (
+                        [t.clone() for t in dec_norms] if dec_norms is not None else None)
+                    final_token_norms_epoch = epoch
+
+                # Persist the diagnostic to disk every time it runs, so partial
+                # runs (early stop / crash) keep their data. File is rewritten
+                # in full each call (the file is small).
+                if args.output_dir and (last_layer_norm_history_enc or last_layer_norm_history_dec):
+                    torch.save({
+                        "encoder": last_layer_norm_history_enc,
+                        "decoder": last_layer_norm_history_dec,
+                        "encoder_embed_dim": last_layer_norm_enc_dim,
+                        "decoder_embed_dim": last_layer_norm_dec_dim,
+                    }, os.path.join(args.output_dir, "last_layer_norms.pt"))
+                if args.output_dir and (final_token_norms_enc is not None
+                                        or final_token_norms_dec is not None):
+                    torch.save({
+                        "encoder": final_token_norms_enc,
+                        "decoder": final_token_norms_dec,
+                        "encoder_embed_dim": last_layer_norm_enc_dim,
+                        "decoder_embed_dim": last_layer_norm_dec_dim,
+                        "epoch": final_token_norms_epoch,
+                    }, os.path.join(args.output_dir, "token_norms_final.pt"))
+            except Exception as e:
+                print(f"[track_token_norms] skipped due to {type(e).__name__}: {e}")
 
         # online evaluation of the downstream task
         online_history = {}
@@ -604,7 +774,7 @@ def main(args):
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                     loss_scaler=loss_scaler, epoch=epoch, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
-        elif args.eval_criterion in ["total_loss", "loss", "mse", "mae"]:
+        elif args.eval_criterion in ["total_loss", "loss", "mse", "mae", "patch_patch_sim"]:
             if early_stop.evaluate_decreasing_metric(val_metric=eval_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
                 break
@@ -623,6 +793,10 @@ def main(args):
                     loss_scaler=loss_scaler, epoch=epoch, test_stats=eval_stats, 
                     evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
                     mode="decreasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
+        elif args.eval_criterion not in eval_stats:
+            # Criterion not computed this epoch (e.g. kshot_cls_acc only runs every
+            # other epoch). Skip checkpointing / early-stop for this step.
+            print(f"[eval] skipping checkpoint: '{args.eval_criterion}' not available this epoch")
         else:
             if early_stop.evaluate_increasing_metric(val_metric=eval_stats[args.eval_criterion]) and misc.is_main_process():
                 print("Early stopping the training")
@@ -639,16 +813,29 @@ def main(args):
 
                 misc.save_best_model(
                     args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                    loss_scaler=loss_scaler, epoch=epoch, test_stats=eval_stats, 
-                    evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'], 
+                    loss_scaler=loss_scaler, epoch=epoch, test_stats=eval_stats,
+                    evaluation_criterion=args.eval_criterion, nb_ckpts_max=best_eval_scores['nb_ckpts_max'],
                     mode="increasing", domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
-        
+
+        # always persist the final-epoch checkpoint, independent of eval_criterion
+        if args.output_dir and epoch == args.epochs - 1 and args.eval_criterion != "epoch":
+            misc.save_model(
+                args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
+                loss_scaler=loss_scaler, epoch=epoch, nb_ckpts_max=best_eval_scores['nb_ckpts_max'],
+                domains=dataset_train.domains, domain_offsets=dataset_train.offsets)
+
         best_stats['total_loss'] = min(best_stats['total_loss'], eval_stats['total_loss'])
         best_stats['loss'] = min(best_stats['loss'], eval_stats['loss'])
         best_stats['ncc'] = max(best_stats['ncc'], eval_stats['ncc'])
         best_stats['cos_sim'] = max(best_stats['cos_sim'], eval_stats['cos_sim'])
         best_stats['mse'] = min(best_stats['mse'], eval_stats['mse'])
         best_stats['mae'] = min(best_stats['mae'], eval_stats['mae'])
+        if 'patch_patch_sim' in eval_stats:
+            best_stats['patch_patch_sim'] = min(best_stats['patch_patch_sim'], eval_stats['patch_patch_sim'])
+        if 'rankme' in eval_stats:
+            best_stats['rankme'] = max(best_stats['rankme'], eval_stats['rankme'])
+        if 'kshot_cls_acc' in eval_stats:
+            best_stats['kshot_cls_acc'] = max(best_stats['kshot_cls_acc'], eval_stats['kshot_cls_acc'])
 
         print(f"Total Loss / Loss / Normalized Cross-Correlation (NCC) / Cosine Similarity / Mean Squared Error (MSE) / ",
               f"Mean Absolute Error (MAE) of the network on {len((dataset_val if args.val_data_path else dataset_train))} val samples: {eval_stats['total_loss']:.4f} / ",
@@ -660,10 +847,18 @@ def main(args):
               f"{best_stats['cos_sim']:.2f} / {best_stats['mse']:.2f} / {best_stats['mae']:.2f}\n")
         
         total_time = time.time() - start_time
+        # online_history / online_diag_history may contain wandb.Image objects
+        # (Reconstruction, sine plots, …) that are not JSON-serialisable; only
+        # carry the scalar entries into log.txt.
+        def _scalars(d):
+            return {k: v for k, v in d.items()
+                    if isinstance(v, (int, float, bool, str)) or v is None}
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                      **({f'val_{k}': v for k, v in val_stats.items()} if args.val_data_path else {}),
+                     **_scalars(online_history),
+                     **_scalars(online_diag_history),
                      'n_parameters': n_parameters,
-                     'epoch': epoch, 
+                     'epoch': epoch,
                      'time_per_epoch' : total_time}
         
         if args.output_dir and misc.is_main_process():
@@ -676,8 +871,23 @@ def main(args):
             log_data = {**train_history,
                         **(val_history if args.val_data_path else {}),
                         **online_history,
+                        **online_diag_history,
+                        **token_norm_history,
                         "Time per epoch [sec]": total_time}
             wandb.log(log_data)
+
+    # End-of-training: render the last-block patch-token L2 norm evolution
+    # (à la Darcet et al. 2024, Fig 4(b)). Raw history was persisted to disk
+    # incrementally inside the per-epoch diagnostic block.
+    if (last_layer_norm_history_enc or last_layer_norm_history_dec) and misc.is_main_process():
+        if args.wandb:
+            evo_img = plot_last_layer_norm_evolution(
+                encoder_history=last_layer_norm_history_enc or None,
+                decoder_history=last_layer_norm_history_dec or None,
+                encoder_embed_dim=last_layer_norm_enc_dim,
+                decoder_embed_dim=last_layer_norm_dec_dim)
+            if evo_img is not None:
+                wandb.log({"Last-layer token L2 norm evolution": evo_img})
 
     if args.wandb and misc.is_main_process():
         wandb.log({f'Best Statistics/{k}': v for k, v in best_stats.items()})
