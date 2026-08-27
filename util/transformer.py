@@ -210,7 +210,12 @@ class TemporalRoPEAttention(nn.Module):
         q, k = self.apply_rope_to_time(q, k, V, ids_restore) # (B, N, D)
 
         if attn_mask is not None:
-            attn_mask = 1 - attn_mask
+            # attn_mask: (B, N) with 1=keep, 0=pad. key_padding_mask must be
+            # boolean with True meaning "ignore": a float mask is treated as
+            # *additive*, so 1 - attn_mask would add +1.0 to padded scores
+            # instead of masking them and padded patches would still be
+            # attended to.
+            attn_mask = ~attn_mask.bool()
         attn, attn_weights = self.mha(q, k, v, key_padding_mask=attn_mask)
         self.attn_map = attn_weights
 
