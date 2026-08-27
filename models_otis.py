@@ -30,9 +30,9 @@ import util.statistics as statistics
 from util.transformer import Attention, TemporalRoPEAttention, DyT
 
 
-class OTiS(nn.Module):
+class OTIS(nn.Module):
     """ 
-        Open model for general time series analysis 
+        An open time series encoder 
     """
     def __init__(self, domains:dict, domain_weights:dict, domain_agnostic:str=False,
                  input_channels=1, time_steps=2500, patch_size=(1, 100),
@@ -53,7 +53,7 @@ class OTiS(nn.Module):
         _mlp_layer = SwiGLU if use_swiglu else Mlp
 
         # --------------------------------------------------------------------------
-        # OTiS encoder specifics
+        # OTIS encoder specifics
         self.patch_size = patch_size
         self.patch_embed = PatchEmbed(input_channels, patch_size, embed_dim, flatten=False)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -92,7 +92,7 @@ class OTiS(nn.Module):
         # --------------------------------------------------------------------------
 
         # --------------------------------------------------------------------------
-        # OTiS output projection specifics
+        # OTIS output projection specifics
         self.output_projection = output_projection
         
         if self.output_projection == 'mlp':
@@ -1019,7 +1019,7 @@ class OTiS(nn.Module):
 
 
 def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.70M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
@@ -1028,7 +1028,7 @@ def otis_baseDeep_patchX_dec160d4b(**kwargs):    # nb_params: 7.58M encoder, 1.7
     return model
 
 def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.57M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=192, depth=12, num_heads=3,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, 
@@ -1037,7 +1037,7 @@ def otis_baseDeep_patchX_dec128d2b(**kwargs):    # nb_params: 7.58M encoder, 0.5
     return model
 
 def otis_smallDeep_patchX_dec160d4b(**kwargs):   # nb_params: 14.77M encoder, 1.71M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=256, depth=14, num_heads=4,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
@@ -1046,7 +1046,7 @@ def otis_smallDeep_patchX_dec160d4b(**kwargs):   # nb_params: 14.77M encoder, 1.
     return model
 
 def otis_mediumDeep_patchX_dec160d4b(**kwargs):  # nb_params: 25.30M encoder, 1.71M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=256, depth=24, num_heads=4,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
@@ -1055,7 +1055,7 @@ def otis_mediumDeep_patchX_dec160d4b(**kwargs):  # nb_params: 25.30M encoder, 1.
     return model
 
 def otis_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.74M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
@@ -1064,7 +1064,7 @@ def otis_largeDeep_patchX_dec160d4b(**kwargs):   # nb_params: 43.52M encoder, 1.
     return model
 
 def otis_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.60M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=384, depth=18, num_heads=6,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, 
@@ -1073,7 +1073,7 @@ def otis_largeDeep_patchX_dec128d2b(**kwargs):   # nb_params: 43.52M encoder, 0.
     return model
 
 def otis_xlargeDeep_patchX_dec160d4b(**kwargs):  # nb_params: 77.30M encoder, 1.74M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=448, depth=24, num_heads=7,                               # dim=64 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
@@ -1082,7 +1082,7 @@ def otis_xlargeDeep_patchX_dec160d4b(**kwargs):  # nb_params: 77.30M encoder, 1.
     return model
 
 def otis_hugeDeep_patchX_dec160d4b(**kwargs):    # nb_params: 130.81M encoder, 1.78M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=576, depth=24, num_heads=8,                               # dim=72 per head
         decoder_embed_dim=160, decoder_depth=4, decoder_num_heads=5,        # dim=32 per head
         mlp_ratio=4, 
@@ -1091,7 +1091,7 @@ def otis_hugeDeep_patchX_dec160d4b(**kwargs):    # nb_params: 130.81M encoder, 1
     return model
 
 def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0.63M decoder
-    model = OTiS(
+    model = OTIS(
         embed_dim=576, depth=24, num_heads=8,                               # dim=64 per head
         decoder_embed_dim=128, decoder_depth=2, decoder_num_heads=4,        # dim=32 per head
         mlp_ratio=4, 
@@ -1100,6 +1100,10 @@ def otis_hugeDeep_patchX_dec128d2b(**kwargs):    # nb_params: 130.81M encoder, 0
     return model
 
 # set recommended archs
+# The class was named OTiS before the paper settled on OTIS; keep the old name
+# working for any code that imports it directly.
+OTiS = OTIS
+
 otis_baseDeep_dec160d4b_patchX = otis_baseDeep_patchX_dec160d4b  # decoder: 160 dim, 4 blocks
 otis_baseDeep_dec128d2b_patchX = otis_baseDeep_patchX_dec128d2b  # decoder: 128 dim, 2 blocks
 

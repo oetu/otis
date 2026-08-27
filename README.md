@@ -9,7 +9,7 @@ conda env create --file envs/otis.yaml
 conda activate otis
 ```
 
-Activate the conda environment before running OTiS.
+Activate the conda environment before running OTIS.
 ```
 conda activate otis
 ```
@@ -104,10 +104,12 @@ python3 main_finetune.py --eval --resume $checkpoint --num_workers $num_workers 
 Please cite the following work:
 ```
 @article{turgut2026otis,
-  title={OTIS: Learning High-Quality Time Series Features With Tiny Encoders},
+  title={{OTIS}: Learning High-Quality Time Series Features With Tiny Encoders},
   author={Turgut, {\"O}zg{\"u}n and M{\"u}ller, Philip and Menten, Martin J and Rueckert, Daniel},
-  journal={arXiv preprint arXiv:2410.07299},
-  year={2026}
+  journal={Transactions on Machine Learning Research},
+  issn={2835-8856},
+  year={2026},
+  url={https://arxiv.org/abs/2410.07299}
 }
 ```
 

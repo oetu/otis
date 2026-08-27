@@ -40,7 +40,7 @@ from engine_pretrain import train_one_epoch, evaluate
 
 
 def get_args_parser():
-    parser = argparse.ArgumentParser('OTiS generative finetuning', add_help=False)
+    parser = argparse.ArgumentParser('OTIS generative finetuning', add_help=False)
     # Basic parameters
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Batch size per GPU (effective batch size is batch_size * accum_iter * # gpus')

@@ -18,7 +18,7 @@ class Attention(nn.Module):
     """
     Multi-head self-attention.
 
-    The released OTiS checkpoints were trained with an inner
+    The released OTIS checkpoints were trained with an inner
     ``nn.MultiheadAttention``, so the trained function is
 
         qkv -> mha.in_proj -> attention -> mha.out_proj -> proj

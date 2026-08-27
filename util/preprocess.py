@@ -4,7 +4,7 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # --------------------------------------------------------
-# Preprocess raw time series data (normalise and clamp) for OTiS.
+# Preprocess raw time series data (normalise and clamp) for OTIS.
 #
 # Usage:
 #   python preprocess.py --input /path/to/raw_data.pt --output /path/to/processed_data.pt
@@ -194,7 +194,7 @@ def load_data(path: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Preprocess raw time series data for OTiS.")
+    parser = argparse.ArgumentParser(description="Preprocess raw time series data for OTIS.")
     parser.add_argument("--input", type=str, required=True,
                         help="Path to raw data file (.pt, .npy, or .npz).")
     parser.add_argument("--output", type=str, required=True,
@@ -221,7 +221,7 @@ def main():
                         help="Load pre-computed normalisation statistics from this .npz file "
                              "(overrides --train_data).")
     parser.add_argument("--domain", type=str, default=None,
-                        help="Domain name for OTiS output format. When provided, output is saved "
+                        help="Domain name for OTIS output format. When provided, output is saved "
                              "as [(domain, tensor), ...] list-of-tuples instead of a single tensor.")
     args = parser.parse_args()
 
@@ -259,9 +259,9 @@ def main():
     print(f"Loading data from {args.input}")
     raw_data = load_data(args.input)
 
-    # Handle OTiS list-of-tuples format: [(domain_str, tensor), ...]
+    # Handle OTIS list-of-tuples format: [(domain_str, tensor), ...]
     if isinstance(raw_data, list) and len(raw_data) > 0 and isinstance(raw_data[0], tuple):
-        print(f"Detected OTiS format: {len(raw_data)} samples")
+        print(f"Detected OTIS format: {len(raw_data)} samples")
         processed = []
         for domain, sample in raw_data:
             if isinstance(sample, torch.Tensor):
@@ -305,7 +305,7 @@ def main():
         if args.domain:
             processed = [(args.domain, torch.tensor(processed[i], dtype=torch.float32))
                          for i in range(processed.shape[0])]
-            print(f"Saving {len(processed)} samples in OTiS format to {args.output}")
+            print(f"Saving {len(processed)} samples in OTIS format to {args.output}")
         else:
             processed = torch.tensor(processed, dtype=torch.float32)
             print(f"Saving to {args.output}")
