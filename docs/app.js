@@ -10,6 +10,9 @@
 
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
+  /* Optional visit counting, defined in analytics.js and a no-op until that file is configured.
+   * Guarded so the page still runs if analytics.js is ever dropped. */
+  const track = (category, action, name, value) => { if (window.track) window.track(category, action, name, value); };
   const C = window.Charts, A = window.Analysis, M = window.OTIS, U = window.UNITS, MO = window.MOMENT, Z = window.ZEROSHOT;
 
   const ENC = ['otis', 'units', 'moment'];
@@ -25,7 +28,7 @@
   const encColor = (e) => C.css(e.startsWith('otis') ? `--enc-${e}` : '--text-muted');   // OTIS in blue, every competitor in grey
   /** The competitor row's name: a dropdown over the encoders OTIS is compared with in that section. */
   const rivalHtml = (cur, options) => `<span class="enc-name"><select class="rival-select" aria-label="Encoder compared with OTIS">${options.map(e => `<option value="${e}"${e === cur ? ' selected' : ''}>${NAME[e]}</option>`).join('')}</select></span>`;
-  const wireRival = (el, busy, onPick) => { const sel = el.querySelector('.rival-select'); if (!sel) return; sel.disabled = !!busy; sel.addEventListener('click', e => e.stopPropagation()); sel.addEventListener('change', () => onPick(sel.value)); };
+  const wireRival = (el, busy, onPick) => { const sel = el.querySelector('.rival-select'); if (!sel) return; sel.disabled = !!busy; sel.addEventListener('click', e => e.stopPropagation()); sel.addEventListener('change', () => { track('Compare', 'pick', sel.value); onPick(sel.value); }); };
   const RIVALS = ['units', 'moment', 'chronos2', 'timesfm3'];   // the competitors of the Fill in and Forecast rows
   const status = (sel, msg, isErr) => { const n = $(sel); n.textContent = msg || ''; n.classList.toggle('err', !!isErr); };
   // lets the page paint before a model runs on this thread (the rows' "predicting…" would otherwise show only after
@@ -195,6 +198,7 @@
   async function selectDataset(key) {
     if (ex.busy) return;
     ex.ds = key; ex.selected = null;
+    track('Explore', 'dataset', key);
     $$('#dataset-seg .seg-btn').forEach(b => b.classList.toggle('is-active', b.dataset.key === key));
     $('#ds-blurb').textContent = DS[key].blurb || '';
     $('#sample-view').hidden = true;
@@ -295,7 +299,7 @@
       if (ex.running === enc || (ex.ds === 'custom' && ex.busy)) { noteStopped(); ex.stop = true; e.target.disabled = true; if (ex.ds === 'custom' && ex.cards[ex.running]) ex.cards[ex.running].state.textContent = 'stopping after this series…'; }
     });
     const sel = root.querySelector('.rival-select');
-    if (sel) sel.addEventListener('change', () => { if (ex.busy) { sel.value = enc; return; } ex.rival = sel.value; renderMaps(); });
+    if (sel) sel.addEventListener('change', () => { if (ex.busy) { sel.value = enc; return; } track('Compare', 'pick', sel.value); ex.rival = sel.value; renderMaps(); });
     return { root, meta: root.querySelector('.enc-meta'), state: root.querySelector('.map-state'), scores: root.querySelector('.scores'),
              chart: root.querySelector('.map-chart'), foot: root.querySelector('.map-foot'), fill: root.querySelector('.bar-fill'), footText: root.querySelector('.foot-text') };
   }
@@ -479,6 +483,7 @@
     const key = ex.ds; if (!key || ex.busy) return;
     const d = ex.data[key], man = d.man, n = man.n_test, V = man.V, T = man.T;
     ex.busy = true; ex.stop = false;
+    track('Explore', 'run-live', encs.join('+'));
     $$('#dataset-seg .seg-btn, .enc, #maps .rival-select').forEach(b => { b.disabled = true; });
     try {
       for (const enc of encs) {
@@ -860,6 +865,7 @@
   /** Run one model on the current state; requests queue up and run one at a time. */
   function runFillModel(enc) {
     if (justStopped() || fill.running[enc] || fill.queue.includes(enc)) return;
+    track('Impute', 'run', enc);
     fill.queue.push(enc); renderFill();
     if (!fill.busy) drainFill();
   }
@@ -1155,6 +1161,7 @@
   async function selectBench(key) {
     holdBenchHeight();
     fc.ds = key; fc.win = 0;
+    track('Forecast', 'benchmark', key);
     $$('#bench-list button').forEach(b => b.classList.toggle('is-active', b.dataset.key === key));
     $('#fc-blurb').textContent = FC_BLURB[key] || '';
     status('#status-fc', 'loading the test windows…');
@@ -1195,6 +1202,7 @@
   function runFcModel(enc) {
     const key = fc.ds, win = fc.win, id = fcJob(key, win, enc);
     if (justStopped() || !key || fc.running[id] || fc.queue.some(j => j.id === id) || fcRes(key, win, enc)) return;
+    track('Forecast', 'run', enc);
     fc.queue.push({ key, win, enc, id }); renderFc();
     if (!fc.busy) drainFc();
   }
