@@ -1,0 +1,485 @@
+{
+ "key": "weather",
+ "name": "Weather",
+ "description": "21 meteorological indicators every 10 minutes from the Max Planck weather station in Jena, 2020.",
+ "domain": "weather",
+ "step": "10 min",
+ "V": 21,
+ "T": 432,
+ "patch": 24,
+ "n_patches": 18,
+ "horizon_patches": 4,
+ "context": 336,
+ "horizon": 96,
+ "mask_ratio": 0.2223222222222222,
+ "variates": [
+  "p (mbar)",
+  "T (degC)",
+  "Tpot (K)",
+  "Tdew (degC)",
+  "rh (%)",
+  "VPmax (mbar)",
+  "VPact (mbar)",
+  "VPdef (mbar)",
+  "sh (g/kg)",
+  "H2OC (mmol/mol)",
+  "rho (g/m**3)",
+  "wv (m/s)",
+  "max. wv (m/s)",
+  "wd (deg)",
+  "rain (mm)",
+  "raining (s)",
+  "SWDR (W/m)",
+  "PAR (mol/m/s)",
+  "max. PAR (mol/m/s)",
+  "Tlog (degC)",
+  "OT"
+ ],
+ "series_names": null,
+ "n_series": 1,
+ "embed_rows": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21
+ ],
+ "windows": [
+  {
+   "series": 0,
+   "offset": 0,
+   "mse": 0.09731165319681168,
+   "mae": 0.2104264199733734,
+   "label": "t = 0"
+  },
+  {
+   "series": 0,
+   "offset": 2089,
+   "mse": 0.07450451701879501,
+   "mae": 0.1888243705034256,
+   "label": "t = 2089"
+  },
+  {
+   "series": 0,
+   "offset": 4178,
+   "mse": 0.03609798103570938,
+   "mae": 0.13351725041866302,
+   "label": "t = 4178"
+  },
+  {
+   "series": 0,
+   "offset": 6266,
+   "mse": 0.15143708884716034,
+   "mae": 0.2567700743675232,
+   "label": "t = 6266"
+  },
+  {
+   "series": 0,
+   "offset": 8355,
+   "mse": 0.055079635232686996,
+   "mae": 0.14119689166545868,
+   "label": "t = 8355"
+  },
+  {
+   "series": 0,
+   "offset": 10444,
+   "mse": 0.026958009228110313,
+   "mae": 0.11496751755475998,
+   "label": "t = 10444"
+  }
+ ],
+ "files": {
+  "windows": "forecast_weather_windows.bin"
+ },
+ "model": "forecast/weather/",
+ "reference": {
+  "test_mse": 0.14475111785426073,
+  "test_mae": 0.20796690018103098,
+  "n_windows": 1306,
+  "stride": 8,
+  "paper_mse": 0.139,
+  "precision": "int8",
+  "ms_per_window_native": 74.1943105046327
+ },
+ "source": {
+  "split": "712"
+ },
+ "revin": {
+  "model": "forecast/weather_revin/",
+  "embed_rows": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21
+  ],
+  "std_floor": 0.05,
+  "windows": [
+   {
+    "mse": 0.10732689499855042,
+    "mae": 0.21750646829605103
+   },
+   {
+    "mse": 0.0965551808476448,
+    "mae": 0.19298085570335388
+   },
+   {
+    "mse": 0.05590064823627472,
+    "mae": 0.12094559520483017
+   },
+   {
+    "mse": 0.1505523920059204,
+    "mae": 0.23878949880599976
+   },
+   {
+    "mse": 0.0518338717520237,
+    "mae": 0.15268343687057495
+   },
+   {
+    "mse": 0.032714199274778366,
+    "mae": 0.10853125154972076
+   }
+  ],
+  "test_mse": 0.15389793511097866,
+  "test_mae": 0.20473431898523436,
+  "n_windows": 1306,
+  "stride": 8,
+  "precision": "int8"
+ },
+ "units": {
+  "graph": "fc_weather",
+  "precision": "int8",
+  "paper_mse": 0.216,
+  "windows": [
+   {
+    "mse": 0.10864679515361786,
+    "mae": 0.2187100648880005
+   },
+   {
+    "mse": 0.07671158015727997,
+    "mae": 0.1863570511341095
+   },
+   {
+    "mse": 0.032139696180820465,
+    "mae": 0.1096247211098671
+   },
+   {
+    "mse": 0.15492583811283112,
+    "mae": 0.24165020883083344
+   },
+   {
+    "mse": 0.060593005269765854,
+    "mae": 0.14333713054656982
+   },
+   {
+    "mse": 0.03217340633273125,
+    "mae": 0.10803530365228653
+   }
+  ],
+  "test_mse": 0.14264328537614385,
+  "test_mae": 0.1948030122468793,
+  "n_windows": 1306,
+  "stride": 8,
+  "finetune": {
+   "steps": 1500,
+   "batch": 8,
+   "lr": 0.0001,
+   "lr_tokens": 0.005,
+   "best_step": 600,
+   "val_mse": 0.36762289727128955
+  }
+ },
+ "zero_shot": {
+  "chronos2": {
+   "name": "Chronos-2",
+   "params": "120M",
+   "hf": "amazon/chronos-2",
+   "license": "Apache-2.0",
+   "point": "median",
+   "note": "encoder-only, in-context multivariate; point forecast = median quantile",
+   "file": "forecast_weather_zs_chronos2.bin",
+   "windows": [
+    {
+     "mse": 0.1143084168434143,
+     "mae": 0.220371276140213
+    },
+    {
+     "mse": 0.054585620760917664,
+     "mae": 0.13641847670078278
+    },
+    {
+     "mse": 0.031695656478405,
+     "mae": 0.08613207191228867
+    },
+    {
+     "mse": 0.10933103412389755,
+     "mae": 0.17190875113010406
+    },
+    {
+     "mse": 0.0474211722612381,
+     "mae": 0.13284876942634583
+    },
+    {
+     "mse": 0.06022203713655472,
+     "mae": 0.13851740956306458
+    }
+   ],
+   "test_mse": 0.1611044853925705,
+   "test_mae": 0.1821330189704895,
+   "n_windows": 1306,
+   "stride": 8,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 99.3
+  },
+  "timesfm3": {
+   "name": "TimesFM-3",
+   "params": "330M",
+   "hf": "google/timesfm-3.0-pytorch",
+   "license": "TimesFM non-commercial v1.0",
+   "point": "median",
+   "note": "decoder-only with variate attention; point forecast = median quantile",
+   "file": "forecast_weather_zs_timesfm3.bin",
+   "windows": [
+    {
+     "mse": 0.135923370718956,
+     "mae": 0.24490538239479065
+    },
+    {
+     "mse": 0.07462294399738312,
+     "mae": 0.17400839924812317
+    },
+    {
+     "mse": 0.050297532230615616,
+     "mae": 0.10039187222719193
+    },
+    {
+     "mse": 0.14086280763149261,
+     "mae": 0.19553905725479126
+    },
+    {
+     "mse": 0.05043181777000427,
+     "mae": 0.13533617556095123
+    },
+    {
+     "mse": 0.08819559961557388,
+     "mae": 0.14583060145378113
+    }
+   ],
+   "test_mse": 0.16262447834014893,
+   "test_mae": 0.1916404366493225,
+   "n_windows": 1306,
+   "stride": 8,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 257.6
+  }
+ },
+ "moment": {
+  "name": "MOMENT-large",
+  "params": "386M",
+  "hf": "AutonLab/MOMENT-1-large",
+  "license": "MIT",
+  "recipe": "linear probing: frozen encoder, forecasting head trained on the benchmark's training split",
+  "note": "channel-independent; 336-step context left-padded to MOMENT's 512-step input with an input mask",
+  "file": "forecast_weather_moment.bin",
+  "seq_len": 512,
+  "patch": 8,
+  "precision": "float32 (bf16 autocast)",
+  "windows": [
+   {
+    "mse": 0.1303044855594635,
+    "mae": 0.25911131501197815
+   },
+   {
+    "mse": 0.15130914747714996,
+    "mae": 0.28990310430526733
+   },
+   {
+    "mse": 0.04470771178603172,
+    "mae": 0.1362185776233673
+   },
+   {
+    "mse": 0.18116290867328644,
+    "mae": 0.26937517523765564
+   },
+   {
+    "mse": 0.0534992478787899,
+    "mae": 0.14779908955097198
+   },
+   {
+    "mse": 0.031259696930646896,
+    "mae": 0.11538714170455933
+   }
+  ],
+  "test_mse": 0.15646495145429928,
+  "test_mae": 0.21285064036307358,
+  "n_windows": 1306,
+  "stride": 8,
+  "context": 336,
+  "horizon": 96,
+  "finetune": {
+   "key": "weather",
+   "V": 21,
+   "context": 336,
+   "horizon": 96,
+   "steps": 1500,
+   "batch": 8,
+   "lr": 0.0005,
+   "seed": 0,
+   "best_step": 1500,
+   "val_mse": 0.3943507519512113,
+   "test_mse": 0.15646495145429928,
+   "test_mae": 0.21285064036307358,
+   "n_test_windows": 1306,
+   "test_stride": 8
+  }
+ },
+ "mod": {
+  "model": "forecast/mod/",
+  "embed_rows": [
+   29,
+   30,
+   31,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48,
+   49
+  ],
+  "windows": [
+   {
+    "mse": 0.12900100648403168,
+    "mae": 0.25360244512557983
+   },
+   {
+    "mse": 0.12141048908233643,
+    "mae": 0.21651998162269592
+   },
+   {
+    "mse": 0.05643805116415024,
+    "mae": 0.1382478028535843
+   },
+   {
+    "mse": 0.13070990145206451,
+    "mae": 0.2305457592010498
+   },
+   {
+    "mse": 0.06295089423656464,
+    "mae": 0.17129968106746674
+   },
+   {
+    "mse": 0.04258990287780762,
+    "mae": 0.13697375357151031
+   }
+  ],
+  "test_mse": 0.15633493124195025,
+  "test_mae": 0.22324256328537856,
+  "n_windows": 1306,
+  "stride": 8,
+  "precision": "int8"
+ },
+ "mod_revin": {
+  "model": "forecast/mod_revin/",
+  "embed_rows": [
+   29,
+   30,
+   31,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48,
+   49
+  ],
+  "windows": [
+   {
+    "mse": 0.11719979345798492,
+    "mae": 0.22704154253005981
+   },
+   {
+    "mse": 0.14576885104179382,
+    "mae": 0.22311897575855255
+   },
+   {
+    "mse": 0.061482351273298264,
+    "mae": 0.12565076351165771
+   },
+   {
+    "mse": 0.1757662296295166,
+    "mae": 0.24375925958156586
+   },
+   {
+    "mse": 0.07115710526704788,
+    "mae": 0.15251728892326355
+   },
+   {
+    "mse": 0.03980790078639984,
+    "mae": 0.11419365555047989
+   }
+  ],
+  "test_mse": 0.16340080944316357,
+  "test_mae": 0.21314444747763425,
+  "n_windows": 1306,
+  "stride": 8,
+  "precision": "int8",
+  "std_floor": 0.05
+ }
+}

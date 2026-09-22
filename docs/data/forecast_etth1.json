@@ -1,0 +1,415 @@
+{
+ "key": "etth1",
+ "name": "ETTh1",
+ "description": "Electricity transformer temperature, hourly: six power-load features and the oil temperature (OT) of one transformer, 2016-2018.",
+ "domain": "etth",
+ "step": "1 h",
+ "V": 7,
+ "T": 432,
+ "patch": 24,
+ "n_patches": 18,
+ "horizon_patches": 4,
+ "context": 336,
+ "horizon": 96,
+ "mask_ratio": 0.2223222222222222,
+ "variates": [
+  "HUFL",
+  "HULL",
+  "MUFL",
+  "MULL",
+  "LUFL",
+  "LULL",
+  "OT"
+ ],
+ "series_names": null,
+ "n_series": 1,
+ "embed_rows": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "windows": [
+  {
+   "series": 0,
+   "offset": 0,
+   "mse": 0.4831891357898712,
+   "mae": 0.4452851116657257,
+   "label": "t = 0"
+  },
+  {
+   "series": 0,
+   "offset": 678,
+   "mse": 0.29443803429603577,
+   "mae": 0.3794298768043518,
+   "label": "t = 678"
+  },
+  {
+   "series": 0,
+   "offset": 1355,
+   "mse": 0.5538725256919861,
+   "mae": 0.5067696571350098,
+   "label": "t = 1355"
+  },
+  {
+   "series": 0,
+   "offset": 2033,
+   "mse": 0.30731701850891113,
+   "mae": 0.41023164987564087,
+   "label": "t = 2033"
+  },
+  {
+   "series": 0,
+   "offset": 2710,
+   "mse": 0.3031790256500244,
+   "mae": 0.40467286109924316,
+   "label": "t = 2710"
+  },
+  {
+   "series": 0,
+   "offset": 3388,
+   "mse": 0.2584616243839264,
+   "mae": 0.3863101601600647,
+   "label": "t = 3388"
+  }
+ ],
+ "files": {
+  "windows": "forecast_etth1_windows.bin"
+ },
+ "model": "forecast/etth1/",
+ "reference": {
+  "test_mse": 0.4294286831721382,
+  "test_mae": 0.45251891417604573,
+  "n_windows": 424,
+  "stride": 8,
+  "paper_mse": 0.419,
+  "precision": "int8",
+  "ms_per_window_native": 53.01004085534563
+ },
+ "source": {
+  "split": "622"
+ },
+ "revin": {
+  "model": "forecast/etth1_revin/",
+  "embed_rows": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "std_floor": 0.05,
+  "windows": [
+   {
+    "mse": 0.5119179487228394,
+    "mae": 0.42005184292793274
+   },
+   {
+    "mse": 0.27774930000305176,
+    "mae": 0.3623906075954437
+   },
+   {
+    "mse": 0.574710488319397,
+    "mae": 0.48319363594055176
+   },
+   {
+    "mse": 0.24940213561058044,
+    "mae": 0.3616507351398468
+   },
+   {
+    "mse": 0.29991695284843445,
+    "mae": 0.39218825101852417
+   },
+   {
+    "mse": 0.23955553770065308,
+    "mae": 0.3766869902610779
+   }
+  ],
+  "test_mse": 0.422156691902651,
+  "test_mae": 0.45500580650174394,
+  "n_windows": 424,
+  "stride": 8,
+  "precision": "int8"
+ },
+ "units": {
+  "graph": "fc_etth1",
+  "precision": "int8",
+  "paper_mse": 0.394,
+  "windows": [
+   {
+    "mse": 0.4111839830875397,
+    "mae": 0.38631749153137207
+   },
+   {
+    "mse": 0.2752266228199005,
+    "mae": 0.37295469641685486
+   },
+   {
+    "mse": 0.5929918885231018,
+    "mae": 0.5213373899459839
+   },
+   {
+    "mse": 0.2756216824054718,
+    "mae": 0.39881742000579834
+   },
+   {
+    "mse": 0.407601535320282,
+    "mae": 0.43823251128196716
+   },
+   {
+    "mse": 0.40186676383018494,
+    "mae": 0.4636598825454712
+   }
+  ],
+  "test_mse": 0.42644716922264053,
+  "test_mae": 0.46401419216450657,
+  "n_windows": 424,
+  "stride": 8,
+  "finetune": {
+   "steps": 1500,
+   "batch": 8,
+   "lr": 0.0001,
+   "lr_tokens": 0.005,
+   "best_step": 500,
+   "val_mse": 0.34110126341128283
+  }
+ },
+ "zero_shot": {
+  "chronos2": {
+   "name": "Chronos-2",
+   "params": "120M",
+   "hf": "amazon/chronos-2",
+   "license": "Apache-2.0",
+   "point": "median",
+   "note": "encoder-only, in-context multivariate; point forecast = median quantile",
+   "file": "forecast_etth1_zs_chronos2.bin",
+   "windows": [
+    {
+     "mse": 0.47194644808769226,
+     "mae": 0.3979392349720001
+    },
+    {
+     "mse": 0.4269467294216156,
+     "mae": 0.38846784830093384
+    },
+    {
+     "mse": 0.5926041603088379,
+     "mae": 0.5360174179077148
+    },
+    {
+     "mse": 0.1948223114013672,
+     "mae": 0.3045341372489929
+    },
+    {
+     "mse": 0.31367698311805725,
+     "mae": 0.366353839635849
+    },
+    {
+     "mse": 0.1899442970752716,
+     "mae": 0.3119736611843109
+    }
+   ],
+   "test_mse": 0.459193617105484,
+   "test_mae": 0.43116816878318787,
+   "n_windows": 424,
+   "stride": 8,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 8.0
+  },
+  "timesfm3": {
+   "name": "TimesFM-3",
+   "params": "330M",
+   "hf": "google/timesfm-3.0-pytorch",
+   "license": "TimesFM non-commercial v1.0",
+   "point": "median",
+   "note": "decoder-only with variate attention; point forecast = median quantile",
+   "file": "forecast_etth1_zs_timesfm3.bin",
+   "windows": [
+    {
+     "mse": 0.7202194929122925,
+     "mae": 0.4479551315307617
+    },
+    {
+     "mse": 0.4604901671409607,
+     "mae": 0.4205895960330963
+    },
+    {
+     "mse": 0.6098691821098328,
+     "mae": 0.4640727639198303
+    },
+    {
+     "mse": 0.17536665499210358,
+     "mae": 0.29043564200401306
+    },
+    {
+     "mse": 0.4181957244873047,
+     "mae": 0.4094636142253876
+    },
+    {
+     "mse": 0.16356298327445984,
+     "mae": 0.2874436676502228
+    }
+   ],
+   "test_mse": 0.4567784368991852,
+   "test_mae": 0.4281746447086334,
+   "n_windows": 424,
+   "stride": 8,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 23.9
+  }
+ },
+ "moment": {
+  "name": "MOMENT-large",
+  "params": "386M",
+  "hf": "AutonLab/MOMENT-1-large",
+  "license": "MIT",
+  "recipe": "linear probing: frozen encoder, forecasting head trained on the benchmark's training split",
+  "note": "channel-independent; 336-step context left-padded to MOMENT's 512-step input with an input mask",
+  "file": "forecast_etth1_moment.bin",
+  "seq_len": 512,
+  "patch": 8,
+  "precision": "float32 (bf16 autocast)",
+  "windows": [
+   {
+    "mse": 0.6392012238502502,
+    "mae": 0.4923916757106781
+   },
+   {
+    "mse": 0.3119940459728241,
+    "mae": 0.3880470395088196
+   },
+   {
+    "mse": 0.5363404750823975,
+    "mae": 0.49322015047073364
+   },
+   {
+    "mse": 0.2770082354545593,
+    "mae": 0.3827351927757263
+   },
+   {
+    "mse": 0.3406132161617279,
+    "mae": 0.4290953278541565
+   },
+   {
+    "mse": 0.27604421973228455,
+    "mae": 0.3788931667804718
+   }
+  ],
+  "test_mse": 0.43377536112193255,
+  "test_mae": 0.4620674318380433,
+  "n_windows": 424,
+  "stride": 8,
+  "context": 336,
+  "horizon": 96,
+  "finetune": {
+   "key": "etth1",
+   "V": 7,
+   "context": 336,
+   "horizon": 96,
+   "steps": 1500,
+   "batch": 9,
+   "lr": 0.0005,
+   "seed": 0,
+   "best_step": 1500,
+   "val_mse": 0.41116040993250924,
+   "test_mse": 0.43377536112193255,
+   "test_mae": 0.4620674318380433,
+   "n_test_windows": 424,
+   "test_stride": 8
+  }
+ },
+ "mod": {
+  "model": "forecast/mod/",
+  "embed_rows": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "windows": [
+   {
+    "mse": 0.5171999931335449,
+    "mae": 0.456666499376297
+   },
+   {
+    "mse": 0.28643307089805603,
+    "mae": 0.37409350275993347
+   },
+   {
+    "mse": 0.6770927906036377,
+    "mae": 0.5486237406730652
+   },
+   {
+    "mse": 0.23351582884788513,
+    "mae": 0.36049920320510864
+   },
+   {
+    "mse": 0.3017139434814453,
+    "mae": 0.3988182842731476
+   },
+   {
+    "mse": 0.32070791721343994,
+    "mae": 0.449133962392807
+   }
+  ],
+  "test_mse": 0.40674189369211783,
+  "test_mae": 0.4425573370085572,
+  "n_windows": 424,
+  "stride": 8,
+  "precision": "int8"
+ },
+ "mod_revin": {
+  "model": "forecast/mod_revin/",
+  "embed_rows": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "windows": [
+   {
+    "mse": 0.6148954033851624,
+    "mae": 0.4567924737930298
+   },
+   {
+    "mse": 0.2945147156715393,
+    "mae": 0.37600407004356384
+   },
+   {
+    "mse": 0.6828938126564026,
+    "mae": 0.523884117603302
+   },
+   {
+    "mse": 0.24897454679012299,
+    "mae": 0.38317394256591797
+   },
+   {
+    "mse": 0.31726327538490295,
+    "mae": 0.4121131896972656
+   },
+   {
+    "mse": 0.2708115577697754,
+    "mae": 0.3981175124645233
+   }
+  ],
+  "test_mse": 0.40976836876767986,
+  "test_mae": 0.4380203723766894,
+  "n_windows": 424,
+  "stride": 8,
+  "precision": "int8",
+  "std_floor": 0.05
+ }
+}

@@ -1,0 +1,415 @@
+{
+ "key": "ili",
+ "name": "Illness",
+ "description": "Weekly influenza-like illness statistics of the US CDC, 2002-2020: patient ratios, age groups, providers.",
+ "domain": "ili",
+ "step": "1 week",
+ "V": 7,
+ "T": 384,
+ "patch": 24,
+ "n_patches": 16,
+ "horizon_patches": 2,
+ "context": 336,
+ "horizon": 48,
+ "mask_ratio": 0.1251,
+ "variates": [
+  "% WEIGHTED ILI",
+  "%UNWEIGHTED ILI",
+  "AGE 0-4",
+  "AGE 5-24",
+  "ILITOTAL",
+  "NUM. OF PROVIDERS",
+  "OT"
+ ],
+ "series_names": null,
+ "n_series": 1,
+ "embed_rows": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "windows": [
+  {
+   "series": 0,
+   "offset": 0,
+   "mse": 1.9790292978286743,
+   "mae": 0.8138751983642578,
+   "label": "t = 0"
+  },
+  {
+   "series": 0,
+   "offset": 29,
+   "mse": 1.1932703256607056,
+   "mae": 0.7422075271606445,
+   "label": "t = 29"
+  },
+  {
+   "series": 0,
+   "offset": 58,
+   "mse": 1.8147426843643188,
+   "mae": 1.0054142475128174,
+   "label": "t = 58"
+  },
+  {
+   "series": 0,
+   "offset": 88,
+   "mse": 5.336344242095947,
+   "mae": 1.5651895999908447,
+   "label": "t = 88"
+  },
+  {
+   "series": 0,
+   "offset": 117,
+   "mse": 5.783276557922363,
+   "mae": 1.6977618932724,
+   "label": "t = 117"
+  },
+  {
+   "series": 0,
+   "offset": 146,
+   "mse": 3.6659724712371826,
+   "mae": 1.5540771484375,
+   "label": "t = 146"
+  }
+ ],
+ "files": {
+  "windows": "forecast_ili_windows.bin"
+ },
+ "model": "forecast/ili/",
+ "reference": {
+  "test_mse": 3.2406107118340577,
+  "test_mae": 1.2152000085837176,
+  "n_windows": 147,
+  "stride": 1,
+  "paper_mse": 2.643,
+  "precision": "int8",
+  "ms_per_window_native": 24.480584155147273
+ },
+ "source": {
+  "split": "712"
+ },
+ "revin": {
+  "model": "forecast/ili_revin/",
+  "embed_rows": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "std_floor": 0.05,
+  "windows": [
+   {
+    "mse": 2.0032501220703125,
+    "mae": 0.7864130735397339
+   },
+   {
+    "mse": 0.8528631329536438,
+    "mae": 0.6928273439407349
+   },
+   {
+    "mse": 2.0072131156921387,
+    "mae": 1.0425035953521729
+   },
+   {
+    "mse": 2.4704577922821045,
+    "mae": 1.030820608139038
+   },
+   {
+    "mse": 3.8716320991516113,
+    "mae": 1.4137736558914185
+   },
+   {
+    "mse": 5.225497722625732,
+    "mae": 1.9138402938842773
+   }
+  ],
+  "test_mse": 2.659876895599625,
+  "test_mae": 1.1157955985490968,
+  "n_windows": 147,
+  "stride": 1,
+  "precision": "int8"
+ },
+ "units": {
+  "graph": "fc_ili",
+  "precision": "int8",
+  "paper_mse": 2.472,
+  "windows": [
+   {
+    "mse": 1.4138513803482056,
+    "mae": 0.6084502935409546
+   },
+   {
+    "mse": 0.4038453698158264,
+    "mae": 0.4013104736804962
+   },
+   {
+    "mse": 0.8880646228790283,
+    "mae": 0.6702905297279358
+   },
+   {
+    "mse": 2.640073776245117,
+    "mae": 1.0208700895309448
+   },
+   {
+    "mse": 3.6899290084838867,
+    "mae": 1.3064779043197632
+   },
+   {
+    "mse": 4.413730144500732,
+    "mae": 1.5541666746139526
+   }
+  ],
+  "test_mse": 2.258562288114003,
+  "test_mae": 0.9433137058806257,
+  "n_windows": 147,
+  "stride": 1,
+  "finetune": {
+   "steps": 1500,
+   "batch": 8,
+   "lr": 0.0001,
+   "lr_tokens": 0.005,
+   "best_step": 600,
+   "val_mse": 0.9010818118140811
+  }
+ },
+ "zero_shot": {
+  "chronos2": {
+   "name": "Chronos-2",
+   "params": "120M",
+   "hf": "amazon/chronos-2",
+   "license": "Apache-2.0",
+   "point": "median",
+   "note": "encoder-only, in-context multivariate; point forecast = median quantile",
+   "file": "forecast_ili_zs_chronos2.bin",
+   "windows": [
+    {
+     "mse": 1.5769208669662476,
+     "mae": 0.6872007250785828
+    },
+    {
+     "mse": 0.5293984413146973,
+     "mae": 0.48350635170936584
+    },
+    {
+     "mse": 0.8148940801620483,
+     "mae": 0.6413658857345581
+    },
+    {
+     "mse": 1.0485804080963135,
+     "mae": 0.49869000911712646
+    },
+    {
+     "mse": 1.4692497253417969,
+     "mae": 0.8022003173828125
+    },
+    {
+     "mse": 4.389000415802002,
+     "mae": 1.5729602575302124
+    }
+   ],
+   "test_mse": 1.5171512365341187,
+   "test_mae": 0.7260798215866089,
+   "n_windows": 147,
+   "stride": 1,
+   "context": 336,
+   "horizon": 48,
+   "seconds": 1.2
+  },
+  "timesfm3": {
+   "name": "TimesFM-3",
+   "params": "330M",
+   "hf": "google/timesfm-3.0-pytorch",
+   "license": "TimesFM non-commercial v1.0",
+   "point": "median",
+   "note": "decoder-only with variate attention; point forecast = median quantile",
+   "file": "forecast_ili_zs_timesfm3.bin",
+   "windows": [
+    {
+     "mse": 0.34672728180885315,
+     "mae": 0.33273711800575256
+    },
+    {
+     "mse": 0.17254595458507538,
+     "mae": 0.26522096991539
+    },
+    {
+     "mse": 0.27110302448272705,
+     "mae": 0.3233974874019623
+    },
+    {
+     "mse": 0.22281265258789062,
+     "mae": 0.25474146008491516
+    },
+    {
+     "mse": 0.7992143034934998,
+     "mae": 0.5932074785232544
+    },
+    {
+     "mse": 0.41088563203811646,
+     "mae": 0.4510384500026703
+    }
+   ],
+   "test_mse": 0.416483610868454,
+   "test_mae": 0.3897177577018738,
+   "n_windows": 147,
+   "stride": 1,
+   "context": 336,
+   "horizon": 48,
+   "seconds": 3.3
+  }
+ },
+ "moment": {
+  "name": "MOMENT-large",
+  "params": "386M",
+  "hf": "AutonLab/MOMENT-1-large",
+  "license": "MIT",
+  "recipe": "linear probing: frozen encoder, forecasting head trained on the benchmark's training split",
+  "note": "channel-independent; 336-step context left-padded to MOMENT's 512-step input with an input mask",
+  "file": "forecast_ili_moment.bin",
+  "seq_len": 512,
+  "patch": 8,
+  "precision": "float32 (bf16 autocast)",
+  "windows": [
+   {
+    "mse": 2.3692121505737305,
+    "mae": 0.9660748243331909
+   },
+   {
+    "mse": 1.0435117483139038,
+    "mae": 0.6717157959938049
+   },
+   {
+    "mse": 2.3573737144470215,
+    "mae": 1.1655062437057495
+   },
+   {
+    "mse": 4.276956558227539,
+    "mae": 1.4709826707839966
+   },
+   {
+    "mse": 6.54140567779541,
+    "mae": 1.81085205078125
+   },
+   {
+    "mse": 4.662178993225098,
+    "mae": 1.8517775535583496
+   }
+  ],
+  "test_mse": 3.543355800281422,
+  "test_mae": 1.3068270125665593,
+  "n_windows": 147,
+  "stride": 1,
+  "context": 336,
+  "horizon": 48,
+  "finetune": {
+   "key": "ili",
+   "V": 7,
+   "context": 336,
+   "horizon": 48,
+   "steps": 1500,
+   "batch": 9,
+   "lr": 0.0005,
+   "seed": 0,
+   "best_step": 900,
+   "val_mse": 0.43301500592912945,
+   "test_mse": 3.543355800281422,
+   "test_mae": 1.3068270125665593,
+   "n_test_windows": 147,
+   "test_stride": 1
+  }
+ },
+ "mod": {
+  "model": "forecast/mod/",
+  "embed_rows": [
+   50,
+   51,
+   52,
+   53,
+   54,
+   55,
+   56
+  ],
+  "windows": [
+   {
+    "mse": 1.360059142112732,
+    "mae": 0.575687050819397
+   },
+   {
+    "mse": 0.8042126893997192,
+    "mae": 0.5285629034042358
+   },
+   {
+    "mse": 1.4179127216339111,
+    "mae": 0.8547317981719971
+   },
+   {
+    "mse": 3.5782558917999268,
+    "mae": 1.1912062168121338
+   },
+   {
+    "mse": 4.262017250061035,
+    "mae": 1.3620449304580688
+   },
+   {
+    "mse": 3.7097465991973877,
+    "mae": 1.6396106481552124
+   }
+  ],
+  "test_mse": 2.4886698789742527,
+  "test_mae": 1.0279343651265513,
+  "n_windows": 147,
+  "stride": 1,
+  "precision": "int8"
+ },
+ "mod_revin": {
+  "model": "forecast/mod_revin/",
+  "embed_rows": [
+   50,
+   51,
+   52,
+   53,
+   54,
+   55,
+   56
+  ],
+  "windows": [
+   {
+    "mse": 1.394446611404419,
+    "mae": 0.6118987202644348
+   },
+   {
+    "mse": 0.929986298084259,
+    "mae": 0.5904656648635864
+   },
+   {
+    "mse": 1.289481282234192,
+    "mae": 0.798140287399292
+   },
+   {
+    "mse": 15.33641529083252,
+    "mae": 2.6171112060546875
+   },
+   {
+    "mse": 2.7327182292938232,
+    "mae": 1.1610521078109741
+   },
+   {
+    "mse": 12.42285442352295,
+    "mae": 2.5309534072875977
+   }
+  ],
+  "test_mse": 5.25356451913613,
+  "test_mae": 1.3492037953973628,
+  "n_windows": 147,
+  "stride": 1,
+  "precision": "int8",
+  "std_floor": 0.05
+ }
+}

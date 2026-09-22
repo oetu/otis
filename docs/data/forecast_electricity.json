@@ -1,0 +1,705 @@
+{
+ "key": "electricity",
+ "name": "Electricity",
+ "description": "Hourly electricity consumption of 321 clients, 2012-2014; every client is forecast as its own series.",
+ "domain": "electricity",
+ "step": "1 h",
+ "V": 1,
+ "T": 432,
+ "patch": 24,
+ "n_patches": 18,
+ "horizon_patches": 4,
+ "context": 336,
+ "horizon": 96,
+ "mask_ratio": 0.2223222222222222,
+ "variates": null,
+ "series_names": [
+  "series 0",
+  "series 1",
+  "series 2",
+  "series 3",
+  "series 4",
+  "series 5",
+  "series 6",
+  "series 7",
+  "series 8",
+  "series 9",
+  "series 10",
+  "series 11",
+  "series 12",
+  "series 13",
+  "series 14",
+  "series 15",
+  "series 16",
+  "series 17",
+  "series 18",
+  "series 19",
+  "series 20",
+  "series 21",
+  "series 22",
+  "series 23",
+  "series 24",
+  "series 25",
+  "series 26",
+  "series 27",
+  "series 28",
+  "series 29",
+  "series 30",
+  "series 31",
+  "series 32",
+  "series 33",
+  "series 34",
+  "series 35",
+  "series 36",
+  "series 37",
+  "series 38",
+  "series 39",
+  "series 40",
+  "series 41",
+  "series 42",
+  "series 43",
+  "series 44",
+  "series 45",
+  "series 46",
+  "series 47",
+  "series 48",
+  "series 49",
+  "series 50",
+  "series 51",
+  "series 52",
+  "series 53",
+  "series 54",
+  "series 55",
+  "series 56",
+  "series 57",
+  "series 58",
+  "series 59",
+  "series 60",
+  "series 61",
+  "series 62",
+  "series 63",
+  "series 64",
+  "series 65",
+  "series 66",
+  "series 67",
+  "series 68",
+  "series 69",
+  "series 70",
+  "series 71",
+  "series 72",
+  "series 73",
+  "series 74",
+  "series 75",
+  "series 76",
+  "series 77",
+  "series 78",
+  "series 79",
+  "series 80",
+  "series 81",
+  "series 82",
+  "series 83",
+  "series 84",
+  "series 85",
+  "series 86",
+  "series 87",
+  "series 88",
+  "series 89",
+  "series 90",
+  "series 91",
+  "series 92",
+  "series 93",
+  "series 94",
+  "series 95",
+  "series 96",
+  "series 97",
+  "series 98",
+  "series 99",
+  "series 100",
+  "series 101",
+  "series 102",
+  "series 103",
+  "series 104",
+  "series 105",
+  "series 106",
+  "series 107",
+  "series 108",
+  "series 109",
+  "series 110",
+  "series 111",
+  "series 112",
+  "series 113",
+  "series 114",
+  "series 115",
+  "series 116",
+  "series 117",
+  "series 118",
+  "series 119",
+  "series 120",
+  "series 121",
+  "series 122",
+  "series 123",
+  "series 124",
+  "series 125",
+  "series 126",
+  "series 127",
+  "series 128",
+  "series 129",
+  "series 130",
+  "series 131",
+  "series 132",
+  "series 133",
+  "series 134",
+  "series 135",
+  "series 136",
+  "series 137",
+  "series 138",
+  "series 139",
+  "series 140",
+  "series 141",
+  "series 142",
+  "series 143",
+  "series 144",
+  "series 145",
+  "series 146",
+  "series 147",
+  "series 148",
+  "series 149",
+  "series 150",
+  "series 151",
+  "series 152",
+  "series 153",
+  "series 154",
+  "series 155",
+  "series 156",
+  "series 157",
+  "series 158",
+  "series 159",
+  "series 160",
+  "series 161",
+  "series 162",
+  "series 163",
+  "series 164",
+  "series 165",
+  "series 166",
+  "series 167",
+  "series 168",
+  "series 169",
+  "series 170",
+  "series 171",
+  "series 172",
+  "series 173",
+  "series 174",
+  "series 175",
+  "series 176",
+  "series 177",
+  "series 178",
+  "series 179",
+  "series 180",
+  "series 181",
+  "series 182",
+  "series 183",
+  "series 184",
+  "series 185",
+  "series 186",
+  "series 187",
+  "series 188",
+  "series 189",
+  "series 190",
+  "series 191",
+  "series 192",
+  "series 193",
+  "series 194",
+  "series 195",
+  "series 196",
+  "series 197",
+  "series 198",
+  "series 199",
+  "series 200",
+  "series 201",
+  "series 202",
+  "series 203",
+  "series 204",
+  "series 205",
+  "series 206",
+  "series 207",
+  "series 208",
+  "series 209",
+  "series 210",
+  "series 211",
+  "series 212",
+  "series 213",
+  "series 214",
+  "series 215",
+  "series 216",
+  "series 217",
+  "series 218",
+  "series 219",
+  "series 220",
+  "series 221",
+  "series 222",
+  "series 223",
+  "series 224",
+  "series 225",
+  "series 226",
+  "series 227",
+  "series 228",
+  "series 229",
+  "series 230",
+  "series 231",
+  "series 232",
+  "series 233",
+  "series 234",
+  "series 235",
+  "series 236",
+  "series 237",
+  "series 238",
+  "series 239",
+  "series 240",
+  "series 241",
+  "series 242",
+  "series 243",
+  "series 244",
+  "series 245",
+  "series 246",
+  "series 247",
+  "series 248",
+  "series 249",
+  "series 250",
+  "series 251",
+  "series 252",
+  "series 253",
+  "series 254",
+  "series 255",
+  "series 256",
+  "series 257",
+  "series 258",
+  "series 259",
+  "series 260",
+  "series 261",
+  "series 262",
+  "series 263",
+  "series 264",
+  "series 265",
+  "series 266",
+  "series 267",
+  "series 268",
+  "series 269",
+  "series 270",
+  "series 271",
+  "series 272",
+  "series 273",
+  "series 274",
+  "series 275",
+  "series 276",
+  "series 277",
+  "series 278",
+  "series 279",
+  "series 280",
+  "series 281",
+  "series 282",
+  "series 283",
+  "series 284",
+  "series 285",
+  "series 286",
+  "series 287",
+  "series 288",
+  "series 289",
+  "series 290",
+  "series 291",
+  "series 292",
+  "series 293",
+  "series 294",
+  "series 295",
+  "series 296",
+  "series 297",
+  "series 298",
+  "series 299",
+  "series 300",
+  "series 301",
+  "series 302",
+  "series 303",
+  "series 304",
+  "series 305",
+  "series 306",
+  "series 307",
+  "series 308",
+  "series 309",
+  "series 310",
+  "series 311",
+  "series 312",
+  "series 313",
+  "series 314",
+  "series 315",
+  "series 316",
+  "series 317",
+  "series 318",
+  "series 319",
+  "series 320"
+ ],
+ "n_series": 321,
+ "embed_rows": [
+  1
+ ],
+ "windows": [
+  {
+   "series": 0,
+   "offset": 2330,
+   "mse": 0.7114166617393494,
+   "mae": 0.48193359375,
+   "label": "series 0"
+  },
+  {
+   "series": 64,
+   "offset": 2128,
+   "mse": 1.0261410474777222,
+   "mae": 0.818646252155304,
+   "label": "series 64"
+  },
+  {
+   "series": 128,
+   "offset": 2673,
+   "mse": 0.12524156272411346,
+   "mae": 0.29306676983833313,
+   "label": "series 128"
+  },
+  {
+   "series": 192,
+   "offset": 1101,
+   "mse": 0.03320547938346863,
+   "mae": 0.13223372399806976,
+   "label": "series 192"
+  },
+  {
+   "series": 256,
+   "offset": 5015,
+   "mse": 0.7734835743904114,
+   "mae": 0.4789734184741974,
+   "label": "series 256"
+  },
+  {
+   "series": 320,
+   "offset": 3764,
+   "mse": 0.1847570687532425,
+   "mae": 0.3987937867641449,
+   "label": "series 320"
+  }
+ ],
+ "files": {
+  "windows": "forecast_electricity_windows.bin"
+ },
+ "model": "forecast/electricity/",
+ "reference": {
+  "test_mse": 0.12541421756225848,
+  "test_mae": 0.22067438336075285,
+  "n_windows": 26001,
+  "stride": 64,
+  "paper_mse": 0.125,
+  "precision": "int8",
+  "ms_per_window_native": 10.964593190389374
+ },
+ "source": {
+  "split": "712"
+ },
+ "revin": {
+  "model": "forecast/electricity_revin/",
+  "embed_rows": [
+   1
+  ],
+  "std_floor": 0.05,
+  "windows": [
+   {
+    "mse": 0.7209029793739319,
+    "mae": 0.4840869903564453
+   },
+   {
+    "mse": 0.9769085049629211,
+    "mae": 0.797644317150116
+   },
+   {
+    "mse": 0.1340867429971695,
+    "mae": 0.28807559609413147
+   },
+   {
+    "mse": 0.0318240150809288,
+    "mae": 0.12809395790100098
+   },
+   {
+    "mse": 0.8246237635612488,
+    "mae": 0.4974360466003418
+   },
+   {
+    "mse": 0.20272888243198395,
+    "mae": 0.4186886250972748
+   }
+  ],
+  "test_mse": 0.1265004716304713,
+  "test_mae": 0.22093447656539586,
+  "n_windows": 26001,
+  "stride": 64,
+  "precision": "int8"
+ },
+ "units": {
+  "graph": "fc_electricity",
+  "precision": "int8",
+  "paper_mse": 0.152,
+  "windows": [
+   {
+    "mse": 0.6931416392326355,
+    "mae": 0.4947618544101715
+   },
+   {
+    "mse": 0.91839998960495,
+    "mae": 0.7890040278434753
+   },
+   {
+    "mse": 0.16272631287574768,
+    "mae": 0.32615604996681213
+   },
+   {
+    "mse": 0.08929073810577393,
+    "mae": 0.22680635750293732
+   },
+   {
+    "mse": 0.7961702346801758,
+    "mae": 0.49511489272117615
+   },
+   {
+    "mse": 0.2041652947664261,
+    "mae": 0.4076576232910156
+   }
+  ],
+  "test_mse": 0.1519769452924555,
+  "test_mae": 0.24994733710300504,
+  "n_windows": 26001,
+  "stride": 64,
+  "finetune": {
+   "steps": 1500,
+   "batch": 8,
+   "lr": 0.0001,
+   "lr_tokens": 0.005,
+   "best_step": 1500,
+   "val_mse": 0.13273773188407795
+  }
+ },
+ "zero_shot": {
+  "chronos2": {
+   "name": "Chronos-2",
+   "params": "120M",
+   "hf": "amazon/chronos-2",
+   "license": "Apache-2.0",
+   "point": "median",
+   "note": "encoder-only, in-context multivariate; point forecast = median quantile",
+   "file": "forecast_electricity_zs_chronos2.bin",
+   "windows": [
+    {
+     "mse": 0.7277821898460388,
+     "mae": 0.45763108134269714
+    },
+    {
+     "mse": 0.9100713729858398,
+     "mae": 0.7732828259468079
+    },
+    {
+     "mse": 0.14042893052101135,
+     "mae": 0.29988062381744385
+    },
+    {
+     "mse": 0.04864971339702606,
+     "mae": 0.1556188464164734
+    },
+    {
+     "mse": 0.7954597473144531,
+     "mae": 0.4636194705963135
+    },
+    {
+     "mse": 0.16192829608917236,
+     "mae": 0.3605423867702484
+    }
+   ],
+   "test_mse": 0.1280343234539032,
+   "test_mae": 0.21274106204509735,
+   "n_windows": 26001,
+   "stride": 64,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 83.8
+  },
+  "timesfm3": {
+   "name": "TimesFM-3",
+   "params": "330M",
+   "hf": "google/timesfm-3.0-pytorch",
+   "license": "TimesFM non-commercial v1.0",
+   "point": "median",
+   "note": "decoder-only with variate attention; point forecast = median quantile",
+   "file": "forecast_electricity_zs_timesfm3.bin",
+   "windows": [
+    {
+     "mse": 0.7179128527641296,
+     "mae": 0.46000000834465027
+    },
+    {
+     "mse": 0.8476729989051819,
+     "mae": 0.7403460144996643
+    },
+    {
+     "mse": 0.1181243285536766,
+     "mae": 0.27108657360076904
+    },
+    {
+     "mse": 0.029337704181671143,
+     "mae": 0.12343915551900864
+    },
+    {
+     "mse": 0.9131636023521423,
+     "mae": 0.4959881007671356
+    },
+    {
+     "mse": 0.1339339017868042,
+     "mae": 0.31925535202026367
+    }
+   ],
+   "test_mse": 0.13100352883338928,
+   "test_mae": 0.21780461072921753,
+   "n_windows": 26001,
+   "stride": 64,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 403.5
+  }
+ },
+ "moment": {
+  "name": "MOMENT-large",
+  "params": "386M",
+  "hf": "AutonLab/MOMENT-1-large",
+  "license": "MIT",
+  "recipe": "linear probing: frozen encoder, forecasting head trained on the benchmark's training split",
+  "note": "channel-independent; 336-step context left-padded to MOMENT's 512-step input with an input mask",
+  "file": "forecast_electricity_moment.bin",
+  "seq_len": 512,
+  "patch": 8,
+  "precision": "float32 (bf16 autocast)",
+  "windows": [
+   {
+    "mse": 0.7017562985420227,
+    "mae": 0.49844732880592346
+   },
+   {
+    "mse": 0.6091836094856262,
+    "mae": 0.5886121392250061
+   },
+   {
+    "mse": 0.23575353622436523,
+    "mae": 0.4077613353729248
+   },
+   {
+    "mse": 0.06132737919688225,
+    "mae": 0.19135701656341553
+   },
+   {
+    "mse": 0.7626113891601562,
+    "mae": 0.5348772406578064
+   },
+   {
+    "mse": 0.2647112309932709,
+    "mae": 0.47926974296569824
+   }
+  ],
+  "test_mse": 0.14672681592484982,
+  "test_mae": 0.2536594376980264,
+  "n_windows": 26001,
+  "stride": 64,
+  "context": 336,
+  "horizon": 96,
+  "finetune": {
+   "key": "electricity",
+   "V": 1,
+   "context": 336,
+   "horizon": 96,
+   "steps": 1500,
+   "batch": 64,
+   "lr": 0.0005,
+   "seed": 0,
+   "best_step": 1400,
+   "val_mse": 0.125506160811348,
+   "test_mse": 0.14672681592484982,
+   "test_mae": 0.2536594376980264,
+   "n_test_windows": 26001,
+   "test_stride": 64
+  }
+ },
+ "mod": {
+  "model": "forecast/mod/",
+  "embed_rows": [
+   57
+  ],
+  "windows": [
+   {
+    "mse": 0.7328727841377258,
+    "mae": 0.5017123222351074
+   },
+   {
+    "mse": 0.7707895636558533,
+    "mae": 0.7084820866584778
+   },
+   {
+    "mse": 0.3981257975101471,
+    "mae": 0.5510633587837219
+   },
+   {
+    "mse": 0.08732510358095169,
+    "mae": 0.22019191086292267
+   },
+   {
+    "mse": 0.8471623063087463,
+    "mae": 0.5540738105773926
+   },
+   {
+    "mse": 0.23237399756908417,
+    "mae": 0.43593332171440125
+   }
+  ],
+  "test_mse": 0.15043039193948943,
+  "test_mae": 0.2527884332860948,
+  "n_windows": 26001,
+  "stride": 64,
+  "precision": "int8"
+ },
+ "mod_revin": {
+  "model": "forecast/mod_revin/",
+  "embed_rows": [
+   57
+  ],
+  "windows": [
+   {
+    "mse": 0.7467469573020935,
+    "mae": 0.5039663314819336
+   },
+   {
+    "mse": 0.9744293093681335,
+    "mae": 0.8020782470703125
+   },
+   {
+    "mse": 0.16430480778217316,
+    "mae": 0.3261363208293915
+   },
+   {
+    "mse": 0.09867206960916519,
+    "mae": 0.2344255894422531
+   },
+   {
+    "mse": 0.8289921879768372,
+    "mae": 0.5213072299957275
+   },
+   {
+    "mse": 0.3380206823348999,
+    "mae": 0.5109939575195312
+   }
+  ],
+  "test_mse": 0.15198123459601706,
+  "test_mae": 0.2518671704926152,
+  "n_windows": 26001,
+  "stride": 64,
+  "precision": "int8",
+  "std_floor": 0.05
+ }
+}

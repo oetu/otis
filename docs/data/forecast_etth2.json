@@ -1,0 +1,415 @@
+{
+ "key": "etth2",
+ "name": "ETTh2",
+ "description": "Electricity transformer temperature, hourly, second transformer: six load features and the oil temperature.",
+ "domain": "etth",
+ "step": "1 h",
+ "V": 7,
+ "T": 432,
+ "patch": 24,
+ "n_patches": 18,
+ "horizon_patches": 4,
+ "context": 336,
+ "horizon": 96,
+ "mask_ratio": 0.2223222222222222,
+ "variates": [
+  "HUFL",
+  "HULL",
+  "MUFL",
+  "MULL",
+  "LUFL",
+  "LULL",
+  "OT"
+ ],
+ "series_names": null,
+ "n_series": 1,
+ "embed_rows": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "windows": [
+  {
+   "series": 0,
+   "offset": 0,
+   "mse": 0.24344149231910706,
+   "mae": 0.3752305507659912,
+   "label": "t = 0"
+  },
+  {
+   "series": 0,
+   "offset": 678,
+   "mse": 0.21250061690807343,
+   "mae": 0.3103843033313751,
+   "label": "t = 678"
+  },
+  {
+   "series": 0,
+   "offset": 1355,
+   "mse": 0.09496315568685532,
+   "mae": 0.23309217393398285,
+   "label": "t = 1355"
+  },
+  {
+   "series": 0,
+   "offset": 2033,
+   "mse": 0.14911143481731415,
+   "mae": 0.29525548219680786,
+   "label": "t = 2033"
+  },
+  {
+   "series": 0,
+   "offset": 2710,
+   "mse": 0.10167255997657776,
+   "mae": 0.23007570207118988,
+   "label": "t = 2710"
+  },
+  {
+   "series": 0,
+   "offset": 3388,
+   "mse": 0.23877139389514923,
+   "mae": 0.36973831057548523,
+   "label": "t = 3388"
+  }
+ ],
+ "files": {
+  "windows": "forecast_etth2_windows.bin"
+ },
+ "model": "forecast/etth2/",
+ "reference": {
+  "test_mse": 0.2570473520471802,
+  "test_mae": 0.3507132143274231,
+  "n_windows": 424,
+  "stride": 8,
+  "paper_mse": 0.247,
+  "precision": "int8",
+  "ms_per_window_native": 31.449523832028113
+ },
+ "source": {
+  "split": "622"
+ },
+ "revin": {
+  "model": "forecast/etth2_revin/",
+  "embed_rows": [
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7
+  ],
+  "std_floor": 0.05,
+  "windows": [
+   {
+    "mse": 0.15427839756011963,
+    "mae": 0.26902106404304504
+   },
+   {
+    "mse": 0.19189497828483582,
+    "mae": 0.3321554362773895
+   },
+   {
+    "mse": 0.08843763917684555,
+    "mae": 0.22311986982822418
+   },
+   {
+    "mse": 0.12660931050777435,
+    "mae": 0.2641129791736603
+   },
+   {
+    "mse": 0.07511541247367859,
+    "mae": 0.19798578321933746
+   },
+   {
+    "mse": 0.2143860161304474,
+    "mae": 0.33819031715393066
+   }
+  ],
+  "test_mse": 0.2370194938156824,
+  "test_mae": 0.32820503055205885,
+  "n_windows": 424,
+  "stride": 8,
+  "precision": "int8"
+ },
+ "units": {
+  "graph": "fc_etth2",
+  "precision": "int8",
+  "paper_mse": 0.361,
+  "windows": [
+   {
+    "mse": 0.1924431473016739,
+    "mae": 0.3057931959629059
+   },
+   {
+    "mse": 0.20294275879859924,
+    "mae": 0.3451167643070221
+   },
+   {
+    "mse": 0.1287478655576706,
+    "mae": 0.26284778118133545
+   },
+   {
+    "mse": 0.1250951588153839,
+    "mae": 0.27188217639923096
+   },
+   {
+    "mse": 0.09791278839111328,
+    "mae": 0.22097933292388916
+   },
+   {
+    "mse": 0.11119354516267776,
+    "mae": 0.24414734542369843
+   }
+  ],
+  "test_mse": 0.24895828334122616,
+  "test_mae": 0.33503351799862563,
+  "n_windows": 424,
+  "stride": 8,
+  "finetune": {
+   "steps": 1500,
+   "batch": 8,
+   "lr": 0.0001,
+   "lr_tokens": 0.005,
+   "best_step": 100,
+   "val_mse": 0.27889028927922144
+  }
+ },
+ "zero_shot": {
+  "chronos2": {
+   "name": "Chronos-2",
+   "params": "120M",
+   "hf": "amazon/chronos-2",
+   "license": "Apache-2.0",
+   "point": "median",
+   "note": "encoder-only, in-context multivariate; point forecast = median quantile",
+   "file": "forecast_etth2_zs_chronos2.bin",
+   "windows": [
+    {
+     "mse": 0.3029557764530182,
+     "mae": 0.400175005197525
+    },
+    {
+     "mse": 0.1931932121515274,
+     "mae": 0.30303823947906494
+    },
+    {
+     "mse": 0.10121382027864456,
+     "mae": 0.236433207988739
+    },
+    {
+     "mse": 0.1025664210319519,
+     "mae": 0.23115110397338867
+    },
+    {
+     "mse": 0.07289286702871323,
+     "mae": 0.18160480260849
+    },
+    {
+     "mse": 0.1685311198234558,
+     "mae": 0.3025793731212616
+    }
+   ],
+   "test_mse": 0.23439669609069824,
+   "test_mae": 0.3171183466911316,
+   "n_windows": 424,
+   "stride": 8,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 7.3
+  },
+  "timesfm3": {
+   "name": "TimesFM-3",
+   "params": "330M",
+   "hf": "google/timesfm-3.0-pytorch",
+   "license": "TimesFM non-commercial v1.0",
+   "point": "median",
+   "note": "decoder-only with variate attention; point forecast = median quantile",
+   "file": "forecast_etth2_zs_timesfm3.bin",
+   "windows": [
+    {
+     "mse": 0.2402229756116867,
+     "mae": 0.33794331550598145
+    },
+    {
+     "mse": 0.1825558841228485,
+     "mae": 0.3088737428188324
+    },
+    {
+     "mse": 0.09102216362953186,
+     "mae": 0.22758515179157257
+    },
+    {
+     "mse": 0.09049788117408752,
+     "mae": 0.22507798671722412
+    },
+    {
+     "mse": 0.06922497600317001,
+     "mae": 0.17835472524166107
+    },
+    {
+     "mse": 0.09129621088504791,
+     "mae": 0.22088153660297394
+    }
+   ],
+   "test_mse": 0.21509592235088348,
+   "test_mae": 0.30338770151138306,
+   "n_windows": 424,
+   "stride": 8,
+   "context": 336,
+   "horizon": 96,
+   "seconds": 24.0
+  }
+ },
+ "moment": {
+  "name": "MOMENT-large",
+  "params": "386M",
+  "hf": "AutonLab/MOMENT-1-large",
+  "license": "MIT",
+  "recipe": "linear probing: frozen encoder, forecasting head trained on the benchmark's training split",
+  "note": "channel-independent; 336-step context left-padded to MOMENT's 512-step input with an input mask",
+  "file": "forecast_etth2_moment.bin",
+  "seq_len": 512,
+  "patch": 8,
+  "precision": "float32 (bf16 autocast)",
+  "windows": [
+   {
+    "mse": 0.22973863780498505,
+    "mae": 0.3829686641693115
+   },
+   {
+    "mse": 0.29165101051330566,
+    "mae": 0.41731497645378113
+   },
+   {
+    "mse": 0.14037278294563293,
+    "mae": 0.2732328474521637
+   },
+   {
+    "mse": 0.24259665608406067,
+    "mae": 0.35609132051467896
+   },
+   {
+    "mse": 0.08170672506093979,
+    "mae": 0.2018185406923294
+   },
+   {
+    "mse": 0.1071050837635994,
+    "mae": 0.23747946321964264
+   }
+  ],
+  "test_mse": 0.25245172958168377,
+  "test_mae": 0.341091347940313,
+  "n_windows": 424,
+  "stride": 8,
+  "context": 336,
+  "horizon": 96,
+  "finetune": {
+   "key": "etth2",
+   "V": 7,
+   "context": 336,
+   "horizon": 96,
+   "steps": 1500,
+   "batch": 9,
+   "lr": 0.0005,
+   "seed": 0,
+   "best_step": 1400,
+   "val_mse": 0.28391384457213753,
+   "test_mse": 0.25245172958168377,
+   "test_mae": 0.341091347940313,
+   "n_test_windows": 424,
+   "test_stride": 8
+  }
+ },
+ "mod": {
+  "model": "forecast/mod/",
+  "embed_rows": [
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14
+  ],
+  "windows": [
+   {
+    "mse": 0.9509070515632629,
+    "mae": 0.6334233283996582
+   },
+   {
+    "mse": 0.19825701415538788,
+    "mae": 0.3031514286994934
+   },
+   {
+    "mse": 0.17827214300632477,
+    "mae": 0.311664879322052
+   },
+   {
+    "mse": 0.10263139009475708,
+    "mae": 0.2499842345714569
+   },
+   {
+    "mse": 0.13787028193473816,
+    "mae": 0.2588036060333252
+   },
+   {
+    "mse": 0.13370631635189056,
+    "mae": 0.2692001461982727
+   }
+  ],
+  "test_mse": 0.3162713045043484,
+  "test_mae": 0.3731177501942752,
+  "n_windows": 424,
+  "stride": 8,
+  "precision": "int8"
+ },
+ "mod_revin": {
+  "model": "forecast/mod_revin/",
+  "embed_rows": [
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14
+  ],
+  "windows": [
+   {
+    "mse": 0.17128130793571472,
+    "mae": 0.3033069372177124
+   },
+   {
+    "mse": 0.24648991227149963,
+    "mae": 0.38076359033584595
+   },
+   {
+    "mse": 0.11062227189540863,
+    "mae": 0.24894854426383972
+   },
+   {
+    "mse": 0.11093902587890625,
+    "mae": 0.2495044767856598
+   },
+   {
+    "mse": 0.06885738670825958,
+    "mae": 0.18651077151298523
+   },
+   {
+    "mse": 0.18933385610580444,
+    "mae": 0.3181973099708557
+   }
+  ],
+  "test_mse": 0.23243054541109023,
+  "test_mae": 0.3256182948584264,
+  "n_windows": 424,
+  "stride": 8,
+  "precision": "int8",
+  "std_floor": 0.05
+ }
+}

@@ -76,3 +76,5 @@ docs/_build/
 
 # PyBuilder
 target/
+# ONNX graphs of the web demo: served from the Hugging Face Hub, not tracked here
+docs/models/

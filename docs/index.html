@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTIS - Open time series encoder</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
+<meta name="description" content="OTIS, an open time series encoder: 7 million parameters, 7 megabytes, running locally on your CPU, in your browser. See how it organises ECG and EEG recordings it has never seen labels for, hide any part of a time series and watch it write it back, compare it with UniTS and MOMENT, and check its fine-tuned forecasts on four public datasets.">
+<script>(function () { var t = null; try { t = sessionStorage.getItem('theme'); } catch (e) {} if (t !== 'dark' && t !== 'light') { var h = new Date().getHours(); t = (h >= 19 || h < 7) ? 'dark' : 'light'; } document.documentElement.dataset.theme = t; })();</script>
+<script>(function () { var q = location.search; if (/[?&]intro\b/.test(q)) { document.documentElement.dataset.intro = 'on'; return; } if (/[?&](nointro|selftest|sync)\b/.test(q)) return; var seen = null; try { seen = localStorage.getItem('otis-intro'); } catch (e) {} if (seen) return; if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return; document.documentElement.dataset.intro = 'on'; })();</script>   <!-- the intro plays on the first visit only (localStorage), never with reduced motion or ?nointro; ?intro replays it -->   <!-- the theme before the first paint: dark from 19:00 to 07:00 local time, unless the button was used this visit -->
+<script>window.coi = { coepCredentialless: () => true, quiet: true };</script>
+<script src="coi-serviceworker.js"></script>   <!-- GitHub Pages cannot send COOP/COEP headers; this MIT service worker (gzuidhof/coi-serviceworker) adds them, so the language model may use several wasm threads. First visit only: registers and reloads once. No effect on a plain http preview (not a secure context) or when the server already isolates. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap">
+<link rel="stylesheet" href="app.css?v=293">
+</head>
+<body>
+
+<!-- the first visit opens with this: the tagline one line at a time, then the wordmark and what it is; app.js plays it and then reveals the hero -->
+<div id="intro" aria-hidden="true"><p class="intro-line" id="intro-line"></p><div class="intro-brand"><p class="intro-otis">OTIS</p><p class="intro-sub">An open time series encoder</p></div></div>
+
+<header class="bar" id="top">
+  <div class="bar-in">
+    <a class="brand" href="#top"><svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14"/><path d="M 8.0 32.0 L 9.0 29.4 L 10.0 26.8 L 11.0 24.3 L 12.0 22.0 L 13.0 19.8 L 14.0 17.9 L 15.0 16.1 L 16.0 14.7 L 17.0 13.5 L 18.0 12.7 L 19.0 12.2 L 20.0 12.0 L 21.0 12.2 L 22.0 12.7 L 23.0 13.5 L 24.0 14.7 L 25.0 16.1 L 26.0 17.9 L 27.0 19.8 L 28.0 22.0 L 29.0 24.3 L 30.0 26.8 L 31.0 29.4 L 32.0 32.0 L 33.0 34.6 L 34.0 37.2 L 35.0 39.7 L 36.0 42.0 L 37.0 44.2 L 38.0 46.1 L 39.0 47.9 L 40.0 49.3 L 41.0 50.5 L 42.0 51.3 L 43.0 51.8 L 44.0 52.0 L 45.0 51.8 L 46.0 51.3 L 47.0 50.5 L 48.0 49.3 L 49.0 47.9 L 50.0 46.1 L 51.0 44.2 L 52.0 42.0 L 53.0 39.7 L 54.0 37.2 L 55.0 34.6 L 56.0 32.0" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="brand-text"><span class="brand-name">OTIS</span><span class="brand-sub">Open time series encoder</span></span></a>
+    <nav>
+      <a href="#explore">Explore</a>
+      <a href="#fill">Impute</a>
+      <a href="#bench">Forecast</a>
+      <a href="#cook">Cook</a>
+      <button type="button" id="about-btn" data-about="top">About</button>
+    </nav>
+    <button type="button" class="mode" id="theme-btn" aria-label="Switch to dark mode" title="Dark mode"><svg class="mode-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg><svg class="mode-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg></button>
+    <a class="btn contact" href="mailto:oezguen.turgut@tum.de">Get in touch<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    <button type="button" class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="menu"><span></span><span></span><span></span></button>   <!-- a phone: the hamburger that opens the menu below -->
+    <!-- every encoder is on by default; the chips stay in the document for the script (?enc=, selftest) but are not shown -->
+    <div class="encoders" id="encoders" role="group" aria-label="Encoders shown" hidden>
+      <button type="button" class="enc" data-enc="otis" aria-pressed="true" title="OTIS, 7.1 M parameters (Turgut et al., 2026)"><i></i>OTIS<small>7 M</small></button>
+      <button type="button" class="enc" data-enc="units" aria-pressed="true" title="UniTS, 8.2 M parameters (Gao et al., 2024)"><i></i>UniTS<small>8 M</small></button>
+      <button type="button" class="enc" data-enc="moment" aria-pressed="true" title="MOMENT-large, 386 M parameters (Goswami et al., 2024)"><i></i>MOMENT<small>386 M</small></button>
+    </div>
+  </div>
+</header>
+
+<!-- the phone menu (below 900px): the sections as a big list, the theme toggle and the actions at the bottom, the way bfl.ai does it; the hamburger in the bar opens it -->
+<div class="menu" id="menu" aria-label="Menu">
+  <nav class="menu-nav">
+    <a href="#explore">Explore</a>
+    <a href="#fill">Impute</a>
+    <a href="#bench">Forecast</a>
+    <a href="#cook">Cook</a>
+    <button type="button" data-about="top">About</button>
+  </nav>
+  <div class="menu-actions">
+    <button type="button" class="menu-theme" id="menu-theme">Dark mode</button>
+    <a class="btn" href="mailto:oezguen.turgut@tum.de">Get in touch<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+  </div>
+</div>
+
+<!-- section rail on wide screens (the top-bar links take over below 1180px); the marker follows the section in view -->
+<nav class="rail" id="rail" aria-label="Sections">
+  <ol class="rail-nav">
+    <li><a href="#explore" data-sec="explore">Explore</a></li>
+    <li><a href="#fill" data-sec="fill">Impute</a></li>
+    <li><a href="#bench" data-sec="bench">Forecast</a></li>
+    <li><a href="#cook" data-sec="cook">Cook</a></li>
+    <li class="rail-about"><button type="button" data-about="top">About</button></li>
+  </ol>
+  <span class="rail-marker" aria-hidden="true"></span>
+</nav>
+
+<main>   <!-- each section spans the full width (Explore and Forecast on a band); its content sits in a centred .wrap column -->
+
+  <section class="hero">
+    <div class="wrap">
+    <h1><span class="h1-nums">7 million parameters. 7&nbsp;megabytes.</span>A time series model so&nbsp;small<br>you can <span class="rot" aria-hidden="true"><span class="rot-word" id="rot-word">explore</span></span><span class="sr-only">explore, impute, forecast and cook</span> locally, <em>on your&nbsp;CPU.</em><br><span class="claim">Faster and cheaper than ever.*</span></h1>
+    <p class="hero-note"><span class="fn-star">*</span>Mind your mobile data plan. Comparable models are a 100+ MB download. OTIS is only 7 MB away.</p>
+    <!-- the waves: a fan of thin trajectories and one bold one, drifting slowly (app.js draws them); the fade runs in from the left -->
+    <div class="hero-waves" aria-hidden="true"><svg id="hero-waves" viewBox="0 0 1000 180" preserveAspectRatio="none"><defs>
+      <linearGradient id="wave-fade" x1="0" x2="1" y1="0" y2="0"><stop offset="0" style="stop-color:var(--text-muted)" stop-opacity=".1"/><stop offset=".5" style="stop-color:var(--text-muted)" stop-opacity=".7"/><stop offset="1" style="stop-color:var(--text-muted)" stop-opacity=".3"/></linearGradient>
+      <linearGradient id="wave-fade-bold" x1="0" x2="1" y1="0" y2="0"><stop offset="0" style="stop-color:var(--text-primary)" stop-opacity=".25"/><stop offset=".6" style="stop-color:var(--text-primary)" stop-opacity="1"/><stop offset="1" style="stop-color:var(--text-primary)" stop-opacity=".8"/></linearGradient>
+    </defs></svg></div>
+    <p class="hero-kicker"><span class="kicker-brand">OTIS</span><span class="kicker-tag">No text. No image. Simply numbers.</span></p>
+    <p class="hero-links"><a class="btn ghost" href="https://arxiv.org/abs/2410.07299" target="_blank" rel="noopener">Documentation<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10M7 17 17 7"/></svg></a><a class="btn ghost" href="https://github.com/oetu/otis" target="_blank" rel="noopener">GitHub<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10M7 17 17 7"/></svg></a></p>
+    </div>
+    <a class="scroll-cue" href="#explore" aria-label="Scroll down to Explore">Scroll<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
+  </section>
+
+  <!-- ================= explore ================= -->
+  <section class="panel band" id="explore">
+    <div class="wrap">
+    <div class="panel-head">
+      <h2>Explore</h2>
+      <p class="sub"><strong>It has never seen a label. Watch it sort anyway.</strong></p>
+      <button type="button" class="info" data-about="explore" title="What happens here">?</button>
+    </div>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Dataset" id="dataset-seg"></div>
+    </div>
+    <div class="legend-row" id="legend-explore"></div>
+    <div class="toolbar ds-line">
+      <div class="ds-text">
+        <p class="ds-blurb" id="ds-blurb"></p>
+        <span class="ds-hint" id="ds-hint" hidden>hover a dot and click it to see the recording</span>
+      </div>
+      <span class="status" id="status-explore" role="status" aria-live="polite"></span>
+    </div>
+    <div class="custom-form" id="custom-form" hidden>
+      <div class="custom-row">
+        <label>train set <input type="file" id="custom-train" accept=".csv,.txt,text/csv,text/plain"></label>
+        <label>test set <input type="file" id="custom-test" accept=".csv,.txt,text/csv,text/plain"></label>
+        <label>variates <input type="text" id="custom-v" value="1" inputmode="numeric" pattern="[0-9]*" placeholder="1" aria-label="number of variates"></label>
+        <button type="button" class="btn" id="custom-go">Run</button>
+      </div>
+      <p class="hint">One time series per row. The first column is its class, called <span class="kw">label</span>; the columns after
+        it are the values, one per time step. An optional <span class="kw">id</span> column names the series on the map. More than one
+        variate? Keep them in the same row: all steps of the first variate, then all steps of the second, and so on. Set the number of variates above.</p>
+    </div>
+    <div class="maps" id="maps"></div>
+    <div class="sample-view" id="sample-view" hidden></div>
+    </div>
+  </section>
+
+  <!-- ================= fill in ================= -->
+  <section class="panel" id="fill">
+    <div class="wrap">
+    <div class="panel-head">
+      <h2>Impute</h2>
+      <p class="sub"><strong>Hide any part. It writes it back.</strong></p>
+      <button type="button" class="info" data-about="fill" title="What happens here">?</button>
+    </div>
+    <div class="toolbar">
+      <span class="seg-label">Time series</span>
+      <div class="chips" id="signal-chips"></div>
+    </div>
+    <div class="toolbar" id="props-row">
+      <span class="seg-label">Properties</span>
+      <label class="slider" id="freq-ctl"><span>frequency</span><input type="range" id="freq" min="1" max="200" step="1" value="60"><output id="freq-out">60 Hz</output></label>
+      <label class="slider" id="noise-ctl" hidden><span>noise</span><input type="range" id="noise" min="0" max="100" step="5" value="10"><output id="noise-out">10%</output></label>
+    </div>
+    <div class="paste" id="paste" hidden>
+      <textarea id="paste-text" placeholder="numbers separated by commas, spaces or newlines — one series"></textarea>
+      <button type="button" class="btn" id="paste-go">Use this series</button>
+      <span class="hint">Resampled to 432 steps and z-scored. Stays in your browser.</span>
+    </div>
+    <div class="toolbar">
+      <span class="seg-label">Hide</span>
+      <div class="chips" id="hide-chips"></div>
+      <span class="hint" id="hide-hint" style="margin:0">or drag across the chart</span>
+      <span class="status" id="status-fill" role="status" aria-live="polite"></span>
+    </div>
+    <div class="fill-chart" id="chart-fill"></div>
+    <div class="enc-rows" id="fill-rows"></div>
+    </div>
+  </section>
+
+  <!-- ================= forecast ================= -->
+  <section class="panel band" id="bench">
+    <div class="wrap">
+    <div class="panel-head">
+      <h2>Forecast</h2>
+      <p class="sub"><strong>Show it the past. It predicts the future.</strong></p>
+      <button type="button" class="info" data-about="bench" title="What happens here">?</button>
+    </div>
+    <div class="toolbar">
+      <span class="seg-label">Time series</span>
+      <div class="chips" id="bench-list"></div>
+    </div>
+    <p class="ds-blurb" id="fc-blurb"></p>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Test window" id="fc-windows"><span class="seg-label">Window</span></div>
+      <label class="slider is-void" id="fc-variate-ctl"><span>Variate</span><select class="select" id="fc-variate"></select></label>
+      <span class="status" id="status-fc" role="status" aria-live="polite"></span>
+    </div>
+    <div class="fill-chart" id="chart-fc"></div>
+    <div class="enc-rows" id="fc-rows"></div>
+    </div>
+  </section>
+
+  <!-- ================= the invitation: the page ends on an offer, not on a benchmark ================= -->
+  <section class="panel" id="cook">
+    <div class="wrap">
+    <div class="panel-head">
+      <h2>Cook</h2>
+      <p class="sub"><strong>Want your own use case solved? Let us know and we build it together.</strong></p>
+      <a class="info info-go" href="mailto:oezguen.turgut@tum.de?subject=Let%20us%20cook" aria-label="Get in touch: let us cook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10M7 17 17 7"/></svg></a>
+    </div>
+    </div>
+  </section>
+
+
+</main>
+
+<!-- ================= about drawer ================= -->
+<div class="drawer-veil" id="about-veil" hidden></div>
+<aside class="drawer" id="about" hidden aria-label="About this page">
+  <button type="button" class="btn close" id="about-close">close</button>
+
+  <section class="about-sec about-page" id="about-top">
+  <div class="about-head">
+    <h2 class="about-statement">One open time series model, <br>small enough to run on any CPU.</h2>
+  </div>
+  <div class="about-lead">
+    <p>OTIS is an open, general-purpose time series model: pre-trained once, it can be used frozen on data it has never seen, from ECGs and EEGs to power meters and
+      light curves, or fine-tuned in a blink.</p>
+    <p>It is tiny. 7 million parameters in 7 megabytes, exported to ONNX, quantised to int8 and run with
+      <a href="https://onnxruntime.ai/docs/tutorials/web/" target="_blank" rel="noopener">onnxruntime-web</a> in WebAssembly. Everything is run locally on your CPU. Nothing leaves your browser.</p>
+    <p>Comparable models weigh a hundred times more. This page lets you feel the difference: same data, same CPU, different runtime.</p>
+  </div>
+  <div class="about-facts">
+    <p class="about-blurb">Turgut, Müller, Menten &amp; Rueckert. <em>OTIS: Learning High-Quality Time Series Features With Tiny Encoders.</em> TMLR 2026.</p>
+  </div>
+  </section>
+
+  <section class="about-sec" id="about-explore" hidden>
+  <h2>Explore</h2>
+  <p class="about-plain">The time series model encodes every recording without ever being told what the recording is. The map
+    places recordings with similar encodings close together; the colours are the true classes, which the time series model never
+    saw. Hover a dot to see the recording and click it for the details. Each panel shows three numbers: the time the model took
+    for all recordings on your CPU, its throughput in recordings per second, and the accuracy, how often a test recording’s
+    nearest training recordings share its class, so higher is better and guessing would score about one over the number of
+    classes. Click an empty panel to run the time series model on your CPU.</p>
+  <p>Setup: 200 training and 100 test recordings per dataset, balanced over the classes, each encoded once by the frozen time
+    series model with no fine-tuning. Accuracy is the balanced accuracy of a weighted nearest-neighbour vote over the training
+    recordings, so every class weighs the same; the map is a t-SNE of the same encodings and the labels only colour it. The
+    training encodings were computed with the same graphs. <strong>Your data</strong> runs the same protocol and nothing is
+    uploaded. Data: PTB-XL, Sleep-EDF, BasicMotions, StarLightCurves and SmallKitchenAppliances; the protocol and the full results
+    are in the paper. The first click on a panel fetches the time series model. The test recordings are encoded on your CPU.</p>
+  </section>
+
+  <section class="about-sec" id="about-fill" hidden>
+  <h2>Impute</h2>
+  <p class="about-plain">Pick a recording (a sine, chirp, square wave or random walk with the frequency and noise of your choice, or
+    draw or paste your own), then hide part of it: at random, or by dragging across the chart. The hidden part is shown in grey.
+    Each time series model gets the visible part only and has to predict the hidden steps; the chart lays its prediction over the
+    truth. Click Run on a row: the time series model runs on your CPU and the row shows how long it took, then MSE and MAE, the
+    distance from the truth on the hidden steps, lower is better and MSE weighs large misses more, and NCC, how well the shape
+    matches, from 1 (perfect) through 0 (no relation) to -1 (the inverted shape).</p>
+  <p>Setup: a 432-step recording, z-scored, with the hidden steps masked. Every time series model sees the same visible steps,
+    never the hidden ones, each on its own patch grid, so the span is rounded to it. Each is frozen and runs its own
+    masked-modelling path; only its few task parameters were fitted, all three on the same signals: sines, chirps or squares drawn
+    afresh between 20 and 120 Hz at every step, so none is tuned to the rate you pick. OTIS fitted the fewest, 96 parameters, and left
+    its mask token and head frozen; UniTS fitted 1,536 and MOMENT 9,224, both including theirs. For a random walk, a drawing or
+    pasted numbers, all three use the sine's. MSE, MAE and NCC
+    are computed on the hidden steps only. Changing the recording or the hidden
+    span clears the rows. The first click on a row fetches the time series
+    model. The prediction is computed on your CPU.</p>
+  </section>
+
+  <section class="about-sec" id="about-bench" hidden>
+  <h2>Forecast</h2>
+  <p class="about-plain">Pick a recording and one of its windows; on a recording with several variates, the dropdown picks the one
+    plotted. Each time series model sees the past of the recording and predicts the steps that follow, the shaded part; the truth
+    is drawn for comparison. Click Run on a row: the time series model runs on your CPU and the row shows how long the window
+    took, then MSE and MAE, the distance from the truth on the predicted steps, lower is better and MSE weighs large misses more,
+    and NCC, how well the shape matches, from 1 (perfect) through 0 (no relation) to -1 (the inverted shape).</p>
+  <p>Setup: four standard benchmarks (Weather, Illness, Electricity, Traffic), split and z-scored as in the paper, six test
+    windows each. Every time series model sees the same 336 steps and predicts the next 96 (48 for Illness), all variates at once;
+    the time is for all variates, the scores for the variate plotted, in the z-scored units of the dataset. A window’s
+    results are kept while you move between windows and recordings. The first click on a row fetches the time series model. The
+    forecast is computed on your CPU.</p>
+  </section>
+
+</aside>
+
+<footer>
+  <div class="wrap"><p>Turgut, Müller, Menten &amp; Rueckert. <em>OTIS: Learning High-Quality Time Series Features With Tiny Encoders.</em> TMLR 2026.</p></div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.wasm.min.js"></script>   <!-- the wasm-only bundle: 48 kB, and its runtime binary is 11 MB instead of the 22 MB of the full bundle's -->
+<script src="charts.js?v=120"></script>
+<script src="analysis.js?v=102"></script>
+<script src="otis.js?v=105"></script>
+<script src="units.js?v=105"></script>
+<script src="moment.js?v=106"></script>
+<script src="zeroshot.js?v=123"></script>
+<script src="app.js?v=228"></script>
+</body>
+</html>

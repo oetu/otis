@@ -1,5 +1,8 @@
 # OTIS: Learning High-Quality Time Series Features With Tiny Encoders
+
 This is the official PyTorch implementation of [OTIS: Learning High-Quality Time Series Features With Tiny Encoders](https://arxiv.org/abs/2410.07299). Transactions on Machine Learning Research (TMLR). 2026.
+
+Live demo at [oetu.github.io/otis](https://oetu.github.io/otis/): runs OTIS locally in your browser, on your CPU.
 
 
 ## Environment Setup

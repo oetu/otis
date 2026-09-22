@@ -1,0 +1,575 @@
+/* Time series encoders in the browser ------------------------------------ */
+
+[hidden] { display: none !important; }
+
+:root {
+  color-scheme: light;
+
+  --surface-0:      #f0edea;   /* warm stone canvas, as on indisea.com */
+  --surface-1:      #fafaf9;   /* cards sit lighter than the canvas */
+  --band:           #e7e3de;   /* every other section (Explore, Forecast) sits on this darker stone, so the sections read apart while scrolling */
+  --qbox-bg:        #ffffff;   /* the Ask section's own-question box */
+  --surface-2:      #e5e1dd;
+  --border:         #dbd6d1;
+  --border-strong:  #bdb7b1;
+
+  --text-primary:   #111110;
+  --text-secondary: #4f4e4a;
+  --text-muted:     #7d7c74;
+
+  --accent:         #1f1f1e;
+  --accent-ink:     #ffffff;
+
+  /* one colour per encoder, used everywhere an encoder's output appears */
+  --enc-otis:       #2563eb;
+  --enc-otis_revin: #7c3aed;   /* the RevIN debugging row in Benchmarks */
+  --enc-otis_mod:   #0f766e;   /* OTIS fine-tuned across every benchmark + the synthetic signals: teal, between the blues and UniTS' green */
+  --enc-otis_mod_revin: #be185d;   /* the same with RevIN: a deep rose, away from Chronos-2's pink by weight */
+  --enc-units:      #16a34a;
+  --enc-moment:     #ea580c;
+  --enc-chronos2:   #db2777;   /* zero-shot rows */
+  --enc-timesfm3:   #0891b2;
+
+  --truth:          #55544f;   /* the observed signal */
+
+  /* categorical: classes and clusters on the maps (never mixed with encoder colours) */
+  --cat-1: #7c3aed;
+  --cat-2: #db2777;
+  --cat-3: #ca8a04;
+  --cat-4: #0891b2;
+  --cat-5: #64748b;
+  --cat-6: #b45309;
+
+  --danger:         #c73a39;
+  --mask-band:      rgba(120,119,111,.12);
+
+  --radius: 12px;
+  --maxw: 1280px;
+  --rail-w: 200px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;   /* one face for the whole page, loaded from Google Fonts in index.html; the system stack until it arrives */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0:      #121211;
+    --surface-1:      #191918;
+    --band:           #1b1b19;
+    --qbox-bg:        #232322;
+    --surface-2:      #232322;
+    --border:         #2f2f2c;
+    --border-strong:  #4a4a44;
+    --text-primary:   #f5f5f2;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #94938a;
+    --accent:         #f5f5f2;
+    --accent-ink:     #121211;
+    --enc-otis:       #5b8def;
+  --enc-otis_revin: #a78bfa;
+    --enc-otis_mod:   #2dd4bf;
+    --enc-otis_mod_revin: #fb7185;
+    --enc-units:      #3fbf6f;
+    --enc-moment:     #f2803f;
+    --enc-chronos2:   #f472b6;
+    --enc-timesfm3:   #22d3ee;
+    --truth:          #e8e7de;   /* the observed signal, lighter than the text so it reads apart from the grey competitor line */
+    --cat-1: #a78bfa; --cat-2: #f472b6; --cat-3: #eab308; --cat-4: #22d3ee; --cat-5: #94a3b8; --cat-6: #d97706;
+    --danger:         #e66767;
+    --mask-band:      rgba(195,194,183,.12);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0:      #121211;
+  --surface-1:      #191918;
+  --band:           #1b1b19;
+  --qbox-bg:        #232322;
+  --surface-2:      #232322;
+  --border:         #2f2f2c;
+  --border-strong:  #4a4a44;
+  --text-primary:   #f5f5f2;
+  --text-secondary: #c3c2b7;
+  --text-muted:     #94938a;
+  --accent:         #f5f5f2;
+  --accent-ink:     #121211;
+  --enc-otis:       #5b8def;
+  --enc-otis_revin: #a78bfa;
+    --enc-otis_mod:   #2dd4bf;
+    --enc-otis_mod_revin: #fb7185;
+  --enc-units:      #3fbf6f;
+  --enc-moment:     #f2803f;
+  --enc-chronos2:   #f472b6;
+  --enc-timesfm3:   #22d3ee;
+  --truth:          #e8e7de;   /* the observed signal, lighter than the text so it reads apart from the grey competitor line */
+  --cat-1: #a78bfa; --cat-2: #f472b6; --cat-3: #eab308; --cat-4: #22d3ee; --cat-5: #94a3b8; --cat-6: #d97706;
+  --danger:         #e66767;
+  --mask-band:      rgba(195,194,183,.12);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 90px; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-primary);
+  font-family: var(--sans); font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+.mono { font-family: var(--mono); font-size: .92em; }
+.kw { font-family: var(--mono); font-size: .92em; color: var(--text-primary); background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 40px; }
+@media (max-width: 720px) { .wrap { padding: 0 18px; } }
+
+/* ---------- section rail: fixed on the left of wide screens, the top-bar links take over below 1180px ---------- */
+.rail { display: none; }
+@media (min-width: 1180px) {
+  .wrap { max-width: min(var(--maxw), calc(100vw - 2 * var(--rail-w))); }   /* centred in the viewport, never under the rail */
+  header.bar nav { display: none; }   /* the top-bar links; the rule below sets display: flex with lower specificity */
+  .bar .mode { margin-left: auto; }
+  .rail {
+    display: flex; flex-direction: column; position: fixed; top: 0; bottom: 0; left: 0; z-index: 19;
+    width: var(--rail-w); padding: 116px 0 0 40px;   /* no background: the section bands run under it */
+  }
+  .rail-nav { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; position: relative; }
+  .rail-nav a, .rail-nav button {   /* the label starts where the OTIS text of the brand starts (40 + 36 + 11 px); the marker sits in the 36 px slot before it */
+    display: inline-flex; align-items: baseline; padding: 3px 0 3px 47px; font-size: 15px; color: var(--text-secondary);
+    text-decoration: none; background: none; border: none; cursor: pointer; transition: color .12s; white-space: nowrap;
+  }
+  .rail-nav a:hover, .rail-nav button:hover, .rail-nav a.is-active { color: var(--text-primary); }
+  .rail-nav button { padding: 3px 0 3px 47px; }   /* the global button rule inherits the font; the size comes from the shared rule above, so About matches the links */
+  .rail-about { }   /* the fifth entry opens the About drawer instead of scrolling */
+  .rail-marker {
+    position: absolute; left: 68px; top: 116px; width: 8px; height: 8px; margin-top: 9px; background: var(--text-primary);   /* in the slot before the labels (40 + 36 px, the brand mark), right-aligned like the digits it replaced */
+    opacity: 0; transform: translateY(var(--rail-y, 0px)); transition: transform .25s cubic-bezier(.4,0,.2,1), opacity .15s;
+  }
+  .rail.has-active .rail-marker { opacity: 1; }
+}
+
+/* ---------- sticky bar: title, encoder chips, navigation ---------- */
+.bar {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.bar-in { display: flex; align-items: center; gap: 28px; height: 76px; padding: 0 40px; }   /* full width: the brand at the very left, Get in touch at the very right */
+@media (max-width: 720px) { .bar-in { padding: 0 18px; } }
+.brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; white-space: nowrap; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-name { font-weight: 700; font-size: 18.5px; letter-spacing: -.05em; }   /* set like .kicker-brand and .intro-otis: the wordmark is one face, one weight, one tracking everywhere */
+.brand-sub { font-size: 12.5px; font-weight: 500; color: var(--text-muted); letter-spacing: -.02em; }   /* like .kicker-tag and .intro-sub */
+.brand-mark { width: 36px; height: 36px; flex: none; }                                     /* the favicon: dark tile, one sine period */
+.btn.contact { box-sizing: border-box; height: 38px; padding: 0 17px 0 20px; font-size: 15.5px; }   /* as tall as the brand mark; the same shape as the Documentation / GitHub buttons in the hero */
+.btn { display: inline-flex; align-items: center; gap: 6px; }
+.btn .arrow { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.btn:hover .arrow { transform: translateX(2px); }
+.hero-links .btn:hover .arrow { transform: translate(1px, -1px); }
+@media (max-width: 720px) { .btn.contact { padding: 0 12px 0 14px; font-size: 14px; } }   /* narrower, but as tall as the mode button beside it */   /* brand, mode button and Get in touch share one row down to 400px */
+/* dark mode: a square outlined button with a sun (light mode) or a moon (dark mode), left of Get in touch */
+.mode { flex: none; box-sizing: border-box; width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer;
+        border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); transition: background .15s, border-color .15s; }
+.mode:hover { background: var(--surface-2); border-color: var(--text-muted); }
+.mode:focus-visible { outline: 2px solid var(--enc-otis); outline-offset: 2px; }
+.mode svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mode-moon { display: none; }
+:root[data-theme="dark"] .mode-sun { display: none; }
+:root[data-theme="dark"] .mode-moon { display: block; }
+.mode + .contact { margin-left: -10px; }   /* closer to the button than the bar's gap */
+.brand-mark rect { fill: var(--text-primary); }
+.brand-mark path { stroke: var(--surface-0); }
+.encoders { display: flex; gap: 6px; margin-left: auto; }
+.enc {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 10px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface-0); cursor: pointer; font-size: 13.5px;
+  color: var(--text-secondary); transition: border-color .12s, background .12s, color .12s; white-space: nowrap;
+}
+.enc i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); opacity: .35; }
+.enc small { color: var(--text-muted); font-size: 12px; }
+.enc:hover { border-color: var(--c); }
+.enc[aria-pressed="true"] { border-color: var(--c); color: var(--text-primary); background: color-mix(in srgb, var(--c) 9%, var(--surface-0)); }
+.enc[aria-pressed="true"] i { opacity: 1; }
+.enc[data-enc="otis"] { --c: var(--enc-otis); }
+.enc[data-enc="units"] { --c: var(--enc-units); }
+.enc[data-enc="moment"] { --c: var(--enc-moment); }
+.enc .enc-load { font-size: 11.5px; color: var(--enc-moment); }
+.bar nav { display: flex; gap: 26px; font-size: 15.5px; margin-left: auto; margin-right: 14px; }   /* the encoder chips are hidden, so the navigation sits right, before the mode button */
+.bar nav a, .bar nav button { color: var(--text-secondary); text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; }
+.bar nav a:hover, .bar nav button:hover { color: var(--text-primary); }
+/* ---------- phone menu ---------- */
+/* below 900px the bar keeps only the brand and a hamburger; the links, the theme toggle and the actions move into a
+   full-screen menu, the way bfl.ai does it. app.js opens and closes it. */
+.menu-btn, .menu { display: none; }
+@media (max-width: 900px) {
+  html { scroll-padding-top: 78px; }
+  .bar-in { height: 64px; gap: 14px; }
+  .bar nav, .bar .mode, .bar .btn.contact { display: none; }
+  .hero { min-height: calc(100svh - 64px); }
+  .menu-btn { display: flex; flex-direction: column; justify-content: center; gap: 6px; box-sizing: border-box; width: 40px; height: 40px; margin: 0 -6px 0 auto; padding: 0 6px; background: none; border: none; cursor: pointer; }
+  .menu-btn span { display: block; width: 28px; height: 2px; background: var(--text-primary); border-radius: 1px; transition: transform .3s cubic-bezier(.2, .7, .2, 1), opacity .2s ease; }
+  .menu-btn.is-open span:nth-child(1) { transform: translateY(8px) rotate(45deg); }   /* the three lines fold into an X */
+  .menu-btn.is-open span:nth-child(2) { opacity: 0; }
+  .menu-btn.is-open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+  .menu { display: flex; flex-direction: column; position: fixed; inset: 0; z-index: 19; box-sizing: border-box; padding: 64px 24px 24px; background: var(--surface-0); opacity: 0; pointer-events: none; transition: opacity .25s ease; }   /* under the bar (z 20), which stays with the X */
+  .menu.is-open { opacity: 1; pointer-events: auto; }
+  html.menu-open { overflow: hidden; }
+  .menu-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 22px; padding-top: 32px; }
+  .menu-nav a, .menu-nav button { font-size: 32px; font-weight: 500; letter-spacing: -.03em; line-height: 1.15; color: var(--text-primary); text-decoration: none; background: none; border: none; padding: 0; cursor: pointer;
+                                  opacity: 0; transform: translateY(12px); transition: opacity .35s ease, transform .35s cubic-bezier(.2, .7, .2, 1); }
+  .menu.is-open .menu-nav a, .menu.is-open .menu-nav button { opacity: 1; transform: none; }
+  .menu-nav > :nth-child(2) { transition-delay: .04s; } .menu-nav > :nth-child(3) { transition-delay: .08s; } .menu-nav > :nth-child(4) { transition-delay: .12s; } .menu-nav > :nth-child(5) { transition-delay: .16s; }
+  .menu-actions { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+  .menu-theme { align-self: flex-start; margin-bottom: 6px; padding: 0; background: none; border: none; cursor: pointer; font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+  .menu-theme:hover { color: var(--text-primary); }
+  .menu-actions .btn { box-sizing: border-box; justify-content: center; height: 52px; font-size: 16px; border-radius: 10px; text-decoration: none; }
+}
+
+/* ---------- hero ---------- */
+/* the first screen is the hero alone: what the page is about, the sections follow on scroll */
+.hero { min-height: calc(100svh - 76px); display: flex; position: relative; padding: 20px 0 84px; text-align: center; overflow-x: clip; }   /* clip: the waves are 100vw wide, which counts the scrollbar */   /* the bottom padding holds the scroll cue, with air, under the buttons */
+.hero > .wrap { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
+.hero > .wrap::before { content: ""; flex: 2 0 0; }   /* the free space is shared 2 : 20 between the top (above the headline) and the waves block, which centres the waves in it; so the headline sits high, ~1/8 down the free space   /* the column is the flex container of the hero's blocks: their auto margins need it to fill the hero's height */   /* the wordmark and the buttons sit at the bottom; the free space above is split by three auto margins (above the headline, below the footnote, above the wordmark),
+   so the headline group floats in the upper third and everything still fits a short window, as bfl.ai lays out its hero */
+/* the scroll cue: a small "scroll" with a bobbing chevron in the hero's bottom padding, under the buttons; it links to Explore */
+.hero .scroll-cue {
+  position: absolute; left: 0; right: 0; bottom: 10px; display: flex; flex-direction: column; align-items: center; gap: 0; margin: 0 auto; width: max-content;
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); text-decoration: none; transition: color .15s;
+}
+.hero .scroll-cue:hover { color: var(--text-primary); }
+.hero .scroll-cue svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; animation: cue-bob 1.8s ease-in-out infinite; }
+@keyframes cue-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .hero .scroll-cue svg { animation: none; } }
+.hero .hero-waves { align-self: flex-start; flex: 20 1 0; display: flex; flex-direction: column; justify-content: center; width: 100vw; margin: 0 0 0 calc(50% - 50vw); }   /* edge to edge across the page; the block takes most of the free space and centres the waves in it */
+.hero .hero-waves svg { display: block; width: 100%; height: 130px; overflow: visible; }
+.hero .hero-waves .wave { fill: none; stroke: url(#wave-fade-bold); stroke-width: .8px; vector-effect: non-scaling-stroke; }   /* same ink as the bold line; app.js sets opacity and width per line, by depth */
+.hero .hero-waves .wave-bold { fill: none; stroke: url(#wave-fade-bold); stroke-width: 1.8px; vector-effect: non-scaling-stroke; }
+@media (max-width: 560px) { .hero .hero-waves svg { height: 84px; } }
+.hero p.hero-kicker { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0; padding-top: 16px; line-height: 1; }   /* the wordmark first, its tagline under it, then the headline */
+.hero .kicker-brand { font-size: clamp(32px, 4.6vw, 56px); font-weight: 700; letter-spacing: -.05em; line-height: 1; color: var(--text-primary); }   /* the wordmark: Instrument Sans, bold, tight */
+.hero .kicker-tag { font-size: 20px; line-height: 1.4; font-weight: 500; letter-spacing: -.02em; color: var(--text-secondary); }
+@media (max-width: 560px) { .hero p.hero-kicker { gap: 6px; } .hero .kicker-brand { font-size: clamp(16px, calc((100vw - 52px) / 16.55), 32px); } .hero .kicker-tag { font-size: 15px; } }   /* the wordmark follows the headline size at every width */
+@media (min-width: 1180px) { .hero .kicker-brand { font-size: clamp(32px, calc((100vw - 480px) / 16.95), 56px); } }
+.hero h1 { margin: 0; padding: 0; font-size: clamp(32px, 4.6vw, 56px); letter-spacing: -.03em; font-weight: 640; line-height: 1.08; }
+@media (max-width: 560px) { .hero h1 { font-size: clamp(16px, calc((100vw - 52px) / 16.55), 32px); } }   /* the hero is 100vw - 52px wide on a phone and the longest lines (the encoder line and faster and cheaper*…) are 16.6 em in Instrument Sans (you can forecast locally, on your CPU.), so every line stays whole */
+@media (min-width: 1180px) { .hero h1 { font-size: clamp(32px, calc((100vw - 480px) / 16.95), 56px); } }   /* beside the rail the column is 100vw - 480px wide, so the 16.6 em lines fit from 1180px up */
+.hero p { margin: 22px auto 0; color: var(--text-secondary); font-size: 18px; line-height: 1.55; }
+.hero p.hero-note { margin: 20px 0 0; font-size: 20px; line-height: 1.4; font-weight: 500; letter-spacing: -.02em; color: var(--text-secondary); }   /* the footnote is styled like the tagline under the wordmark */
+.hero .fn-star { font-size: 1.35em; line-height: 0; vertical-align: -.12em; }
+@media (max-width: 560px) { .hero p.hero-note { font-size: 15px; } .hero p.hero-links { margin-top: 12px; } .hero p.hero-links .btn { height: 40px; font-size: 15px; padding: 0 16px 0 20px; } }   /* the phone rule sits above the base rule, so it needs the extra specificity */   /* a phone: the headline is ~24px there, so the footnote steps down with it */   /* the glyph is drawn small and raised, so it is scaled to the height of the letters */   /* the footnote: the download sizes behind "cheaper" */
+.hero p.hero-links { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }   /* a little under the tagline, close to the gap between the wordmark and the tagline */
+.hero-links .btn { box-sizing: border-box; height: 44px; text-decoration: none; font-size: 16px; padding: 0 20px 0 24px; gap: 8px; }   /* a touch larger than Get in touch, as befits the hero */
+@media (max-width: 720px) { .hero p br { display: none; } }   /* the headline's two lines are short enough for a phone */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* the headline's last line cycles through the four sections: the word leaves upwards and the next one rises in */
+.hero h1 .rot { display: inline-block; box-sizing: content-box; overflow: hidden; vertical-align: bottom; white-space: nowrap; text-align: center; padding: .12em .1em; margin: -.12em .06em -.12em -.02em; }   /* a little air after "can", like before the italic */   /* the script sets the width to the widest word and each word is centred in it, between "you can" and "locally"; a little air on the right */   /* the script sets the width to the widest word and the words sit at its right edge, against the static text; the padding keeps descenders and the italic's overhang unclipped */
+.hero h1 .rot-measure { position: absolute; visibility: hidden; white-space: nowrap; }
+.hero h1 .h1-nums { display: block; }
+.hero h1 em { font-style: italic; font-weight: 500; color: var(--enc-otis); margin-left: .08em; }   /* a little air after the comma before the italic */   /* "on your CPU.": set like the rotating word */
+.hero h1 .rot-word { display: inline-block; font-style: italic; font-weight: 500; color: var(--enc-otis); transition: transform .32s ease, opacity .32s ease; }
+.hero h1 .rot-word.out { transform: translateY(-110%); opacity: 0; }
+.hero h1 .rot-word.pre { transform: translateY(110%); opacity: 0; transition: none; }
+@media (prefers-reduced-motion: reduce) { .hero h1 .rot-word { transition: none; } .hero h1 .rot-word.out, .hero h1 .rot-word.pre { transform: none; } }
+.hero p strong { color: var(--text-primary); font-weight: 600; }
+
+/* ---------- intro ---------- */
+/* the first visit opens with the tagline, one line at a time, then the wordmark, which lifts to make room for what it is;
+   index.html sets data-intro="on" before the first paint, app.js runs the sequence and reveals the hero underneath */
+#intro { display: none; }
+html[data-intro="on"] { overflow: hidden; }
+html[data-intro="on"] #intro { display: flex; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; text-align: center; background: var(--surface-0); color: var(--text-primary); cursor: pointer; transition: opacity 1s ease; }
+#intro.done { opacity: 0; pointer-events: none; }
+#intro .intro-line { position: absolute; margin: 0; padding: 0 16px; font-size: clamp(28px, 4.2vw, 52px); font-style: italic; font-weight: 500; letter-spacing: -.03em; line-height: 1.2; opacity: 0; transform: translateY(18px); filter: blur(8px); transition: opacity .45s cubic-bezier(.2, .7, .2, 1), transform .45s cubic-bezier(.2, .7, .2, 1), filter .45s ease; }
+#intro .intro-line.show { opacity: 1; transform: none; filter: none; }
+#intro .intro-line.hide { opacity: 0; transform: translateY(-18px); filter: blur(8px); transition-duration: .35s; }
+#intro .intro-brand { position: absolute; transition: transform 1s cubic-bezier(.2, .7, .2, 1); }
+#intro .intro-brand.lift { transform: translateY(-27px); }   /* half of the subtitle's margin plus its line box, so the pair ends up centred */
+#intro .intro-otis { margin: 0; font-size: clamp(64px, 11vw, 132px); font-weight: 700; letter-spacing: -.05em; text-indent: -.05em;   /* the tracking is applied after the last letter too, so the box is narrower than the letters on the right only and centring the box pushes them right. An indent pulls them back, halved by text-align: center, and leaves the box (which .intro-sub is positioned against) alone */ line-height: .9; opacity: 0; transform: scale(.94); filter: blur(10px); transition: opacity 1s ease, transform 1.2s cubic-bezier(.2, .7, .2, 1), filter 1s ease; }
+#intro .intro-otis.show { opacity: 1; transform: none; filter: none; }
+#intro .intro-sub { position: absolute; top: 100%; left: 50%; margin: 18px 0 0; white-space: nowrap; font-size: clamp(17px, 2vw, 24px); font-weight: 500; letter-spacing: -.02em; color: var(--text-secondary); opacity: 0; transform: translate(-50%, 12px); transition: opacity .9s ease, transform .9s cubic-bezier(.2, .7, .2, 1); }
+#intro .intro-sub.show { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 560px) { #intro .intro-sub { font-size: 15px; margin-top: 12px; } #intro .intro-brand.lift { transform: translateY(-18px); } }
+/* the hero rises in, line by line, as the intro clears */
+html[data-intro="on"] .hero > * { opacity: 0; transform: translateY(14px); }
+html[data-intro="on"] .hero.reveal > * { opacity: 1; transform: none; transition: opacity .9s ease, transform .9s cubic-bezier(.2, .7, .2, 1); }
+html[data-intro="on"] .hero.reveal > :nth-child(2) { transition-delay: .12s; }
+html[data-intro="on"] .hero.reveal > :nth-child(3) { transition-delay: .24s; }
+html[data-intro="on"] .hero.reveal > :nth-child(4) { transition-delay: .36s; }
+
+/* ---------- panels ---------- */
+.panel { padding: 48px 0 56px; border-top: 1px solid var(--border); }   /* sections take the height of their content, so the page flows without empty screens between them (the hero alone fills the first screen) */
+@media (max-width: 720px) { .panel { padding: 36px 0 44px; } }
+.panel.band { background: var(--band); }   /* the section spans the page, so the band runs edge to edge */
+.panel-head { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; position: relative; padding-right: 42px; }   /* the ? sits in the padding, level with the heading */
+.panel-head h2 { margin: 0; font-size: 24px; letter-spacing: -.02em; font-weight: 640; }
+.panel-head .sub { margin: 0; color: var(--text-secondary); }
+.panel-head .sub strong { color: var(--text-primary); font-weight: 600; }
+.panel-head .panel-note { flex: 1 1 100%; margin: 0; color: var(--text-secondary); }   /* a full-width line under the heading row (the Chat disclaimer) */
+.panel-head .panel-note strong { color: var(--text-primary); font-weight: 600; }
+.info {
+  width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border-strong); background: none; cursor: pointer;
+  color: var(--text-muted); font-size: 13px; line-height: 1; padding: 0; align-self: center;
+}
+.info:hover { color: var(--text-primary); border-color: var(--text-primary); }
+#cook .panel-head { margin-bottom: 0; }   /* nothing follows the heading row here */
+/* where the other sections put their ?, this one puts the invitation itself: the same circle, filled,
+   carrying the hero's outward arrow, so the section that asks for your use case is the one you can act on */
+.info.info-go { display: inline-flex; align-items: center; justify-content: center; border-color: var(--accent); background: var(--accent); color: var(--accent-ink); text-decoration: none; }
+.info.info-go svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.info.info-go:hover { opacity: .88; color: var(--accent-ink); border-color: var(--accent); }
+.panel-head .info { position: absolute; right: 0; top: 6px; }   /* centred on the 24 px heading, whatever the lead line wraps to */
+
+/* toolbars: rows of segmented controls, chips and status text */
+.toolbar { display: flex; align-items: center; gap: 12px 22px; flex-wrap: wrap; margin: 0 0 16px; min-height: 34px; }
+.custom-form { display: flex; align-items: center; gap: 10px 22px; flex-wrap: wrap; margin: -4px 0 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); font-size: 13.5px; color: var(--text-secondary); }
+.custom-row { display: flex; align-items: center; gap: 10px 22px; width: 100%; min-width: 0; }   /* train set, test set, variates and Run on one line: the file pickers give way, the button never wraps */
+.custom-form label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
+.custom-form label:has(input[type="file"]) { flex: 0 1 auto; }
+.custom-form input[type="file"] { font-size: 12.5px; flex: 0 1 auto; min-width: 0; max-width: 240px; }
+.custom-form #custom-go { flex: none; }
+@media (max-width: 720px) { .custom-row { flex-wrap: wrap; } .custom-form label:has(input[type="file"]) { flex-basis: 100%; } }
+.custom-form #custom-v { width: 58px; text-align: center; font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-0); color: var(--text-primary); }
+.custom-form select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-0); color: var(--text-primary); }
+.custom-form .hint { flex-basis: 100%; margin: 2px 0 0; font-size: 12.5px; color: var(--text-muted); }
+.toolbar .status { margin-left: auto; }
+.ds-blurb { margin: -6px 0 14px; font-size: 14.5px; color: var(--text-secondary); }
+.ds-blurb:empty { display: none; }
+.ds-line { margin-top: -6px; }   /* dataset description with the timing button and status on its right */
+.ds-line .ds-text { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }   /* blurb and hint side by side, on one line with the button */
+.ds-line .ds-blurb { margin: 0; }
+.ds-line .ds-blurb:empty { display: block; }
+.seg { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }   /* dataset / window pickers: the same pills as the chips below */
+.seg-label { font-size: 12.5px; color: var(--text-muted); margin-right: 4px; }
+.seg-btn {
+  padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-0);
+  color: var(--text-secondary); cursor: pointer; font-size: 13px; line-height: 1.2; white-space: nowrap;
+}
+.seg-btn:hover { color: var(--text-primary); border-color: var(--text-primary); }
+.seg-btn.is-active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.seg-btn:disabled { opacity: .5; cursor: default; }
+.seg.is-off .seg-btn { opacity: .45; pointer-events: none; }
+.seg-btn small, .chip-btn small { color: inherit; opacity: .7; margin-left: 6px; font-size: 11.5px; }
+
+.chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.chip-btn {
+  padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-0);
+  color: var(--text-secondary); cursor: pointer; font-size: 13px; line-height: 1.2;
+}
+.chip-btn:hover { color: var(--text-primary); border-color: var(--text-primary); }
+.chip-btn.is-active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip-btn:disabled { opacity: .5; cursor: default; }
+
+.btn {
+  padding: 7px 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+  cursor: pointer; font-size: 13.5px; font-weight: 560; line-height: 1.2; text-decoration: none;
+}
+.btn:hover:not(:disabled) { opacity: .88; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: none; color: var(--text-primary); border-color: var(--border-strong); }
+.btn.ghost:hover:not(:disabled) { border-color: var(--text-primary); opacity: 1; }
+.btn.tiny { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
+.status { font-size: 13px; color: var(--text-muted); min-height: 18px; }
+.status.err { color: var(--danger); }
+
+.slider { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); }
+.slider input[type=range] { width: 160px; accent-color: var(--text-primary); }
+.slider output { font-variant-numeric: tabular-nums; min-width: 4.5ch; color: var(--text-primary); }
+#props-row .slider input[type=range] { width: 100px; }   /* the Properties row: frequency and noise on their own line under the series chips */
+
+/* ---------- explore: one map per encoder ---------- */
+.legend-row { display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap; margin: 0 0 12px; font-size: 13px; color: var(--text-secondary); }
+.legend-row[hidden] { display: none; }   /* Explore's legend waits for the first map */
+.legend-item { display: inline-flex; align-items: center; gap: 7px; }
+.legend-item.is-clickable { cursor: pointer; padding: 2px 8px; margin: -2px -8px; border-radius: 999px; user-select: none; }
+.legend-item.is-clickable:hover { background: var(--surface-2); }
+.legend-item.is-focus { background: var(--surface-2); color: var(--text-primary); font-weight: 600; }
+.legend-item.is-dim { opacity: .45; }
+.legend-item.is-off { opacity: .45; text-decoration: line-through; }   /* a model switched off in Fill in / Benchmarks */
+.enc-row.is-off { opacity: .5; }
+.enc-row.is-linked:hover { background: var(--surface-2); }   /* hovering a row highlights its line in the chart */
+.enc-row .enc-name.is-toggle { cursor: pointer; user-select: none; }
+.enc-row .enc-name.is-toggle:hover { text-decoration: underline; }
+.legend-hint { color: var(--text-muted); font-size: 12px; }
+.ds-line .ds-hint { color: var(--text-muted); font-size: 12.5px; white-space: nowrap; }
+#legend-explore { gap: 6px; margin: -4px 0 16px; }   /* the class legend under the dataset pills, as pills itself */
+#legend-explore .legend-item.is-clickable {
+  padding: 5px 11px; margin: 0; border: 1px solid var(--border-strong); background: var(--surface-0); color: var(--text-secondary); font-size: 13px; line-height: 1.2;
+}
+#legend-explore .legend-item.is-clickable:hover { background: var(--surface-0); color: var(--text-primary); border-color: var(--text-primary); }
+#legend-explore .legend-item.is-focus { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.swatch { display: inline-block; width: 14px; height: 2.5px; border-radius: 2px; }
+.swatch.dot { width: 9px; height: 9px; border-radius: 50%; }
+.swatch.gal { width: 10px; height: 10px; border-radius: 50%; opacity: .22; }
+.swatch.test { width: 10px; height: 10px; border-radius: 50%; }
+.swatch.dash { width: 14px; height: 0; border-top: 2.5px dashed currentColor; background: none !important; }
+
+.maps { display: grid; gap: 18px; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }
+@media (max-width: 1100px) { .maps { grid-template-columns: 1fr; } }
+.map-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-1); padding: 14px 16px 12px; min-width: 0; }
+.map-card[data-enc="otis"] { --c: var(--enc-otis); }
+.map-card:not([data-enc="otis"]) { --c: var(--text-muted); }   /* every comparison in grey: the section reads as OTIS versus the competitor */
+.map-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-height: 27px; align-content: center; }   /* as tall as the competitor's dropdown, so both cards' stats and charts start at the same y */
+.map-head .enc-meta { white-space: nowrap; font-size: 12px; }   /* name, parameters and Run it here fit one line of a 308 px card */
+.enc-name { font-weight: 650; color: var(--c); display: inline-flex; align-items: center; gap: 8px; }
+.enc-name::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }   /* flex: none: next to the competitor dropdown the dot was squeezed into a sliver */
+.rival-select { font: inherit; font-weight: 650; color: var(--c); background: var(--surface-0); border: 1px solid var(--border-strong); border-radius: 7px; padding: 2px 6px; cursor: pointer; }   /* the right-hand map's encoder, chosen here */
+.rival-select:hover { border-color: var(--text-primary); }
+.rival-select:disabled { cursor: default; opacity: .6; }
+.enc-meta { color: var(--text-muted); font-size: 12.5px; }
+.map-sub { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 2px; min-height: 18px; }   /* parameters on the left, run state on the right */
+.map-state { margin-left: auto; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.map-state.live { color: var(--text-primary); }
+.scores { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; margin: 10px 0 8px; }   /* centred in the panel */
+.score { display: flex; flex-direction: column; gap: 0; align-items: center; text-align: center; }   /* the number centred over its caption */
+/* tooltips drawn by the page: instant on hover, a dotted underline marks what has one */
+[data-tip] { position: relative; cursor: help; }
+.score[data-tip] .cap, .enc-row .cell[data-tip] > span { text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-color: var(--text-muted); }
+[data-tip]::after {
+  content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 20; width: max-content; max-width: 280px;
+  padding: 8px 10px; border-radius: 8px; background: var(--text-primary); color: var(--surface-0); font-size: 12.5px; font-weight: 400;
+  line-height: 1.4; letter-spacing: 0; white-space: normal; text-align: left; box-shadow: 0 4px 16px rgba(0,0,0,.18);
+  display: none; pointer-events: none;   /* display, not visibility: a hidden box would still widen the page and add a horizontal scrollbar */
+}
+@media (hover: hover) { [data-tip]:hover::after { display: block; } }   /* a mouse only: on a phone the tap that started a run leaves :hover on whatever lands under the finger, which popped a metric's tooltip after every run */
+@media (hover: none) { [data-tip] { cursor: auto; } .score[data-tip] .cap, .enc-row .cell[data-tip] > span { text-decoration: none; } }   /* no tooltips to reach there, so no dotted hint at one */
+.score .val { font-size: 18px; font-weight: 640; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.score .val small { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-left: 5px; }
+.score .cap { font-size: 12px; color: var(--text-muted); }
+.score.chance .val { color: var(--text-muted); font-weight: 500; }
+.map-chart figure { margin: 0; }
+.map-wait .map-foot { flex-direction: column; align-items: stretch; gap: 10px; width: min(80%, 320px); margin: 0; }   /* the progress bar and its text inside the message box while encoding */
+.map-wait .map-foot .bar-track { flex: none; width: 100%; }
+.map-wait .map-foot .foot-text { text-align: center; }
+.map-wait small { display: inline-block; margin-top: 6px; font-size: 12px; }
+.map-wait.map-idle { cursor: pointer; transition: border-color .15s, color .15s, background .15s; }   /* the empty panel is the button that starts the run */
+.map-wait.map-idle:hover { border-color: var(--text-primary); color: var(--text-primary); background: var(--surface-0); }
+.map-wait.map-idle:focus-visible { outline: 2px solid var(--enc-otis); outline-offset: 2px; }
+.map-wait { display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-muted); font-size: 13px; }
+.map-foot { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12.5px; color: var(--text-muted); min-height: 22px; }
+.map-foot .bar-track { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.map-foot .bar-fill { height: 100%; width: 0; background: var(--c); transition: width .12s linear; }
+
+.sample-view { margin-top: 18px; padding: 14px 16px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-1); }
+.sample-view figure { margin: 0; }
+.sample-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; font-size: 14px; }
+.sample-head strong { font-weight: 640; }
+.sample-head .link-btn { margin-left: auto; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; color: var(--text-secondary); background: var(--surface-0); }
+.chip-ok { color: var(--text-primary); }
+.chip-bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.chip .enc-dot { width: 8px; height: 8px; border-radius: 50%; }
+.link-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--text-muted); font: inherit; font-size: 13px; text-decoration: underline; }
+.link-btn:hover { color: var(--text-primary); }
+
+/* ---------- fill in ---------- */
+.fill-chart figure { margin: 0; }
+.fill-chart { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 6px; background: var(--surface-1); }
+.paste { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 14px; flex-wrap: wrap; }
+.paste textarea { flex: 1 1 420px; min-height: 64px; font-family: var(--mono); font-size: 12.5px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-0); color: var(--text-primary); }
+.paste .hint { flex-basis: 100%; }
+.hint { font-size: 12.5px; color: var(--text-muted); margin: 6px 0 0; }
+
+/* per-encoder result rows under a chart */
+.enc-rows { display: grid; gap: 8px; margin-top: 14px; }
+.enc-row {
+  display: grid; grid-template-columns: 120px 92px repeat(3, 72px) minmax(0, 1fr); align-items: center; gap: 12px;   /* fixed cells (name, time, MSE, MAE, NCC), so numbers line up across rows */
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); font-size: 13.5px;
+}
+.enc-row[data-enc="otis"], .enc-row[data-enc^="otis@"] { --c: var(--enc-otis); }   /* "<encoder>@<llm>": the Ask rows of an encoder on another LLM */
+.enc-row[data-enc="otis_revin"] { --c: var(--enc-otis_revin); }
+.enc-row[data-enc="otis_mod"] { --c: var(--enc-otis_mod); }
+.enc-row[data-enc="otis_mod_revin"] { --c: var(--enc-otis_mod_revin); }
+.enc-row:not([data-enc^="otis"]) { --c: var(--text-muted); }   /* every competitor in grey: each section reads as OTIS versus the competitor */
+.enc-row .rival-select { max-width: 100%; }
+.enc-row .cell { display: flex; flex-direction: column; line-height: 1.2; }
+.enc-row .cell b { font-weight: 620; font-variant-numeric: tabular-nums; font-size: 15px; }
+.enc-row .cell span { font-size: 11.5px; color: var(--text-muted); }
+.enc-row .note { grid-column: 2 / -1; color: var(--text-muted); font-size: 13px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.enc-row .note .btn { margin-left: auto; }   /* Run it here sits at the row's right end */
+/* a running row's loading bar, in the model's colour: the fetched share of its graph */
+.load-bar { flex: 0 1 120px; min-width: 44px; height: 5px; border-radius: 999px; background: var(--border-strong); overflow: hidden; }   /* the bar gives up width on a narrow row; the counter beside it must not be squeezed into a column of digits */
+.load-bar > span { display: block; height: 100%; width: 0; background: var(--c, var(--text-primary)); transition: width .15s linear; }
+.load-mb { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Stop: one control for everything a visitor may want to abandon — a competitor's download (the Impute and
+   Forecast rows, the Explore card's message box) and the live encoding under an Explore map. A 100+ MB fetch
+   or a minute of encoding starts on one click, so stopping it is one click too, in one shape wherever it
+   appears; the target is kept finger-sized on a phone, where the data and the wait it saves matter most. */
+.stop-btn { flex: none; align-self: center; font: inherit; font-size: 12px; font-weight: 600; line-height: 1; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface-0); color: var(--text-secondary); cursor: pointer; text-decoration: none; }
+.stop-btn:hover:not(:disabled) { color: var(--text-primary); border-color: var(--text-primary); }
+.stop-btn:focus-visible { outline: 2px solid var(--enc-otis); outline-offset: 2px; }
+.stop-btn:disabled { opacity: .45; cursor: not-allowed; }
+.load-text { white-space: nowrap; }
+.enc-row .load-stop { margin-left: auto; }   /* pinned to the row's right end, where Run was: the growing "74 / 330 MB" must not walk the button out from under a finger */
+.dl-line { display: inline-flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: nowrap; max-width: 100%; }   /* one line, like an Impute or Forecast row: the bar gives up width before anything wraps */
+.dl-line .load-bar { flex: 0 1 110px; }
+@media (max-width: 560px) { .stop-btn { padding: 6px 11px; } }
+@media (max-width: 360px) { .enc-row .load-bar { display: none; } .enc-row .note { gap: 9px; } }   /* a narrow phone has no room for the bar beside the phase, the counter and the Stop; "10 / 131 MB" is the progress there */
+.enc-row .right { margin-left: auto; font-size: 12.5px; color: var(--text-muted); text-align: right; }
+/* an Ask row with an offline score: text (hint or run statistics) | score | a slot for the Run button, the slot kept even in rows
+   without one, so the score ends at the same x in every row; everything on the baseline of the row's first line, level with the name */
+@media (max-width: 900px) { .enc-row, .enc-row.bench-row { grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 8px; } .enc-row > .enc-name:first-child, .enc-row .note, .enc-row .right { grid-column: 1 / -1; } .enc-row .note { flex-wrap: nowrap; } }   /* nowrap: the hint wraps its own words and the Run button stays on its right, instead of dropping onto a line of its own under a long hint */   /* a phone: the name on its own line, the four metrics in one row under it */
+.is-void { visibility: hidden; }   /* keeps the element's space so switching datasets does not move the page */
+.table-scroll { overflow-x: auto; }
+
+/* ---------- benchmarks: the datasets are chips like the Fill-in sources; the chart spans the panel ---------- */
+.select { font: inherit; font-size: 13.5px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-0); color: var(--text-primary); }
+
+/* ---------- charts ---------- */
+.viz-scroll { overflow-x: auto; }
+figure { margin: 0; }
+figcaption { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 2px 0 8px; font-size: 12.5px; color: var(--text-secondary); }
+.viz-tip {
+  position: fixed; z-index: 50; pointer-events: none; opacity: 0; transition: opacity .08s;
+  background: var(--text-primary); color: var(--surface-0); padding: 7px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.35;
+  max-width: 300px; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+}
+.viz-tip .tip-sub { opacity: .75; }
+.minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.mini { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px 6px; background: var(--surface-1); }
+.mini:hover { border-color: var(--border-strong); }
+.mini svg { width: 100%; height: 54px; display: block; }
+.mini-label { font-size: 12.5px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 7px; }
+
+/* ---------- about drawer ---------- */
+.drawer-veil { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 30; }
+html.about-open { overflow: hidden; }   /* the page behind an open drawer does not scroll */
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); z-index: 31; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface-0); border-left: 1px solid var(--border); padding: 28px 32px 40px; font-size: 14.5px; color: var(--text-secondary);
+  box-shadow: -12px 0 40px rgba(0,0,0,.10);
+}
+.drawer h2 { margin: 0 0 6px; font-size: 20px; color: var(--text-primary); letter-spacing: -.02em; }
+.drawer p { margin: 0 0 10px; }
+.drawer a { color: var(--text-primary); }
+.drawer .close { position: absolute; top: 19px; right: 40px; box-sizing: border-box; height: 38px; padding: 0 18px; font-size: 15.5px; }   /* the same size and centre as Get in touch in the bar: 76px bar, 40px side padding */
+@media (max-width: 900px) { .drawer .close { top: 13px; } }   /* 64px bar */
+@media (max-width: 720px) { .drawer .close { right: 18px; font-size: 14px; } }
+.drawer strong { color: var(--text-primary); font-weight: 600; }
+.drawer .about-plain { font-size: 15px; line-height: 1.55; color: var(--text-primary); margin-bottom: 14px; }   /* the plain opener of a section's panel: what happens here, no jargon */
+.drawer dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; }
+.drawer dt { color: var(--text-primary); font-weight: 600; }
+.drawer dd { margin: 0; }
+/* the About page: opened from the bar or the rail, the drawer takes the whole window and lays the top section out like
+   bfl.ai/about: a statement, a rule, three large paragraphs, the facts in small type, a centred call to action */
+.drawer.is-page { width: 100%; border-left: none; box-shadow: none; padding: 0 0 96px; }
+.about-page { max-width: 1180px; margin: 0 auto; padding: 96px 40px 0; box-sizing: border-box; }
+.about-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+.drawer .about-statement { margin: 0; max-width: 700px; font-size: clamp(32px, 3.8vw, 52px); font-weight: 500; letter-spacing: -.05em; line-height: 1; color: var(--text-primary); }
+.about-lead { padding: 36px 0 56px; }
+.drawer .about-lead p { margin: 0 0 28px; font-size: clamp(22px, 2.8vw, 38px); font-weight: 500; letter-spacing: -.04em; line-height: 1.1; color: var(--text-primary); }
+.drawer .about-lead p:last-child { margin-bottom: 0; }
+.about-facts { padding: 40px 0 0; border-top: 1px solid var(--border); }
+.drawer .about-blurb { margin: 0; font-size: 12px; line-height: 1.6; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.drawer .about-blurb em { font-style: normal; }
+@media (max-width: 720px) {
+  .about-page { padding: 72px 18px 0; }
+  .about-head { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .about-statement br { display: none; }   /* the phone wraps the statement on its own */
+}
+
+footer { margin-top: 0; padding: 16px 0 56px; font-size: 13px; color: var(--text-muted); }
+footer p { margin: 0; padding-top: 40px; border-top: 1px solid var(--border); text-align: center; }
+footer a { color: var(--text-secondary); }
+
+/* Ask: one row per encoder with the rationale below the name and the timings */
+/* the free question: chips with the trained questions, a 200-character box, the rows of the chat fine-tune below */
+/* the own-question box: as wide as the chart below it, the same 16px above (the toolbar's margin) and below; the count sits inside, top right */
