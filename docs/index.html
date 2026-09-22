@@ -12,10 +12,10 @@
 <meta property="og:url" content="https://oetu.github.io/otis/">
 <meta property="og:title" content="OTIS - Open time series encoder">
 <meta property="og:description" content="An open, general-purpose time series model: 7 million parameters in 7 megabytes, run locally on your CPU in your browser, with nothing leaving it.">
-<meta property="og:image" content="https://oetu.github.io/otis/og.png">
+<meta property="og:image" content="https://oetu.github.io/otis/og.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="A fan of thin drifting waveforms over the OTIS wordmark and the line: No text. No image. Simply numbers.">
+<meta property="og:image:alt" content="A fan of thin drifting waveforms over the OTIS wordmark and the line: No text. No images. Simply numbers.">
 <meta name="twitter:card" content="summary_large_image">
 <script>(function () { var t = null; try { t = sessionStorage.getItem('theme'); } catch (e) {} if (t !== 'dark' && t !== 'light') { var h = new Date().getHours(); t = (h >= 19 || h < 7) ? 'dark' : 'light'; } document.documentElement.dataset.theme = t; })();</script>
 <script>(function () { var q = location.search; if (/[?&]intro\b/.test(q)) { document.documentElement.dataset.intro = 'on'; return; } if (/[?&](nointro|selftest|sync)\b/.test(q)) return; var seen = null; try { seen = localStorage.getItem('otis-intro'); } catch (e) {} if (seen) return; if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return; document.documentElement.dataset.intro = 'on'; })();</script>   <!-- the intro plays on the first visit only (localStorage), never with reduced motion or ?nointro; ?intro replays it -->   <!-- the theme before the first paint: dark from 19:00 to 07:00 local time, unless the button was used this visit -->
@@ -91,7 +91,7 @@
       <linearGradient id="wave-fade" x1="0" x2="1" y1="0" y2="0"><stop offset="0" style="stop-color:var(--text-muted)" stop-opacity=".1"/><stop offset=".5" style="stop-color:var(--text-muted)" stop-opacity=".7"/><stop offset="1" style="stop-color:var(--text-muted)" stop-opacity=".3"/></linearGradient>
       <linearGradient id="wave-fade-bold" x1="0" x2="1" y1="0" y2="0"><stop offset="0" style="stop-color:var(--text-primary)" stop-opacity=".25"/><stop offset=".6" style="stop-color:var(--text-primary)" stop-opacity="1"/><stop offset="1" style="stop-color:var(--text-primary)" stop-opacity=".8"/></linearGradient>
     </defs></svg></div>
-    <p class="hero-kicker"><span class="kicker-brand">OTIS</span><span class="kicker-tag">No text. No image. Simply numbers.</span></p>
+    <p class="hero-kicker"><span class="kicker-brand">OTIS</span><span class="kicker-tag">No text. No images. Simply numbers.</span></p>
     <p class="hero-links"><a class="btn ghost" href="https://arxiv.org/abs/2410.07299" target="_blank" rel="noopener">Documentation<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10M7 17 17 7"/></svg></a><a class="btn ghost" href="https://github.com/oetu/otis" target="_blank" rel="noopener">GitHub<svg class="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10M7 17 17 7"/></svg></a></p>
     </div>
     <a class="scroll-cue" href="#explore" aria-label="Scroll down to Explore">Scroll<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
@@ -286,6 +286,6 @@
 <script src="moment.js?v=106"></script>
 <script src="zeroshot.js?v=123"></script>
 <script src="analytics.js?v=2"></script>   <!-- visit counting, self-hosted; off on the local preview and during the self-test -->
-<script src="app.js?v=229"></script>
+<script src="app.js?v=230"></script>
 </body>
 </html>

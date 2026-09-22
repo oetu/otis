@@ -1504,7 +1504,7 @@
     box.addEventListener('click', finish);
     try { await document.fonts.ready; } catch (e) {}
     await sleep(400);
-    for (const t of ['No text.', 'No image.', 'Simply numbers.']) {
+    for (const t of ['No text.', 'No images.', 'Simply numbers.']) {
       if (over) return;
       line.textContent = t; line.classList.remove('hide'); void line.offsetWidth; line.classList.add('show');
       await sleep(900);
