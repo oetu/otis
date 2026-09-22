@@ -6,6 +6,17 @@
 <title>OTIS - Open time series encoder</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
 <meta name="description" content="OTIS is an open, general-purpose time series model: 7 million parameters in 7 megabytes, run locally on your CPU in your browser, with nothing leaving it. Pre-trained once, it works frozen on data it has never seen — ECGs, EEGs, power meters, light curves — or fine-tunes in a blink. Comparable models weigh a hundred times more; this page lets you feel the difference on the same data and the same CPU.">
+<!-- link previews: the hero waves over the wordmark, 1200x630. Absolute URLs are required, and the
+     platforms cache the image hard -- to refresh it after a change, rename the file or use their debugger. -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://oetu.github.io/otis/">
+<meta property="og:title" content="OTIS - Open time series encoder">
+<meta property="og:description" content="An open, general-purpose time series model: 7 million parameters in 7 megabytes, run locally on your CPU in your browser, with nothing leaving it.">
+<meta property="og:image" content="https://oetu.github.io/otis/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A fan of thin drifting waveforms over the OTIS wordmark and the line: No text. No image. Simply numbers.">
+<meta name="twitter:card" content="summary_large_image">
 <script>(function () { var t = null; try { t = sessionStorage.getItem('theme'); } catch (e) {} if (t !== 'dark' && t !== 'light') { var h = new Date().getHours(); t = (h >= 19 || h < 7) ? 'dark' : 'light'; } document.documentElement.dataset.theme = t; })();</script>
 <script>(function () { var q = location.search; if (/[?&]intro\b/.test(q)) { document.documentElement.dataset.intro = 'on'; return; } if (/[?&](nointro|selftest|sync)\b/.test(q)) return; var seen = null; try { seen = localStorage.getItem('otis-intro'); } catch (e) {} if (seen) return; if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return; document.documentElement.dataset.intro = 'on'; })();</script>   <!-- the intro plays on the first visit only (localStorage), never with reduced motion or ?nointro; ?intro replays it -->   <!-- the theme before the first paint: dark from 19:00 to 07:00 local time, unless the button was used this visit -->
 <script>window.coi = { coepCredentialless: () => true, quiet: true };</script>
