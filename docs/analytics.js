@@ -41,7 +41,10 @@
   try {
     const _paq = window._paq = window._paq || [];
     _paq.push(['disableCookies']);                     // no terminal-device storage, so no consent banner
-    _paq.push(['setDoNotTrackEnabled', true]);
+    // setDoNotTrack, not setDoNotTrackEnabled: an unknown method name makes matomo.js
+    // throw while draining this queue, so every command after it -- trackPageView
+    // included -- is silently dropped and nothing is ever counted.
+    _paq.push(['setDoNotTrack', true]);
     _paq.push(['setTrackerUrl', MATOMO_URL + TRACKER_PHP]);
     _paq.push(['setSiteId', MATOMO_SITE_ID]);
     _paq.push(['trackPageView']);
